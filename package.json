@@ -1,0 +1,150 @@
+{
+  "name": "battlestation",
+  "displayName": "Battlestation",
+  "description": "A configurable panel with action buttons driven by battle.config",
+  "version": "0.0.1",
+  "publisher": "cc-dayers",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "battlestation.open",
+        "title": "Battlestation: Open Panel",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "battlestation.refresh",
+        "title": "Battlestation: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "battlestation.openSettings",
+        "title": "Battlestation: Settings",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "battlestation.addItem",
+        "title": "Battlestation: Add Item",
+        "icon": "$(add)"
+      },
+      {
+        "command": "battlestation.addGroup",
+        "title": "Battlestation: Add Group",
+        "icon": "$(new-folder)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "battlestation",
+          "title": "Battlestation",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "icon": "media/icon.svg",
+    "views": {
+      "battlestation": [
+        {
+          "type": "webview",
+          "id": "battlestation.view",
+          "name": "Battlestation",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "battlestation.addItem",
+          "when": "view == battlestation.view",
+          "group": "navigation@1"
+        },
+        {
+          "command": "battlestation.addGroup",
+          "when": "view == battlestation.view && battlestation.hasConfig",
+          "group": "navigation@2"
+        },
+        {
+          "command": "battlestation.refresh",
+          "when": "view == battlestation.view",
+          "group": "navigation@3"
+        },
+        {
+          "command": "battlestation.openSettings",
+          "when": "view == battlestation.view",
+          "group": "navigation@4"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Battlestation",
+      "properties": {
+        "battlestation.display.showIcon": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show icons next to button names"
+        },
+        "battlestation.display.showType": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show command type in button metadata (e.g., 'npm', 'shell')"
+        },
+        "battlestation.display.showCommand": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the actual command in button metadata"
+        },
+        "battlestation.display.showGroup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show group headers when items are grouped"
+        },
+        "battlestation.display.hideIcon": {
+          "type": "string",
+          "default": "eye-closed",
+          "enum": ["eye-closed", "x", "trash", "close", "circle-slash"],
+          "enumDescriptions": [
+            "Eye with slash (hide from view)",
+            "X mark (close/remove)",
+            "Trash can (delete appearance)",
+            "Close symbol",
+            "Circle with slash (disable)"
+          ],
+          "description": "Icon to use for hiding items"
+        },
+        "battlestation.customIconMappings": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "markdownDescription": "Custom icon mappings for command types. Keys are command types, values are [codicon names](https://microsoft.github.io/vscode-codicons/dist/codicon.html). Example: `{\"mytype\": \"rocket\", \"deploy\": \"cloud-upload\"}`",
+          "description": "Custom icon mappings for command types (type: codicon-name pairs)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.js --production",
+    "watch": "node --no-deprecation esbuild.js --watch",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.44"
+  }
+}

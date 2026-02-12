@@ -3,6 +3,7 @@
 .vscode-test/**
 .gitignore
 .vscodeignore
+.claude/**
 
 # Source files (compiled files in dist/ are included)
 src/**

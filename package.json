@@ -168,7 +168,12 @@
     "check-types": "tsc --noEmit",
     "lint": "eslint src --ext ts",
     "package": "npm run build && vsce package",
-    "publish": "npm run build && vsce publish"
+    "publish": "npm run build && vsce publish",
+    "release:patch": "npm run release-version patch",
+    "release:minor": "npm run release-version minor",
+    "release:major": "npm run release-version major",
+    "release-version": "npm run build && npm version --no-git-tag-version",
+    "release:tag": "git add package.json && git commit -m \"chore: bump version to v$(node -p \\\"require('./package.json').version\\\")\" && git tag v$(node -p \"require('./package.json').version\") && git push && git push --tags"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

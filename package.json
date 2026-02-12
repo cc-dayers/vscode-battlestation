@@ -169,10 +169,6 @@
     "lint": "eslint src --ext ts",
     "package": "npm run build && vsce package",
     "publish": "npm run build && vsce publish"
-    "build": "node esbuild.js --production",
-    "watch": "node --no-deprecation esbuild.js --watch",
-    "lint": "eslint src --ext ts",
-    "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

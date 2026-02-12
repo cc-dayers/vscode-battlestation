@@ -145,6 +145,130 @@ export class ToolDetectionService {
     }
   }
 
+  /* ─── Command-based detection (check if command exists) ─── */
+
+  private async commandExists(command: string): Promise<boolean> {
+    // For command detection, we'll use a simpler approach:
+    // Check common installation paths or use which/where command
+    const isWindows = process.platform === "win32";
+    const checkCmd = isWindows ? `where ${command}` : `which ${command}`;
+    
+    try {
+      const { exec } = require("child_process");
+      return await new Promise<boolean>((resolve) => {
+        exec(checkCmd, (error: any) => {
+          resolve(error === null);
+        });
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  async hasDockerCommand(): Promise<boolean> {
+    return this.commandExists("docker");
+  }
+
+  async hasDockerComposeCommand(): Promise<boolean> {
+    return this.commandExists("docker-compose") || this.commandExists("docker");
+  }
+
+  async hasPythonCommand(): Promise<boolean> {
+    const hasPython = await this.commandExists("python");
+    const hasPython3 = await this.commandExists("python3");
+    return hasPython || hasPython3;
+  }
+
+  async hasGoCommand(): Promise<boolean> {
+    return this.commandExists("go");
+  }
+
+  async hasRustCommand(): Promise<boolean> {
+    return this.commandExists("cargo");
+  }
+
+  async hasMakeCommand(): Promise<boolean> {
+    return this.commandExists("make");
+  }
+
+  async hasGradleCommand(): Promise<boolean> {
+    return this.commandExists("gradle");
+  }
+
+  async hasMavenCommand(): Promise<boolean> {
+    return this.commandExists("mvn");
+  }
+
+  async hasCMakeCommand(): Promise<boolean> {
+    return this.commandExists("cmake");
+  }
+
+  async hasGitCommand(): Promise<boolean> {
+    return this.commandExists("git");
+  }
+
+  /* ─── Hybrid detection (combines file and command detection) ─── */
+
+  async detectToolAvailability(method: DetectionMethod): Promise<{
+    docker: boolean;
+    dockerCompose: boolean;
+    python: boolean;
+    go: boolean;
+    rust: boolean;
+    make: boolean;
+    gradle: boolean;
+    maven: boolean;
+    cmake: boolean;
+    git: boolean;
+  }> {
+    switch (method) {
+      case "file":
+        return {
+          docker: await this.hasDockerfile(),
+          dockerCompose: await this.hasDockerCompose(),
+          python: await this.hasPython(),
+          go: await this.hasGo(),
+          rust: await this.hasRust(),
+          make: await this.hasMakefile(),
+          gradle: await this.hasGradle(),
+          maven: await this.hasMaven(),
+          cmake: await this.hasCMake(),
+          git: await this.hasGit(),
+        };
+      
+      case "command":
+        return {
+          docker: await this.hasDockerCommand(),
+          dockerCompose: await this.hasDockerComposeCommand(),
+          python: await this.hasPythonCommand(),
+          go: await this.hasGoCommand(),
+          rust: await this.hasRustCommand(),
+          make: await this.hasMakeCommand(),
+          gradle: await this.hasGradleCommand(),
+          maven: await this.hasMavenCommand(),
+          cmake: await this.hasCMakeCommand(),
+          git: await this.hasGitCommand(),
+        };
+      
+      case "hybrid":
+        // For hybrid, both file AND command must be present
+        const fileResults = await this.detectToolAvailability("file");
+        const cmdResults = await this.detectToolAvailability("command");
+        return {
+          docker: fileResults.docker && cmdResults.docker,
+          dockerCompose: fileResults.dockerCompose && cmdResults.dockerCompose,
+          python: fileResults.python && cmdResults.python,
+          go: fileResults.go && cmdResults.go,
+          rust: fileResults.rust && cmdResults.rust,
+          make: fileResults.make && cmdResults.make,
+          gradle: fileResults.gradle && cmdResults.gradle,
+          maven: fileResults.maven && cmdResults.maven,
+          cmake: fileResults.cmake && cmdResults.cmake,
+          git: fileResults.git && cmdResults.git,
+        };
+    }
+  }
+
   /* ─── Tool detection with action generation ─── */
 
   async detectDocker(method: DetectionMethod): Promise<Action[]> {

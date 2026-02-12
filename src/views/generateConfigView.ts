@@ -44,50 +44,53 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
 
   // Enhanced Mode section (only show if enhancedMode context is provided)
   const enhancedSection = ctx.enhancedMode ? `
-    <details class="lp-enhanced-section">
+    <details class="lp-enhanced-section" open>
       <summary class="lp-enhanced-header">
         <span class="codicon codicon-sparkle"></span>
         Enhanced Mode (Advanced Options)
       </summary>
       <div class="lp-enhanced-content">
-        <div class="lp-sources">
-          <div class="lp-sources-title">Container Tools:</div>
-          ${renderCheckbox("dockerCheck", "Docker", ctx.enhancedMode.hasDocker)}
-          ${renderCheckbox("dockerComposeCheck", "Docker Compose", ctx.enhancedMode.hasDockerCompose)}
-        </div>
-        <div class="lp-sources">
-          <div class="lp-sources-title">Language Runtimes:</div>
-          ${renderCheckbox("pythonCheck", "Python", ctx.enhancedMode.hasPython)}
-          ${renderCheckbox("goCheck", "Go", ctx.enhancedMode.hasGo)}
-          ${renderCheckbox("rustCheck", "Rust", ctx.enhancedMode.hasRust)}
-        </div>
-        <div class="lp-sources">
-          <div class="lp-sources-title">Build Tools:</div>
-          ${renderCheckbox("makeCheck", "Make", ctx.enhancedMode.hasMakefile)}
-          ${renderCheckbox("gradleCheck", "Gradle", ctx.enhancedMode.hasGradle)}
-          ${renderCheckbox("mavenCheck", "Maven", ctx.enhancedMode.hasMaven)}
-          ${renderCheckbox("cmakeCheck", "CMake", ctx.enhancedMode.hasCMake)}
-        </div>
-        <div class="lp-sources">
-          <div class="lp-sources-title">Version Control:</div>
-          ${renderCheckbox("gitCheck", "Git Operations", ctx.enhancedMode.hasGit)}
-        </div>
-        <div class="lp-sources">
+        <div class="lp-sources" style="border-bottom: 1px solid var(--vscode-widget-border); padding-bottom: 10px; margin-bottom: 10px;">
           <div class="lp-sources-title">Detection Method:</div>
           <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
             <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
-              <input type="radio" name="detectionMethod" value="hybrid" checked style="cursor: pointer;">
+              <input type="radio" name="detectionMethod" value="hybrid" checked style="cursor: pointer;" id="hybridRadio">
               <span>Hybrid (File + Command) - Recommended</span>
             </label>
             <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
-              <input type="radio" name="detectionMethod" value="file" style="cursor: pointer;">
+              <input type="radio" name="detectionMethod" value="file" style="cursor: pointer;" id="fileRadio">
               <span>File-based (Fast)</span>
             </label>
             <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
-              <input type="radio" name="detectionMethod" value="command" style="cursor: pointer;">
+              <input type="radio" name="detectionMethod" value="command" style="cursor: pointer;" id="commandRadio">
               <span>Command-based (Accurate)</span>
             </label>
           </div>
+          <div style="font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 6px; font-style: italic;">
+            ℹ️ Changing detection method will re-scan available tools
+          </div>
+        </div>
+        <div class="lp-sources">
+          <div class="lp-sources-title">Container Tools:</div>
+          ${renderCheckbox("dockerCheck", "Docker", ctx.enhancedMode.hasDocker, !ctx.enhancedMode.hasDocker)}
+          ${renderCheckbox("dockerComposeCheck", "Docker Compose", ctx.enhancedMode.hasDockerCompose, !ctx.enhancedMode.hasDockerCompose)}
+        </div>
+        <div class="lp-sources">
+          <div class="lp-sources-title">Language Runtimes:</div>
+          ${renderCheckbox("pythonCheck", "Python", ctx.enhancedMode.hasPython, !ctx.enhancedMode.hasPython)}
+          ${renderCheckbox("goCheck", "Go", ctx.enhancedMode.hasGo, !ctx.enhancedMode.hasGo)}
+          ${renderCheckbox("rustCheck", "Rust", ctx.enhancedMode.hasRust, !ctx.enhancedMode.hasRust)}
+        </div>
+        <div class="lp-sources">
+          <div class="lp-sources-title">Build Tools:</div>
+          ${renderCheckbox("makeCheck", "Make", ctx.enhancedMode.hasMakefile, !ctx.enhancedMode.hasMakefile)}
+          ${renderCheckbox("gradleCheck", "Gradle", ctx.enhancedMode.hasGradle, !ctx.enhancedMode.hasGradle)}
+          ${renderCheckbox("mavenCheck", "Maven", ctx.enhancedMode.hasMaven, !ctx.enhancedMode.hasMaven)}
+          ${renderCheckbox("cmakeCheck", "CMake", ctx.enhancedMode.hasCMake, !ctx.enhancedMode.hasCMake)}
+        </div>
+        <div class="lp-sources">
+          <div class="lp-sources-title">Version Control:</div>
+          ${renderCheckbox("gitCheck", "Git Operations", ctx.enhancedMode.hasGit, !ctx.enhancedMode.hasGit)}
         </div>
       </div>
     </details>
@@ -219,6 +222,15 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
             vscode.postMessage({ command: 'cancelForm' });
           });
         }
+
+        // Listen for detection method changes and trigger re-detection
+        const detectionRadios = document.querySelectorAll('input[name="detectionMethod"]');
+        detectionRadios.forEach((radio) => {
+          radio.addEventListener('change', (e) => {
+            const method = e.target.value;
+            vscode.postMessage({ command: 'redetectTools', detectionMethod: method });
+          });
+        });
       })();
     `,
   });

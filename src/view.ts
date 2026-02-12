@@ -114,6 +114,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       case "refresh":
         void this.refresh();
         break;
+      case "redetectTools":
+        void this.handleRedetectTools(message.detectionMethod || "hybrid");
+        break;
       case "createConfig":
         void this.handleCreateConfig(
           message.sources || {},
@@ -271,18 +274,19 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       const hasTasks = await this.configService.fileExistsInWorkspace(".vscode/tasks.json");
       const hasLaunch = await this.configService.fileExistsInWorkspace(".vscode/launch.json");
       
-      // Detect available tools for enhanced mode
+      // Detect available tools for enhanced mode (using hybrid by default)
+      const availability = await this.toolDetectionService.detectToolAvailability("hybrid");
       const enhancedMode = {
-        hasDocker: await this.toolDetectionService.hasDockerfile(),
-        hasDockerCompose: await this.toolDetectionService.hasDockerCompose(),
-        hasPython: await this.toolDetectionService.hasPython(),
-        hasGo: await this.toolDetectionService.hasGo(),
-        hasRust: await this.toolDetectionService.hasRust(),
-        hasMakefile: await this.toolDetectionService.hasMakefile(),
-        hasGradle: await this.toolDetectionService.hasGradle(),
-        hasMaven: await this.toolDetectionService.hasMaven(),
-        hasCMake: await this.toolDetectionService.hasCMake(),
-        hasGit: await this.toolDetectionService.hasGit(),
+        hasDocker: availability.docker,
+        hasDockerCompose: availability.dockerCompose,
+        hasPython: availability.python,
+        hasGo: availability.go,
+        hasRust: availability.rust,
+        hasMakefile: availability.make,
+        hasGradle: availability.gradle,
+        hasMaven: availability.maven,
+        hasCMake: availability.cmake,
+        hasGit: availability.git,
       };
       
       this.view.webview.html = renderGenerateConfigView({
@@ -746,22 +750,46 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     const hasTasks = await this.configService.fileExistsInWorkspace(".vscode/tasks.json");
     const hasLaunch = await this.configService.fileExistsInWorkspace(".vscode/launch.json");
     
-    // Detect available tools for enhanced mode
+    // Use hybrid detection by default for initial load
+    const availability = await this.toolDetectionService.detectToolAvailability("hybrid");
     const enhancedMode = {
-      hasDocker: await this.toolDetectionService.hasDockerfile(),
-      hasDockerCompose: await this.toolDetectionService.hasDockerCompose(),
-      hasPython: await this.toolDetectionService.hasPython(),
-      hasGo: await this.toolDetectionService.hasGo(),
-      hasRust: await this.toolDetectionService.hasRust(),
-      hasMakefile: await this.toolDetectionService.hasMakefile(),
-      hasGradle: await this.toolDetectionService.hasGradle(),
-      hasMaven: await this.toolDetectionService.hasMaven(),
-      hasCMake: await this.toolDetectionService.hasCMake(),
-      hasGit: await this.toolDetectionService.hasGit(),
+      hasDocker: availability.docker,
+      hasDockerCompose: availability.dockerCompose,
+      hasPython: availability.python,
+      hasGo: availability.go,
+      hasRust: availability.rust,
+      hasMakefile: availability.make,
+      hasGradle: availability.gradle,
+      hasMaven: availability.maven,
+      hasCMake: availability.cmake,
+      hasGit: availability.git,
     };
     
     this.showingForm = "generateConfig";
     this.generateFormParams = { hasNpm, hasTasks, hasLaunch, enhancedMode };
+    void this.refresh();
+  }
+
+  private async handleRedetectTools(detectionMethod: "file" | "command" | "hybrid") {
+    if (this.showingForm !== "generateConfig") return;
+    
+    const availability = await this.toolDetectionService.detectToolAvailability(detectionMethod);
+    const enhancedMode = {
+      hasDocker: availability.docker,
+      hasDockerCompose: availability.dockerCompose,
+      hasPython: availability.python,
+      hasGo: availability.go,
+      hasRust: availability.rust,
+      hasMakefile: availability.make,
+      hasGradle: availability.gradle,
+      hasMaven: availability.maven,
+      hasCMake: availability.cmake,
+      hasGit: availability.git,
+    };
+    
+    if (this.generateFormParams) {
+      this.generateFormParams.enhancedMode = enhancedMode;
+    }
     void this.refresh();
   }
 

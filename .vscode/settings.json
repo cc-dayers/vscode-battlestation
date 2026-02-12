@@ -1,5 +1,9 @@
 {
     "chat.tools.terminal.autoApprove": {
-        "git remote": true
+        "git remote": true,
+        "/^Copy-Item \"node_modules/@vscode/codicons/dist/codicon\\.ttf\" -Destination \"media/\"; Copy-Item \"node_modules/@vscode/codicons/dist/codicon\\.css\" -Destination \"media/\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
 }

@@ -71,7 +71,8 @@
           "type": "webview",
           "id": "battlestation.todosView",
           "name": "Todos",
-          "icon": "$(sync)"
+          "icon": "$(sync)",
+          "when": "config.battlestation.experimental.enableTodos"
         }
       ]
     },
@@ -143,6 +144,12 @@
           },
           "markdownDescription": "Custom icon mappings for command types. Keys are command types, values are [codicon names](https://microsoft.github.io/vscode-codicons/dist/codicon.html). Example: `{\"mytype\": \"rocket\", \"deploy\": \"cloud-upload\"}`",
           "description": "Custom icon mappings for command types (type: codicon-name pairs)"
+        },
+        "battlestation.experimental.enableTodos": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "**⚠️ EXPERIMENTAL**: Enable the integrated Todos panel. This feature is in early development and may change in future releases.",
+          "description": "Enable the experimental Todos panel feature"
         }
       }
     }

@@ -14,13 +14,14 @@ A powerful VS Code extension that provides a configurable command launcher panel
 - **Hide Actions**: Temporarily hide actions without deleting them
 - **Progressive Disclosure**: UI adapts based on your configuration
 
-### ✅ Todo Management
+### ✅ Todo Management (⚠️ Experimental)
 - **Integrated Todos Panel**: Manage project tasks directly in the sidebar
 - **Priority Levels**: High, medium, and low priority tasks
 - **Detailed Notes**: Add detailed descriptions to each todo
 - **Completion Tracking**: Check off completed tasks
 - **Reorderable**: Drag and drop todos to reorganize
 - **CRUD Operations**: Create, edit, and delete todos easily
+- **Enable in Settings**: Set `battlestation.experimental.enableTodos` to `true`
 
 ### 🎨 Customization
 - **Custom Icon Mappings**: Define your own icon mappings for command types
@@ -35,6 +36,16 @@ A powerful VS Code extension that provides a configurable command launcher panel
 4. Create your first `battle.config` file:
    - **Option A**: Click "Generate Config" to automatically detect npm scripts, tasks, and launch configs
    - **Option B**: Manually create a `battle.config` file in your workspace root
+
+### Enabling Experimental Todos (\u26a0\ufe0f Optional)
+
+The Todos feature is currently experimental and disabled by default. To enable it:
+
+1. Open VS Code Settings (`Ctrl+,` or `Cmd+,`)
+2. Search for "Battlestation Experimental"
+3. Enable **"Battlestation: Experimental: Enable Todos"**
+4. Reload VS Code
+5. The Todos view will now appear in the Battlestation sidebar
 
 ## Configuration
 
@@ -124,6 +135,7 @@ Customize Battlestation through VS Code settings (`File > Preferences > Settings
   - Options: `eye-closed`, `x`, `trash`, `close`, `circle-slash`
 - **`battlestation.customIconMappings`** (default: `{}`): Custom icon mappings for command types
   - Example: `{"mytype": "rocket", "deploy": "cloud-upload"}`
+- **`battlestation.experimental.enableTodos`** (default: `false`): ⚠️ **EXPERIMENTAL** - Enable the integrated Todos panel
 
 ## Available Commands
 

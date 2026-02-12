@@ -1,7 +1,27 @@
+# Development files
 .vscode/**
-node_modules/**
+.vscode-test/**
+.gitignore
+.vscodeignore
+
+# Source files (compiled files in dist/ are included)
 src/**
+out/**
 tsconfig.json
 esbuild.js
+
+# Dependencies (not needed in package)
+node_modules/**
+
+# Documentation for development only
+.eslintrc.*
+.prettierrc.*
+
+# Source maps
 **/*.map
-.gitignore
+
+# OS files
+.DS_Store
+
+# Build artifacts not needed
+*.vsix

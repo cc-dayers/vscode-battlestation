@@ -38,10 +38,13 @@ function renderButton(
   const isInGroup = !!item.group;
   const showGroupButton = hasGroups || isInGroup;
   const hideIcon = item.hidden ? "eye" : hideIconName;
+  
+  // Apply action background color if set
+  const actionStyle = item.backgroundColor ? `background-color: ${item.backgroundColor} !important;` : "";
 
   return `<div class="lp-btn-wrapper">
     ${showCheckbox ? `<input type="checkbox" class="lp-btn-checkbox" data-item='${itemJson}'>` : ""}
-    <button class="lp-btn ${showCheckbox ? "has-checkbox" : ""}" data-item='${itemJson}'>
+    <button class="lp-btn ${showCheckbox ? "has-checkbox" : ""}" data-item='${itemJson}' style="${actionStyle}">
       <span class="lp-btn-name">
         ${icon ? `<span class="codicon codicon-${icon} lp-icon"></span>` : ""}${esc(item.name)}${item.hidden ? ' <span class="lp-hidden-badge">(hidden)</span>' : ""}
       </span>
@@ -56,6 +59,7 @@ function renderButton(
              ${groupOptionsWithItem}
            </div>`
       : ""}
+    <button class="lp-color-btn" data-item='${itemJson}' title="Set action color"><span class="codicon codicon-symbol-color"></span></button>
     <button class="lp-edit-btn" data-item='${itemJson}' title="Edit this action"><span class="codicon codicon-edit"></span></button>
     <button class="lp-hide-btn" data-item='${itemJson}' title="${item.hidden ? "Show this action" : "Hide this action"}"><span class="codicon codicon-${hideIcon} lp-hide-icon"></span></button>
   </div>`;
@@ -127,17 +131,31 @@ export function renderMainView(ctx: MainViewContext): string {
             : `<span class="lp-group-icon">${group.icon}</span>`
           : "";
         const groupJson = JSON.stringify(group).replace(/'/g, "&#39;");
-        const groupColor = group.color ? `color: ${group.color}; border-color: ${group.color};` : "";
+        const groupStyles = [];
+        if (group.color) groupStyles.push(`color: ${group.color}`);
+        if (group.backgroundColor) groupStyles.push(`background-color: ${group.backgroundColor}`);
+        if (group.borderColor) groupStyles.push(`border-color: ${group.borderColor}`);
+        const groupStyle = groupStyles.length > 0 ? `style="${groupStyles.join('; ')}"` : "";
+        
+        const groupItemsStyles = [];
+        if (group.backgroundColor) groupItemsStyles.push(`background-color: ${group.backgroundColor}`);
+        if (group.borderColor) {
+          groupItemsStyles.push(`border: 1px solid ${group.borderColor}`);
+          groupItemsStyles.push(`border-radius: 4px`);
+          groupItemsStyles.push(`padding: 8px`);
+        }
+        const groupItemsStyle = groupItemsStyles.length > 0 ? `style="${groupItemsStyles.join('; ')}"` : "";
+        
         content += `
           <div class="lp-group">
-            <div class="lp-group-header" style="${groupColor}">
+            <div class="lp-group-header" ${groupStyle}>
               <div class="lp-group-header-content">
                 ${groupIconHtml}
                 <span class="lp-group-name">${esc(group.name)}</span>
               </div>
               <button class="lp-group-edit-btn" data-group='${groupJson}' title="Edit group"><span class="codicon codicon-settings-gear"></span></button>
             </div>
-            <div class="lp-group-items">${buttons}</div>
+            <div class="lp-group-items" ${groupItemsStyle}>${buttons}</div>
           </div>`;
       }
     });
@@ -230,11 +248,12 @@ const mainViewStyles = `
   .lp-workspace-label { padding: 2px 6px; border-radius: 2px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); font-weight: 600; font-size: 9px; }
   .lp-hide-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; padding: 0; border: none; border-radius: 3px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; opacity: 0; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; }
   .lp-edit-btn { position: absolute; right: 26px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; padding: 0; border: none; border-radius: 3px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; opacity: 0; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; font-size: 16px; }
-  .lp-group-btn, .lp-ungroup-btn { position: absolute; right: 48px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; padding: 0; border: none; border-radius: 3px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; opacity: 0; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; font-size: 16px; }
-  .lp-btn-wrapper:hover .lp-hide-btn, .lp-btn-wrapper:hover .lp-edit-btn, .lp-btn-wrapper:hover .lp-group-btn, .lp-btn-wrapper:hover .lp-ungroup-btn { opacity: 1; }
+  .lp-color-btn { position: absolute; right: 48px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; padding: 0; border: none; border-radius: 3px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; opacity: 0; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .lp-group-btn, .lp-ungroup-btn { position: absolute; right: 70px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; padding: 0; border: none; border-radius: 3px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; opacity: 0; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .lp-btn-wrapper:hover .lp-hide-btn, .lp-btn-wrapper:hover .lp-edit-btn, .lp-btn-wrapper:hover .lp-color-btn, .lp-btn-wrapper:hover .lp-group-btn, .lp-btn-wrapper:hover .lp-ungroup-btn { opacity: 1; }
   .lp-group-btn:hover, .lp-ungroup-btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
-  .lp-hide-btn:hover, .lp-edit-btn:hover { background: var(--vscode-inputOption-hoverBackground); }
-  .lp-group-dropdown { position: absolute; right: 48px; top: calc(50% + 14px); background: var(--vscode-dropdown-background); border: 1px solid var(--vscode-dropdown-border, var(--vscode-contrastBorder)); border-radius: 3px; padding: 4px 0; z-index: 100; min-width: 150px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
+  .lp-hide-btn:hover, .lp-edit-btn:hover, .lp-color-btn:hover { background: var(--vscode-inputOption-hoverBackground); }
+  .lp-group-dropdown { position: absolute; right: 70px; top: calc(50% + 14px); background: var(--vscode-dropdown-background); border: 1px solid var(--vscode-dropdown-border, var(--vscode-contrastBorder)); border-radius: 3px; padding: 4px 0; z-index: 100; min-width: 150px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
   .lp-group-option { padding: 4px 12px; font-size: 11px; cursor: pointer; white-space: nowrap; }
   .lp-group-option:hover { background: var(--vscode-list-hoverBackground); }
   .lp-hide-icon { font-size: 16px; line-height: 1; }
@@ -396,6 +415,9 @@ function mainViewScript(
       });
       document.querySelectorAll('.lp-edit-btn').forEach(btn => {
         btn.addEventListener('click', (e) => { e.stopPropagation(); vscode.postMessage({ command: 'editAction', item: JSON.parse(btn.getAttribute('data-item')) }); });
+      });
+      document.querySelectorAll('.lp-color-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); vscode.postMessage({ command: 'setActionColor', item: JSON.parse(btn.getAttribute('data-item')) }); });
       });
       document.querySelectorAll('.lp-group-edit-btn').forEach(btn => {
         btn.addEventListener('click', (e) => { e.stopPropagation(); vscode.postMessage({ command: 'editGroup', group: JSON.parse(btn.getAttribute('data-group')) }); });

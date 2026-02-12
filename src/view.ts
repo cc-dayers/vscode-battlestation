@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { Action, IconMapping, Group, Config, Todo } from "./types";
 import { ConfigService } from "./services/configService";
 import { TodosService } from "./services/todosService";
+import { ToolDetectionService } from "./services/toolDetectionService";
 import { getNonce } from "./templates/nonce";
 import {
   renderMainView,
@@ -36,6 +37,18 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     hasNpm: boolean;
     hasTasks: boolean;
     hasLaunch: boolean;
+    enhancedMode?: {
+      hasDocker: boolean;
+      hasDockerCompose: boolean;
+      hasPython: boolean;
+      hasGo: boolean;
+      hasRust: boolean;
+      hasMakefile: boolean;
+      hasGradle: boolean;
+      hasMaven: boolean;
+      hasCMake: boolean;
+      hasGit: boolean;
+    };
   };
 
   public static readonly defaultIcons: IconMapping[] = [
@@ -54,11 +67,14 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     { type: "test", icon: "beaker" },
   ];
 
+  private readonly toolDetectionService: ToolDetectionService;
+
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly configService: ConfigService,
     private readonly todosService: TodosService
   ) {
+    this.toolDetectionService = new ToolDetectionService(context);
     // Refresh when config or todos change
     this.configService.onDidChange(() => this.refresh());
     this.todosService.onDidChange(() => {
@@ -98,8 +114,16 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       case "refresh":
         void this.refresh();
         break;
+      case "redetectTools":
+        void this.handleRedetectTools(message.detectionMethod || "hybrid");
+        break;
       case "createConfig":
-        void this.handleCreateConfig(message.sources || {}, message.enableGrouping || false);
+        void this.handleCreateConfig(
+          message.sources || {},
+          message.enableGrouping || false,
+          message.enhancedSources || {},
+          message.detectionMethod || "hybrid"
+        );
         break;
       case "executeCommand":
         void this.executeCommand(message.item);
@@ -137,6 +161,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         this.showingForm = "editAction";
         this.currentEditAction = message.item;
         void this.refresh();
+        break;
+      case "setActionColor":
+        void this.handleSetActionColor(message.item);
         break;
       case "submitEditAction":
         void this.updateAction(message.oldItem, message.newItem, message.customIcon);
@@ -249,6 +276,22 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       const hasNpm = await this.configService.fileExistsInWorkspace("package.json");
       const hasTasks = await this.configService.fileExistsInWorkspace(".vscode/tasks.json");
       const hasLaunch = await this.configService.fileExistsInWorkspace(".vscode/launch.json");
+      
+      // Detect available tools for enhanced mode (using hybrid by default)
+      const availability = await this.toolDetectionService.detectToolAvailability("hybrid");
+      const enhancedMode = {
+        hasDocker: availability.docker,
+        hasDockerCompose: availability.dockerCompose,
+        hasPython: availability.python,
+        hasGo: availability.go,
+        hasRust: availability.rust,
+        hasMakefile: availability.make,
+        hasGradle: availability.gradle,
+        hasMaven: availability.maven,
+        hasCMake: availability.cmake,
+        hasGit: availability.git,
+      };
+      
       this.view.webview.html = renderGenerateConfigView({
         cspSource,
         nonce,
@@ -257,6 +300,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         hasTasks,
         hasLaunch,
         showWelcome: true,
+        enhancedMode,
       });
       return;
     }
@@ -605,6 +649,39 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private async handleSetActionColor(item: Action) {
+    const THEME_COLORS = [
+      { label: "$(symbol-color) Remove Color", value: "" },
+      { label: "$(circle-filled) Red", value: "var(--vscode-charts-red)" },
+      { label: "$(circle-filled) Orange", value: "var(--vscode-charts-orange)" },
+      { label: "$(circle-filled) Yellow", value: "var(--vscode-charts-yellow)" },
+      { label: "$(circle-filled) Green", value: "var(--vscode-charts-green)" },
+      { label: "$(circle-filled) Blue", value: "var(--vscode-charts-blue)" },
+      { label: "$(circle-filled) Purple", value: "var(--vscode-charts-purple)" },
+      { label: "$(circle-filled) Pink", value: "var(--vscode-charts-pink)" },
+    ];
+
+    const selected = await vscode.window.showQuickPick(THEME_COLORS, {
+      placeHolder: `Set background color for "${item.name}"`,
+      title: "Action Color",
+    });
+
+    if (selected !== undefined) {
+      const config = await this.configService.readConfig();
+      const target = config.actions.find((i) => i.name === item.name && i.command === item.command);
+      if (target) {
+        if (selected.value === "") {
+          delete target.backgroundColor;
+        } else {
+          target.backgroundColor = selected.value;
+        }
+        await this.configService.writeConfig(config);
+        void this.refresh();
+        this.showToast(`Color ${selected.value ? "set" : "removed"} for "${item.name}"`);
+      }
+    }
+  }
+
   private async assignActionToGroup(item: Action, groupName: string) {
     const config = await this.configService.readConfig();
     const target = config.actions.find((i) => i.name === item.name && i.command === item.command);
@@ -708,23 +785,74 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     const hasNpm = await this.configService.fileExistsInWorkspace("package.json");
     const hasTasks = await this.configService.fileExistsInWorkspace(".vscode/tasks.json");
     const hasLaunch = await this.configService.fileExistsInWorkspace(".vscode/launch.json");
+    
+    // Use hybrid detection by default for initial load
+    const availability = await this.toolDetectionService.detectToolAvailability("hybrid");
+    const enhancedMode = {
+      hasDocker: availability.docker,
+      hasDockerCompose: availability.dockerCompose,
+      hasPython: availability.python,
+      hasGo: availability.go,
+      hasRust: availability.rust,
+      hasMakefile: availability.make,
+      hasGradle: availability.gradle,
+      hasMaven: availability.maven,
+      hasCMake: availability.cmake,
+      hasGit: availability.git,
+    };
+    
     this.showingForm = "generateConfig";
-    this.generateFormParams = { hasNpm, hasTasks, hasLaunch };
+    this.generateFormParams = { hasNpm, hasTasks, hasLaunch, enhancedMode };
+    void this.refresh();
+  }
+
+  private async handleRedetectTools(detectionMethod: "file" | "command" | "hybrid") {
+    if (this.showingForm !== "generateConfig") return;
+    
+    const availability = await this.toolDetectionService.detectToolAvailability(detectionMethod);
+    const enhancedMode = {
+      hasDocker: availability.docker,
+      hasDockerCompose: availability.dockerCompose,
+      hasPython: availability.python,
+      hasGo: availability.go,
+      hasRust: availability.rust,
+      hasMakefile: availability.make,
+      hasGradle: availability.gradle,
+      hasMaven: availability.maven,
+      hasCMake: availability.cmake,
+      hasGit: availability.git,
+    };
+    
+    if (this.generateFormParams) {
+      this.generateFormParams.enhancedMode = enhancedMode;
+    }
     void this.refresh();
   }
 
   private async handleCreateConfig(
     sources: { npm?: boolean; tasks?: boolean; launch?: boolean },
-    enableGrouping: boolean
+    enableGrouping: boolean,
+    enhancedSources: any,
+    detectionMethod: "file" | "command" | "hybrid"
   ) {
     this.isLoading = true;
     void this.refresh();
 
     try {
+      // Get enhanced actions if any enhanced sources are enabled
+      let enhancedActions: Action[] = [];
+      if (enhancedSources && Object.values(enhancedSources).some((v) => v === true)) {
+        enhancedActions = await this.toolDetectionService.scanEnhanced(
+          enhancedSources,
+          detectionMethod
+        );
+      }
+
       await this.configService.createAutoConfig(
         sources,
         enableGrouping,
-        BattlestationViewProvider.defaultIcons
+        BattlestationViewProvider.defaultIcons,
+        enhancedActions
       );
       // Open the config file for review
       await this.configService.openConfigFile();

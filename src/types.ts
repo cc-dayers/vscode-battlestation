@@ -7,6 +7,7 @@ export interface Action {
   group?: string;
   hidden?: boolean;
   workspace?: string;
+  backgroundColor?: string; // Hex color for action background
 }
 
 export interface IconMapping {
@@ -17,7 +18,9 @@ export interface IconMapping {
 export interface Group {
   name: string;
   icon?: string;
-  color?: string;
+  color?: string; // Text/icon color (keeping for backwards compatibility)
+  backgroundColor?: string; // Background color for the group
+  borderColor?: string; // Border color for the group
 }
 
 export interface Todo {

@@ -43,6 +43,20 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
     )
     .join("");
 
+  const bgColorOptions = THEME_COLORS
+    .map(
+      (color) =>
+        `<div class="lp-color-option ${color.value === group.backgroundColor ? "selected" : ""}" data-color="${color.value}" style="background: ${color.value};" title="${color.name}"></div>`
+    )
+    .join("");
+
+  const borderColorOptions = THEME_COLORS
+    .map(
+      (color) =>
+        `<div class="lp-color-option ${color.value === group.borderColor ? "selected" : ""}" data-color="${color.value}" style="background: ${color.value};" title="${color.name}"></div>`
+    )
+    .join("");
+
   return htmlShell({
     title: "Edit Group",
     cspSource: ctx.cspSource,
@@ -78,11 +92,25 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
           <div class="lp-hint">Click an icon above or type codicon name/emoji</div>
         </div>
         <div class="lp-form-group">
-          <label>Color (optional)</label>
+          <label>Text/Icon Color (optional)</label>
           <div class="lp-color-picker" id="colorPicker">
             ${colorOptions}
           </div>
-          <div class="lp-hint">Choose a theme color for the group header</div>
+          <div class="lp-hint">Color for text and icon in group header</div>
+        </div>
+        <div class="lp-form-group">
+          <label>Background Color (optional)</label>
+          <div class="lp-color-picker" id="bgColorPicker">
+            ${bgColorOptions}
+          </div>
+          <div class="lp-hint">Background color for the group section</div>
+        </div>
+        <div class="lp-form-group">
+          <label>Border Color (optional)</label>
+          <div class="lp-color-picker" id="borderColorPicker">
+            ${borderColorOptions}
+          </div>
+          <div class="lp-hint">Border color around the group section</div>
         </div>
         <div class="lp-form-actions">
           <button type="button" class="lp-btn lp-btn-secondary" id="cancelBtn">Cancel</button>
@@ -96,6 +124,8 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
         const oldGroup = ${groupJson};
         let selectedIcon = '${esc(group.icon || "")}';
         let selectedColor = '${esc(group.color || "")}';
+        let selectedBgColor = '${esc(group.backgroundColor || "")}';
+        let selectedBorderColor = '${esc(group.borderColor || "")}';
 
         document.querySelectorAll('.lp-icon-option').forEach(opt => {
           opt.addEventListener('click', () => {
@@ -106,11 +136,27 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
           });
         });
 
-        document.querySelectorAll('.lp-color-option').forEach(opt => {
+        document.querySelectorAll('#colorPicker .lp-color-option').forEach(opt => {
           opt.addEventListener('click', () => {
-            document.querySelectorAll('.lp-color-option').forEach(o => o.classList.remove('selected'));
+            document.querySelectorAll('#colorPicker .lp-color-option').forEach(o => o.classList.remove('selected'));
             opt.classList.add('selected');
             selectedColor = opt.getAttribute('data-color');
+          });
+        });
+
+        document.querySelectorAll('#bgColorPicker .lp-color-option').forEach(opt => {
+          opt.addEventListener('click', () => {
+            document.querySelectorAll('#bgColorPicker .lp-color-option').forEach(o => o.classList.remove('selected'));
+            opt.classList.add('selected');
+            selectedBgColor = opt.getAttribute('data-color');
+          });
+        });
+
+        document.querySelectorAll('#borderColorPicker .lp-color-option').forEach(opt => {
+          opt.addEventListener('click', () => {
+            document.querySelectorAll('#borderColorPicker .lp-color-option').forEach(o => o.classList.remove('selected'));
+            opt.classList.add('selected');
+            selectedBorderColor = opt.getAttribute('data-color');
           });
         });
 
@@ -129,7 +175,13 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
           const customIcon = document.getElementById('customIcon').value.trim();
           const icon = customIcon || selectedIcon || '';
           if (!groupName) return;
-          const newGroup = { name: groupName, icon: icon || undefined, color: selectedColor || undefined };
+          const newGroup = { 
+            name: groupName, 
+            icon: icon || undefined, 
+            color: selectedColor || undefined,
+            backgroundColor: selectedBgColor || undefined,
+            borderColor: selectedBorderColor || undefined
+          };
           vscode.postMessage({ command: 'submitEditGroup', oldGroup, newGroup });
         });
       })();

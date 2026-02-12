@@ -162,6 +162,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         this.currentEditAction = message.item;
         void this.refresh();
         break;
+      case "setActionColor":
+        void this.handleSetActionColor(message.item);
+        break;
       case "submitEditAction":
         void this.updateAction(message.oldItem, message.newItem, message.customIcon);
         break;
@@ -643,6 +646,39 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       target.hidden = true;
       await this.configService.writeConfig(config);
       void this.refresh();
+    }
+  }
+
+  private async handleSetActionColor(item: Action) {
+    const THEME_COLORS = [
+      { label: "$(symbol-color) Remove Color", value: "" },
+      { label: "$(circle-filled) Red", value: "var(--vscode-charts-red)" },
+      { label: "$(circle-filled) Orange", value: "var(--vscode-charts-orange)" },
+      { label: "$(circle-filled) Yellow", value: "var(--vscode-charts-yellow)" },
+      { label: "$(circle-filled) Green", value: "var(--vscode-charts-green)" },
+      { label: "$(circle-filled) Blue", value: "var(--vscode-charts-blue)" },
+      { label: "$(circle-filled) Purple", value: "var(--vscode-charts-purple)" },
+      { label: "$(circle-filled) Pink", value: "var(--vscode-charts-pink)" },
+    ];
+
+    const selected = await vscode.window.showQuickPick(THEME_COLORS, {
+      placeHolder: `Set background color for "${item.name}"`,
+      title: "Action Color",
+    });
+
+    if (selected !== undefined) {
+      const config = await this.configService.readConfig();
+      const target = config.actions.find((i) => i.name === item.name && i.command === item.command);
+      if (target) {
+        if (selected.value === "") {
+          delete target.backgroundColor;
+        } else {
+          target.backgroundColor = selected.value;
+        }
+        await this.configService.writeConfig(config);
+        void this.refresh();
+        this.showToast(`Color ${selected.value ? "set" : "removed"} for "${item.name}"`);
+      }
     }
   }
 

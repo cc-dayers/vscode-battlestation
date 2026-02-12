@@ -31,3 +31,9 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Claude Code files (contains sensitive tokens)
+.claude/
+
+# Error files
+nul

@@ -126,7 +126,13 @@
         "battlestation.display.hideIcon": {
           "type": "string",
           "default": "eye-closed",
-          "enum": ["eye-closed", "x", "trash", "close", "circle-slash"],
+          "enum": [
+            "eye-closed",
+            "x",
+            "trash",
+            "close",
+            "circle-slash"
+          ],
           "enumDescriptions": [
             "Eye with slash (hide from view)",
             "X mark (close/remove)",
@@ -163,15 +169,16 @@
     "lint": "eslint src --ext ts",
     "package": "npm run build && vsce package",
     "publish": "npm run build && vsce publish"
+    "build": "node esbuild.js --production",
+    "watch": "node --no-deprecation esbuild.js --watch",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
-    "@vscode/vsce": "^2.22.0",
+    "@vscode/vsce": "^3.2.1",
     "esbuild": "^0.20.0",
     "typescript": "^5.3.0"
-  },
-  "dependencies": {
-    "@vscode/codicons": "^0.0.44"
   }
 }

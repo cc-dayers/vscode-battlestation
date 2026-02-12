@@ -6,9 +6,8 @@
   "publisher": "cc-dayers",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cc-dayers/vscode-battlestation.git"
+    "url": "https://github.com/cc-dayers/vscode-battlestation"
   },
-  "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -16,13 +15,18 @@
     "Other"
   ],
   "activationEvents": [],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "battlestation.open",
         "title": "Battlestation: Open Panel",
         "icon": "$(rocket)"
+      },
+      {
+        "command": "battlestation.openTodos",
+        "title": "Battlestation: Open Todos",
+        "icon": "$(sync)"
       },
       {
         "command": "battlestation.refresh",
@@ -36,7 +40,7 @@
       },
       {
         "command": "battlestation.addItem",
-        "title": "Battlestation: Add Item",
+        "title": "Battlestation: Add Action",
         "icon": "$(add)"
       },
       {
@@ -62,6 +66,13 @@
           "id": "battlestation.view",
           "name": "Battlestation",
           "icon": "media/icon.svg"
+        },
+        {
+          "type": "webview",
+          "id": "battlestation.todosView",
+          "name": "Todos",
+          "icon": "$(sync)",
+          "when": "config.battlestation.experimental.enableTodos"
         }
       ]
     },
@@ -139,12 +150,25 @@
           },
           "markdownDescription": "Custom icon mappings for command types. Keys are command types, values are [codicon names](https://microsoft.github.io/vscode-codicons/dist/codicon.html). Example: `{\"mytype\": \"rocket\", \"deploy\": \"cloud-upload\"}`",
           "description": "Custom icon mappings for command types (type: codicon-name pairs)"
+        },
+        "battlestation.experimental.enableTodos": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "**⚠️ EXPERIMENTAL**: Enable the integrated Todos panel. This feature is in early development and may change in future releases.",
+          "description": "Enable the experimental Todos panel feature"
         }
       }
     }
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
+    "copy:codicons": "node -e \"require('fs').cpSync('node_modules/@vscode/codicons/dist/codicon.ttf', 'media/codicon.ttf'); require('fs').cpSync('node_modules/@vscode/codicons/dist/codicon.css', 'media/codicon.css');\"",
+    "build": "npm run copy:codicons && npm run check-types && node esbuild.js --production",
+    "watch": "npm run copy:codicons && node --no-deprecation esbuild.js --watch",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src --ext ts",
+    "package": "npm run build && vsce package",
+    "publish": "npm run build && vsce publish"
     "build": "node esbuild.js --production",
     "watch": "node --no-deprecation esbuild.js --watch",
     "lint": "eslint src --ext ts",

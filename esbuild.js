@@ -4,6 +4,24 @@ const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
 
 /**
+ * Plugin to load CSS files as text strings for embedding in webviews
+ * @type {import('esbuild').Plugin}
+ */
+const cssTextLoaderPlugin = {
+  name: "css-text-loader",
+  setup(build) {
+    build.onLoad({ filter: /codicon\.css$/ }, async (args) => {
+      const fs = require("fs");
+      const css = await fs.promises.readFile(args.path, "utf8");
+      return {
+        contents: `export default ${JSON.stringify(css)}`,
+        loader: "js",
+      };
+    });
+  },
+};
+
+/**
  * This plugin hooks into the build process to print errors in a format that the problem matcher
  * in VS Code can understand.
  * @type {import('esbuild').Plugin}
@@ -39,10 +57,10 @@ async function main() {
     sourcemap: !production,
     sourcesContent: false,
     platform: "node",
-    outfile: "out/extension.js",
+    outfile: "dist/extension.js",
     external: ["vscode"],
     logLevel: "silent",
-    plugins: [esbuildProblemMatcherPlugin],
+    plugins: [cssTextLoaderPlugin, esbuildProblemMatcherPlugin],
   });
 
   if (watch) {

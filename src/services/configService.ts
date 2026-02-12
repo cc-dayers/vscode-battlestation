@@ -393,7 +393,8 @@ export class ConfigService {
   async createAutoConfig(
     sources: { npm?: boolean; tasks?: boolean; launch?: boolean },
     enableGrouping: boolean,
-    defaultIcons: IconMapping[]
+    defaultIcons: IconMapping[],
+    enhancedActions: Action[] = []
   ): Promise<void> {
     const actions: Action[] = [];
     const groups: Group[] = [];
@@ -423,6 +424,50 @@ export class ConfigService {
         launchActions.forEach((item) => (item.group = "Launch Configs"));
       }
       actions.push(...launchActions);
+    }
+
+    // Add enhanced actions (from tool detection)
+    if (enhancedActions.length > 0) {
+      if (enableGrouping) {
+        // Group enhanced actions by type
+        const typeGroups = new Map<string, Action[]>();
+        enhancedActions.forEach((action) => {
+          if (!typeGroups.has(action.type)) {
+            typeGroups.set(action.type, []);
+          }
+          typeGroups.get(action.type)!.push(action);
+        });
+
+        // Create groups for each type
+        const typeGroupNames: Record<string, string> = {
+          docker: "Docker",
+          "docker-compose": "Docker Compose",
+          python: "Python",
+          go: "Go",
+          rust: "Rust",
+          build: "Build Tools",
+          test: "Tests",
+          git: "Git",
+        };
+
+        const typeGroupIcons: Record<string, string> = {
+          docker: "\ud83d\udc33",
+          "docker-compose": "\ud83d\udc33",
+          python: "\ud83d\udc0d",
+          go: "\ud83d\udd37",
+          rust: "\ud83e\udd80",
+          build: "\ud83d\udd28",
+          test: "\ud83e\uddea",
+          git: "\ud83d\udcdd",
+        };
+
+        typeGroups.forEach((actionsInType, type) => {
+          const groupName = typeGroupNames[type] || type.charAt(0).toUpperCase() + type.slice(1);
+          groups.push({ name: groupName, icon: typeGroupIcons[type] || "\ud83d\udce6" });
+          actionsInType.forEach((action) => (action.group = groupName));
+        });
+      }
+      actions.push(...enhancedActions);
     }
 
     if (actions.length === 0) {

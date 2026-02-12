@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { Action, IconMapping, Group, Config, Todo } from "./types";
 import { ConfigService } from "./services/configService";
 import { TodosService } from "./services/todosService";
+import { ToolDetectionService } from "./services/toolDetectionService";
 import { getNonce } from "./templates/nonce";
 import {
   renderMainView,
@@ -36,6 +37,18 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     hasNpm: boolean;
     hasTasks: boolean;
     hasLaunch: boolean;
+    enhancedMode?: {
+      hasDocker: boolean;
+      hasDockerCompose: boolean;
+      hasPython: boolean;
+      hasGo: boolean;
+      hasRust: boolean;
+      hasMakefile: boolean;
+      hasGradle: boolean;
+      hasMaven: boolean;
+      hasCMake: boolean;
+      hasGit: boolean;
+    };
   };
 
   public static readonly defaultIcons: IconMapping[] = [
@@ -54,11 +67,14 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     { type: "test", icon: "beaker" },
   ];
 
+  private readonly toolDetectionService: ToolDetectionService;
+
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly configService: ConfigService,
     private readonly todosService: TodosService
   ) {
+    this.toolDetectionService = new ToolDetectionService(context);
     // Refresh when config or todos change
     this.configService.onDidChange(() => this.refresh());
     this.todosService.onDidChange(() => {
@@ -99,7 +115,12 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         void this.refresh();
         break;
       case "createConfig":
-        void this.handleCreateConfig(message.sources || {}, message.enableGrouping || false);
+        void this.handleCreateConfig(
+          message.sources || {},
+          message.enableGrouping || false,
+          message.enhancedSources || {},
+          message.detectionMethod || "hybrid"
+        );
         break;
       case "executeCommand":
         void this.executeCommand(message.item);
@@ -249,6 +270,21 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       const hasNpm = await this.configService.fileExistsInWorkspace("package.json");
       const hasTasks = await this.configService.fileExistsInWorkspace(".vscode/tasks.json");
       const hasLaunch = await this.configService.fileExistsInWorkspace(".vscode/launch.json");
+      
+      // Detect available tools for enhanced mode
+      const enhancedMode = {
+        hasDocker: await this.toolDetectionService.hasDockerfile(),
+        hasDockerCompose: await this.toolDetectionService.hasDockerCompose(),
+        hasPython: await this.toolDetectionService.hasPython(),
+        hasGo: await this.toolDetectionService.hasGo(),
+        hasRust: await this.toolDetectionService.hasRust(),
+        hasMakefile: await this.toolDetectionService.hasMakefile(),
+        hasGradle: await this.toolDetectionService.hasGradle(),
+        hasMaven: await this.toolDetectionService.hasMaven(),
+        hasCMake: await this.toolDetectionService.hasCMake(),
+        hasGit: await this.toolDetectionService.hasGit(),
+      };
+      
       this.view.webview.html = renderGenerateConfigView({
         cspSource,
         nonce,
@@ -257,6 +293,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         hasTasks,
         hasLaunch,
         showWelcome: true,
+        enhancedMode,
       });
       return;
     }
@@ -708,23 +745,50 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     const hasNpm = await this.configService.fileExistsInWorkspace("package.json");
     const hasTasks = await this.configService.fileExistsInWorkspace(".vscode/tasks.json");
     const hasLaunch = await this.configService.fileExistsInWorkspace(".vscode/launch.json");
+    
+    // Detect available tools for enhanced mode
+    const enhancedMode = {
+      hasDocker: await this.toolDetectionService.hasDockerfile(),
+      hasDockerCompose: await this.toolDetectionService.hasDockerCompose(),
+      hasPython: await this.toolDetectionService.hasPython(),
+      hasGo: await this.toolDetectionService.hasGo(),
+      hasRust: await this.toolDetectionService.hasRust(),
+      hasMakefile: await this.toolDetectionService.hasMakefile(),
+      hasGradle: await this.toolDetectionService.hasGradle(),
+      hasMaven: await this.toolDetectionService.hasMaven(),
+      hasCMake: await this.toolDetectionService.hasCMake(),
+      hasGit: await this.toolDetectionService.hasGit(),
+    };
+    
     this.showingForm = "generateConfig";
-    this.generateFormParams = { hasNpm, hasTasks, hasLaunch };
+    this.generateFormParams = { hasNpm, hasTasks, hasLaunch, enhancedMode };
     void this.refresh();
   }
 
   private async handleCreateConfig(
     sources: { npm?: boolean; tasks?: boolean; launch?: boolean },
-    enableGrouping: boolean
+    enableGrouping: boolean,
+    enhancedSources: any,
+    detectionMethod: "file" | "command" | "hybrid"
   ) {
     this.isLoading = true;
     void this.refresh();
 
     try {
+      // Get enhanced actions if any enhanced sources are enabled
+      let enhancedActions: Action[] = [];
+      if (enhancedSources && Object.values(enhancedSources).some((v) => v === true)) {
+        enhancedActions = await this.toolDetectionService.scanEnhanced(
+          enhancedSources,
+          detectionMethod
+        );
+      }
+
       await this.configService.createAutoConfig(
         sources,
         enableGrouping,
-        BattlestationViewProvider.defaultIcons
+        BattlestationViewProvider.defaultIcons,
+        enhancedActions
       );
       // Open the config file for review
       await this.configService.openConfigFile();

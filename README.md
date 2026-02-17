@@ -28,6 +28,12 @@ A powerful VS Code extension that provides a configurable command launcher panel
 - **Flexible Configuration**: JSON-based configuration with auto-generation
 - **Per-Workspace Settings**: Each workspace can have its own battle.config
 
+### ⚡ User Experience
+- **Loading Indicators**: Progress feedback during config generation, tool detection, and file operations
+- **Non-Intrusive Progress**: Loading states appear in the view header without blocking the UI
+- **Instant Feedback**: All async operations provide clear progress messages
+- **Reliable View State**: Views properly refresh when reopened or made visible
+
 ## Getting Started
 
 1. Install the extension

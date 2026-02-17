@@ -1,6 +1,11 @@
 import { htmlShell } from "../templates/layout";
+import { esc } from "./helpers";
 
-export function renderLoadingView(cspSource: string, nonce: string): string {
+export function renderLoadingView(
+  cspSource: string,
+  nonce: string,
+  options?: Record<string, never>
+): string {
   return htmlShell({
     title: "Loading...",
     cspSource,
@@ -35,7 +40,7 @@ export function renderLoadingView(cspSource: string, nonce: string): string {
     `,
     body: `
       <div class="loader"></div>
-      <div class="loading-text">Loading Launchpad...</div>
+      <div class="loading-text">Loading Battlestation...</div>
     `,
     script: "",
   });

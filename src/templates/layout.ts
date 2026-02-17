@@ -6,6 +6,7 @@ export interface LayoutOptions {
   styles: string;
   body: string;
   script: string;
+  scriptUri?: string;
 }
 
 /**
@@ -17,12 +18,16 @@ export function htmlShell(opts: LayoutOptions): string {
     ? `<style>${opts.codiconStyles}</style>`
     : "";
 
+  const externalScript = opts.scriptUri
+    ? `<script nonce="${opts.nonce}" type="module" src="${opts.scriptUri}"></script>`
+    : "";
+
   return /*html*/ `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; style-src ${opts.cspSource} 'unsafe-inline'; font-src ${opts.cspSource}; script-src 'nonce-${opts.nonce}';">
+    content="default-src 'none'; style-src ${opts.cspSource} 'unsafe-inline'; font-src ${opts.cspSource}; script-src ${opts.cspSource} 'nonce-${opts.nonce}';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   ${codiconBlock}
   <title>${opts.title}</title>
@@ -33,6 +38,7 @@ ${opts.body}
 <script nonce="${opts.nonce}">
 ${opts.script}
 </script>
+${externalScript}
 </body>
 </html>`;
 }

@@ -1,5 +1,5 @@
 import { htmlShell } from "../templates/layout";
-import { buttonStyles, checkboxStyles } from "../templates/styles";
+import { buttonStyles, checkboxStyles, optionCardStyles } from "../templates/styles";
 import { renderCheckbox } from "./helpers";
 
 export interface EnhancedModeContext {
@@ -30,13 +30,16 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
   const heading = ctx.showWelcome
     ? `<div class="lp-setup">
         <h2>Welcome to Battlestation</h2>
-        <p>No <code>battle.config</code> found.</p>
-        <p>Create one automatically or manually to get started.</p>
+        <p>No <code>battle.json</code> found.</p>
+        <p style="margin-bottom: 20px;">Create one automatically or manually to get started.</p>
       </div>`
     : '<h2>🚀 Generate Configuration</h2><p>Auto-detect commands from your workspace.</p>';
 
   const actions = ctx.showWelcome
-    ? '<button class="lp-btn lp-btn-primary" id="createBtn" style="width: 100%;">Create battle.config</button>'
+    ? `<div class="lp-form-actions" style="margin-top: 20px;">
+        <button type="button" class="lp-btn lp-btn-secondary" id="createBlankBtn">Create Blank</button>
+        <button type="button" class="lp-btn lp-btn-primary" id="generateBtn">Generate</button>
+      </div>`
     : `<div class="lp-form-actions">
         <button type="button" class="lp-btn lp-btn-secondary" id="cancelBtn">Cancel</button>
         <button type="button" class="lp-btn lp-btn-primary" id="createBtn">Generate</button>
@@ -44,7 +47,7 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
 
   // Enhanced Mode section (only show if enhancedMode context is provided)
   const enhancedSection = ctx.enhancedMode ? `
-    <details class="lp-enhanced-section" open>
+    <details class="lp-enhanced-section">
       <summary class="lp-enhanced-header">
         <span class="codicon codicon-sparkle"></span>
         Enhanced Mode (Advanced Options)
@@ -52,16 +55,16 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
       <div class="lp-enhanced-content">
         <div class="lp-sources" style="border-bottom: 1px solid var(--vscode-widget-border); padding-bottom: 10px; margin-bottom: 10px;">
           <div class="lp-sources-title">Detection Method:</div>
-          <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
-            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+          <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px;">
+            <label class="lp-checkbox-row">
               <input type="radio" name="detectionMethod" value="hybrid" checked style="cursor: pointer;" id="hybridRadio">
               <span>Hybrid (File + Command) - Recommended</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+            <label class="lp-checkbox-row">
               <input type="radio" name="detectionMethod" value="file" style="cursor: pointer;" id="fileRadio">
               <span>File-based (Fast)</span>
             </label>
-            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+            <label class="lp-checkbox-row">
               <input type="radio" name="detectionMethod" value="command" style="cursor: pointer;" id="commandRadio">
               <span>Command-based (Accurate)</span>
             </label>
@@ -97,7 +100,7 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
   ` : '';
 
   return htmlShell({
-    title: "Launchpad",
+    title: "Battlestation",
     cspSource: ctx.cspSource,
     nonce: ctx.nonce,
     codiconStyles: ctx.codiconStyles,
@@ -159,63 +162,177 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
         margin-bottom: 0;
       }
       ${checkboxStyles}
-      .lp-form-actions { display: flex; gap: 8px; margin-top: 12px; }
+      ${optionCardStyles}
+      .lp-form-actions { display: flex; gap: 8px; }
       ${buttonStyles}
     `,
     body: `
       ${heading}
-      <div class="lp-sources">
-        <div class="lp-sources-title">Auto-detect from:</div>
-        ${renderCheckbox("npmCheck", "npm scripts (package.json)", ctx.hasNpm)}
-        ${renderCheckbox("tasksCheck", "VS Code tasks (tasks.json)", ctx.hasTasks)}
-        ${renderCheckbox("launchCheck", "Launch configs (launch.json)", ctx.hasLaunch)}
+      
+      <label class="lp-option-card" id="showOptionsLabel" for="showOptionsCheck">
+        <div class="lp-option-header">
+          <input type="checkbox" id="showOptionsCheck" style="cursor: pointer; margin: 0;">
+          <span class="lp-option-title">Show generation options</span>
+        </div>
+        <div class="lp-option-desc">
+          When unchecked, all available sources are automatically included
+        </div>
+      </label>
+
+      <div id="optionsContainer" style="display: none;">
+        <div class="lp-sources">
+          <div class="lp-sources-title">Auto-detect from:</div>
+          ${renderCheckbox("npmCheck", "npm scripts (package.json)", ctx.hasNpm)}
+          ${renderCheckbox("tasksCheck", "VS Code tasks (tasks.json)", ctx.hasTasks)}
+          ${renderCheckbox("launchCheck", "Launch configs (launch.json)", ctx.hasLaunch)}
+        </div>
+        ${enhancedSection}
+        <div class="lp-sources">
+          <div class="lp-sources-title">Global Options:</div>
+          ${renderCheckbox("groupCheck", "Group by type", ctx.hasNpm || ctx.hasTasks || ctx.hasLaunch)}
+          ${renderCheckbox("colorCheck", "Auto-colorize groups", false)}
+        </div>
       </div>
-      ${enhancedSection}
-      <div class="lp-sources" style="margin-top: 8px;">
-        <div class="lp-sources-title">Options:</div>
-        ${renderCheckbox("groupCheck", "Group by type", ctx.hasNpm || ctx.hasTasks || ctx.hasLaunch)}
-      </div>
+      
       ${actions}
     `,
     script: `
       (function () {
         const vscode = acquireVsCodeApi();
-        document.getElementById('createBtn').addEventListener('click', () => {
-          const sources = {
-            npm: document.getElementById('npmCheck').checked,
-            tasks: document.getElementById('tasksCheck').checked,
-            launch: document.getElementById('launchCheck').checked
-          };
+        
+        // Toggle options visibility with visual state
+        const showOptionsCheck = document.getElementById('showOptionsCheck');
+        const showOptionsLabel = document.getElementById('showOptionsLabel');
+        const optionsContainer = document.getElementById('optionsContainer');
 
-          // Collect enhanced sources if available
-          const enhancedSources = {};
-          const dockerCheckbox = document.getElementById('dockerCheck');
-          if (dockerCheckbox) {
-            enhancedSources.docker = dockerCheckbox.checked;
-            enhancedSources.dockerCompose = document.getElementById('dockerComposeCheck').checked;
-            enhancedSources.python = document.getElementById('pythonCheck').checked;
-            enhancedSources.go = document.getElementById('goCheck').checked;
-            enhancedSources.rust = document.getElementById('rustCheck').checked;
-            enhancedSources.make = document.getElementById('makeCheck').checked;
-            enhancedSources.gradle = document.getElementById('gradleCheck').checked;
-            enhancedSources.maven = document.getElementById('mavenCheck').checked;
-            enhancedSources.cmake = document.getElementById('cmakeCheck').checked;
-            enhancedSources.git = document.getElementById('gitCheck').checked;
+        function updateOptionState() {
+          const checked = showOptionsCheck?.checked;
+          if (optionsContainer) optionsContainer.style.display = checked ? 'block' : 'none';
+          if (showOptionsLabel) {
+            if (checked) showOptionsLabel.classList.add('selected');
+            else showOptionsLabel.classList.remove('selected');
           }
+        }
 
-          // Get detection method
-          const detectionMethodRadio = document.querySelector('input[name="detectionMethod"]:checked');
-          const detectionMethod = detectionMethodRadio ? detectionMethodRadio.value : 'hybrid';
-
-          const enableGrouping = document.getElementById('groupCheck').checked;
-          vscode.postMessage({
-            command: 'createConfig',
-            sources,
-            enhancedSources,
-            detectionMethod,
-            enableGrouping
-          });
+        showOptionsCheck?.addEventListener('change', updateOptionState);
+        // Initialize state
+        updateOptionState();
+        
+        document.getElementById('createBlankBtn')?.addEventListener('click', () => {
+          vscode.postMessage({ command: 'createBlankConfig' });
         });
+
+        function collectSources(optionsVisible) {
+          const sources = {};
+          
+          if (optionsVisible) {
+            // Basic sources
+            const npmCheck = document.getElementById('npmCheck');
+            const tasksCheck = document.getElementById('tasksCheck');
+            const launchCheck = document.getElementById('launchCheck');
+            
+            if (npmCheck) sources.npm = npmCheck.checked;
+            if (tasksCheck) sources.tasks = tasksCheck.checked;
+            if (launchCheck) sources.launch = launchCheck.checked;
+
+            // Enhanced sources
+            const dockerCheck = document.getElementById('dockerCheck');
+            if (dockerCheck) sources.docker = dockerCheck.checked;
+            
+            const dockerComposeCheck = document.getElementById('dockerComposeCheck');
+            if (dockerComposeCheck) sources.dockerCompose = dockerComposeCheck.checked;
+            
+            const pythonCheck = document.getElementById('pythonCheck');
+            if (pythonCheck) sources.python = pythonCheck.checked;
+            
+            const goCheck = document.getElementById('goCheck');
+            if (goCheck) sources.go = goCheck.checked;
+            
+            const rustCheck = document.getElementById('rustCheck');
+            if (rustCheck) sources.rust = rustCheck.checked;
+            
+            const makeCheck = document.getElementById('makeCheck');
+            if (makeCheck) sources.make = makeCheck.checked;
+            
+            const gradleCheck = document.getElementById('gradleCheck');
+            if (gradleCheck) sources.gradle = gradleCheck.checked;
+            
+            const mavenCheck = document.getElementById('mavenCheck');
+            if (mavenCheck) sources.maven = mavenCheck.checked;
+            
+            const cmakeCheck = document.getElementById('cmakeCheck');
+            if (cmakeCheck) sources.cmake = cmakeCheck.checked;
+            
+            const gitCheck = document.getElementById('gitCheck');
+            if (gitCheck) sources.git = gitCheck.checked;
+          } else {
+            // Default to all basic sources enabled if options hidden
+            sources.npm = true;
+            sources.tasks = true;
+            sources.launch = true;
+          }
+          
+          return sources;
+        }
+
+        const generateBtn = document.getElementById('generateBtn');
+        if (generateBtn) {
+          generateBtn.addEventListener('click', () => {
+            const optionsVisible = showOptionsCheck?.checked || false;
+            const sources = collectSources(optionsVisible);
+            const enableGrouping = optionsVisible ? document.getElementById('groupCheck').checked : true;
+            const enableColoring = optionsVisible ? document.getElementById('colorCheck').checked : false;
+            
+            // Get detection method (only if options visible)
+            const detectionMethodRadio = document.querySelector('input[name="detectionMethod"]:checked');
+            const detectionMethod = (optionsVisible && detectionMethodRadio) ? detectionMethodRadio.value : 'hybrid';
+            
+            vscode.postMessage({
+              command: 'createConfig',
+              sources,
+              detectionMethod,
+              enableGrouping,
+              enableColoring
+            });
+          });
+        }
+
+        const createBtn = document.getElementById('createBtn');
+        if (createBtn) {
+          createBtn.addEventListener('click', () => {
+            // createBtn is "Generate" in non-welcome view (options always visible/available in DOM but hidden by default)
+            // But actually createBtn is used in the "Generate Configuration" view which is renderGenerateConfigView
+            // The logic above handles showOptionsCheck for visibility.
+            // Wait, the original code had two blocks. Let's see. 
+            // The original code had:
+            // generateBtn (welcome view) -> checks showOptionsCheck
+            // createBtn (normal view) -> assumes options are available to read?
+            
+            // Actually in renderGenerateConfigView, both use the same HTML structure for options.
+            // The difference is just the button ID.
+            
+            const optionsVisible = showOptionsCheck?.checked || false; 
+            // In the "normal" view (not welcome), optionsContainer is hidden by default too.
+            // But we should probably respect the checkboxes regardless of visibility if the user hasn't toggled them?
+            // Or maybe just do the same logic.
+            
+            const sources = collectSources(optionsVisible);
+            const enableGrouping = document.getElementById('groupCheck')?.checked ?? true;
+            const enableColoring = document.getElementById('colorCheck')?.checked ?? false;
+
+            const detectionMethodRadio = document.querySelector('input[name="detectionMethod"]:checked');
+            const detectionMethod = detectionMethodRadio ? detectionMethodRadio.value : 'hybrid';
+
+            vscode.postMessage({
+              command: 'createConfig',
+              sources,
+              detectionMethod,
+              enableGrouping,
+              enableColoring
+            });
+          });
+        }
+        
         const cancelBtn = document.getElementById('cancelBtn');
         if (cancelBtn) {
           cancelBtn.addEventListener('click', () => {
@@ -223,13 +340,12 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
           });
         }
 
-        // Listen for detection method changes and trigger re-detection
-        const detectionRadios = document.querySelectorAll('input[name="detectionMethod"]');
-        detectionRadios.forEach((radio) => {
-          radio.addEventListener('change', (e) => {
+        // Event delegation for detection method changes
+        document.addEventListener('change', (e) => {
+          if (e.target.matches && e.target.matches('input[name="detectionMethod"]')) {
             const method = e.target.value;
             vscode.postMessage({ command: 'redetectTools', detectionMethod: method });
-          });
+          }
         });
       })();
     `,

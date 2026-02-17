@@ -11,6 +11,7 @@ export function activate(context: vscode.ExtensionContext) {
   const todosProvider = new TodoPanelProvider(context, todosService, provider);
 
   context.subscriptions.push(
+    provider,
     vscode.window.registerWebviewViewProvider("battlestation.view", provider)
   );
 
@@ -18,6 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
   const config = vscode.workspace.getConfiguration('battlestation');
   if (config.get<boolean>('experimental.enableTodos', false)) {
     context.subscriptions.push(
+      todosProvider,
       vscode.window.registerWebviewViewProvider("battlestation.todosView", todosProvider)
     );
   }

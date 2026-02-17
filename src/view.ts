@@ -32,7 +32,6 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   private showHidden = false;
   private currentEditGroup?: Group;
   private currentEditAction?: Action;
-  private isLoading = false;
   private generateFormParams?: {
     hasNpm: boolean;
     hasTasks: boolean;
@@ -50,6 +49,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       hasGit: boolean;
     };
   };
+
+  private readonly disposables: vscode.Disposable[] = [];
 
   public static readonly defaultIcons: IconMapping[] = [
     { type: "shell", icon: "terminal" },
@@ -76,10 +77,29 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   ) {
     this.toolDetectionService = new ToolDetectionService(context);
     // Refresh when config or todos change
-    this.configService.onDidChange(() => this.refresh());
-    this.todosService.onDidChange(() => {
-      /* todosView handles its own refresh */
-    });
+    this.disposables.push(
+      this.configService.onDidChange(() => this.refresh()),
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("battlestation")) {
+          // If enhanced mode setting changed and we are preparing generation config
+          if (
+            e.affectsConfiguration("battlestation.experimental.enableEnhancedMode") &&
+            this.showingForm === "generateConfig"
+          ) {
+            void this.handleShowGenerateConfig();
+            return;
+          }
+          void this.refresh();
+        }
+      })
+    );
+    // todosView handles its own refresh for todos changes
+  }
+
+  /* ─── Disposal ─── */
+
+  public dispose(): void {
+    this.disposables.forEach(d => d.dispose());
   }
 
   /* ─── WebviewViewProvider ─── */
@@ -90,6 +110,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ) {
     this.view = webviewView;
+    this._cachedCodiconStyles = undefined;
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -98,12 +119,25 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       ],
     };
 
-    void this.configService.configExists().then((exists) => {
-      vscode.commands.executeCommand("setContext", "battlestation.hasConfig", exists);
+    // Show loading view immediately while initializing
+    const cspSource = webviewView.webview.cspSource;
+    const nonce = getNonce();
+
+    webviewView.webview.html = renderLoadingView(cspSource, nonce, {});
+
+    // Set up context after first render
+    void this.configService.getConfigStatus().then((status) => {
+      vscode.commands.executeCommand("setContext", "battlestation.hasConfig", status.valid);
     });
 
     webviewView.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) {
+        void this.refresh();
+      }
+    });
 
+    // Refresh with actual content
     void this.refresh();
   }
 
@@ -122,7 +156,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           message.sources || {},
           message.enableGrouping || false,
           message.enhancedSources || {},
-          message.detectionMethod || "hybrid"
+          message.detectionMethod || "hybrid",
+          message.enableColoring || false
         );
         break;
       case "executeCommand":
@@ -195,8 +230,20 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       case "showGenerateConfig":
         void this.handleShowGenerateConfig();
         break;
+      case "createBlankConfig":
+        void this.handleCreateBlankConfig();
+        break;
+      case "createExampleConfig":
+        void this.handleCreateExampleConfig();
+        break;
       case "deleteConfig":
         void this.handleDeleteConfig();
+        break;
+      case "restoreConfig":
+        void this.handleRestoreConfig();
+        break;
+      case "openVisualSettings":
+        void this.handleOpenVisualSettings();
         break;
     }
   }
@@ -247,112 +294,109 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  public showSettingsForm() {
+  public async showSettingsForm() {
     this.showingForm = "settings";
+    await vscode.commands.executeCommand("battlestation.view.focus");
+    this.view?.show?.(true);
     void this.refresh();
   }
 
   /* ─── refresh / render ─── */
 
+  private refreshTimeout?: NodeJS.Timeout;
+
   public async refresh() {
-    if (!this.view) {
-      return;
+    // Debounce the refresh to prevent excessive CPU usage
+    if (this.refreshTimeout) {
+      clearTimeout(this.refreshTimeout);
     }
 
-    const exists = await this.configService.configExists();
-    vscode.commands.executeCommand("setContext", "battlestation.hasConfig", exists);
+    this.refreshTimeout = setTimeout(async () => {
+      if (!this.view) {
+        return;
+      }
 
-    const cspSource = this.view.webview.cspSource;
-    const nonce = getNonce();
+      const configStatus = await this.configService.getConfigStatus();
+      const exists = configStatus.exists;
+      const valid = configStatus.valid;
+      vscode.commands.executeCommand("setContext", "battlestation.hasConfig", valid);
 
-    if (this.isLoading) {
-      this.view.webview.html = renderLoadingView(cspSource, nonce);
-      return;
-    }
+      const cspSource = this.view.webview.cspSource;
+      const nonce = getNonce();
 
-    if (!exists) {
-      this.showingForm = false;
-      const codiconStyles = this.getCodiconStyles();
-      const hasNpm = await this.configService.fileExistsInWorkspace("package.json");
-      const hasTasks = await this.configService.fileExistsInWorkspace(".vscode/tasks.json");
-      const hasLaunch = await this.configService.fileExistsInWorkspace(".vscode/launch.json");
-      
-      // Detect available tools for enhanced mode (using hybrid by default)
-      const availability = await this.toolDetectionService.detectToolAvailability("hybrid");
-      const enhancedMode = {
-        hasDocker: availability.docker,
-        hasDockerCompose: availability.dockerCompose,
-        hasPython: availability.python,
-        hasGo: availability.go,
-        hasRust: availability.rust,
-        hasMakefile: availability.make,
-        hasGradle: availability.gradle,
-        hasMaven: availability.maven,
-        hasCMake: availability.cmake,
-        hasGit: availability.git,
-      };
-      
-      this.view.webview.html = renderGenerateConfigView({
-        cspSource,
-        nonce,
-        codiconStyles,
-        hasNpm,
-        hasTasks,
-        hasLaunch,
-        showWelcome: true,
-        enhancedMode,
-      });
-      return;
-    }
+      if (this.showingForm === "settings") {
+        this.view.webview.html = await this.renderSettings(cspSource, nonce);
+        return;
+      }
 
-    if (this.showingForm === "settings") {
-      this.view.webview.html = await this.renderSettings(cspSource, nonce);
-      return;
-    }
+      // Check for generateConfig form BEFORE no-config screen
+      if (this.showingForm === "generateConfig") {
+        const params = this.generateFormParams || {
+          hasNpm: false,
+          hasTasks: false,
+          hasLaunch: false,
+        };
+        this.view.webview.html = renderGenerateConfigView({
+          cspSource,
+          nonce,
+          codiconStyles: this.getCodiconStyles(),
+          ...params,
+          showWelcome: false,
+        });
+        return;
+      }
 
-    if (this.showingForm === "generateConfig") {
-      const params = this.generateFormParams || {
-        hasNpm: false,
-        hasTasks: false,
-        hasLaunch: false,
-      };
-      this.view.webview.html = renderGenerateConfigView({
-        cspSource,
-        nonce,
-        codiconStyles: this.getCodiconStyles(),
-        ...params,
-        showWelcome: false,
-      });
-      return;
-    }
+      if (!exists || !valid) {
+        this.showingForm = false;
+        const codiconStyles = this.getCodiconStyles();
 
-    if (this.showingForm === "group") {
-      this.view.webview.html = await this.renderAddGroup(cspSource, nonce);
-      return;
-    }
+        // Quick detection of basic tools for welcome view
+        // This is fast (just file existence checks) so it won't slow down initial load
+        const hasNpm = await this.configService.hasSource("npm");
+        const hasTasks = await this.configService.hasSource("tasks");
+        const hasLaunch = await this.configService.hasSource("launch");
 
-    if (this.showingForm === "editGroup") {
-      this.view.webview.html = await this.renderEditGroup(cspSource, nonce);
-      return;
-    }
+        this.view.webview.html = renderGenerateConfigView({
+          cspSource,
+          nonce,
+          codiconStyles,
+          hasNpm,
+          hasTasks,
+          hasLaunch,
+          showWelcome: true,
+          enhancedMode: undefined,
+        });
+        return;
+      }
 
-    if (this.showingForm === "editAction") {
-      if (!this.currentEditAction) {
+      if (this.showingForm === "group") {
+        this.view.webview.html = await this.renderAddGroup(cspSource, nonce);
+        return;
+      }
+
+      if (this.showingForm === "editGroup") {
+        this.view.webview.html = await this.renderEditGroup(cspSource, nonce);
+        return;
+      }
+
+      if (this.showingForm === "editAction") {
+        if (!this.currentEditAction) {
+          this.view.webview.html = await this.renderAddAction(cspSource, nonce);
+          return;
+        }
+        this.view.webview.html = await this.renderEditAction(cspSource, nonce);
+        return;
+      }
+
+      if (this.showingForm === true) {
         this.view.webview.html = await this.renderAddAction(cspSource, nonce);
         return;
       }
-      this.view.webview.html = await this.renderEditAction(cspSource, nonce);
-      return;
-    }
 
-    if (this.showingForm === true) {
-      this.view.webview.html = await this.renderAddAction(cspSource, nonce);
-      return;
-    }
-
-    // Main view
-    const config = await this.configService.readConfig();
-    this.view.webview.html = this.renderMain(config, cspSource, nonce);
+      // Main view
+      const config = configStatus.config || (await this.configService.readConfig());
+      this.view.webview.html = this.renderMain(config, cspSource, nonce);
+    }, 100);
   }
 
   /* ─── render helpers ─── */
@@ -373,11 +417,14 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     const enrichedConfig: Config & Record<string, any> = {
       ...config,
       icons: mergedIcons,
-      __showIcon: wsConfig.get<boolean>("display.showIcon", true),
+      __showIcon: wsConfig.get<boolean>("display.showIcon", false),
       __showType: wsConfig.get<boolean>("display.showType", true),
       __showCommand: wsConfig.get<boolean>("display.showCommand", true),
       __showGroup: wsConfig.get<boolean>("display.showGroup", true),
       __hideIcon: wsConfig.get<string>("display.hideIcon", "eye-closed"),
+      __playButtonBackgroundColor: wsConfig.get<string>("display.playButtonBackgroundColor", "transparent"),
+      density: wsConfig.get<string>("display.density", "comfortable"),
+      secondaryGroups: wsConfig.get<Record<string, Group>>("secondaryGroups", {}),
     };
 
     return renderMainView({
@@ -394,18 +441,26 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     const config = await this.configService.readConfig();
     const usedIcons = Array.from(this.getUsedCodiconNames(config)).sort();
     const configExists = await this.configService.configExists();
+    const backups = await this.configService.listConfigVersions();
+    const settingsScriptUri = this.view
+      ? this.view.webview.asWebviewUri(
+        vscode.Uri.joinPath(this.context.extensionUri, "media", "settingsView.js")
+      ).toString()
+      : "";
 
     return renderSettingsView({
       cspSource,
       nonce,
       codiconStyles: this.getCodiconStyles(),
-      showIcon: wsConfig.get<boolean>("display.showIcon", true),
+      showIcon: wsConfig.get<boolean>("display.showIcon", false),
       showType: wsConfig.get<boolean>("display.showType", true),
       showCommand: wsConfig.get<boolean>("display.showCommand", true),
       showGroup: wsConfig.get<boolean>("display.showGroup", true),
       hideIcon: wsConfig.get<string>("display.hideIcon", "eye-closed"),
+      backupCount: backups.length,
       configExists,
       usedIcons,
+      settingsScriptUri,
     });
   }
 
@@ -482,9 +537,15 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
   /* ─── codicon styles ─── */
 
+  private _cachedCodiconStyles: string | undefined;
+
   private getCodiconStyles(): string {
     if (!this.view) {
       return "";
+    }
+
+    if (this._cachedCodiconStyles) {
+      return this._cachedCodiconStyles;
     }
 
     const codiconFontUri = this.view.webview.asWebviewUri(
@@ -497,6 +558,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       /src:\s*url\([^)]+\)(\s*format\([^)]+\))?/g,
       `src: url("${codiconFontUri}") format("truetype")`
     );
+
+    this._cachedCodiconStyles = updatedCss;
     return updatedCss;
   }
 
@@ -559,18 +622,32 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   private async executeCommand(item: Action) {
     try {
       switch (item.type) {
+        case "launch":
+          await this.executeLaunchConfig(item.command);
+          break;
         case "vscode":
         case "task":
-        case "launch":
           await this.executeVSCodeCommand(item.command);
           break;
         default:
-          await this.executeShellCommand(item.command);
+          await this.executeShellCommand(item);
           break;
       }
     } catch (error) {
       vscode.window.showErrorMessage(`Failed to execute: ${(error as Error).message}`);
     }
+  }
+
+  private async executeLaunchConfig(command: string) {
+    // Format: workbench.action.debug.start|ConfigName
+    const [, configName] = command.split("|");
+    if (!configName) {
+      throw new Error("No launch configuration name specified");
+    }
+
+    // Use VS Code debug API to start debugging with the named configuration
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    await vscode.debug.startDebugging(workspaceFolder, configName.trim());
   }
 
   private async executeVSCodeCommand(command: string) {
@@ -582,13 +659,26 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async executeShellCommand(command: string) {
-    const terminal = vscode.window.createTerminal({
-      name: "Launchpad",
-      cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
-    });
+  private async executeShellCommand(item: Action) {
+    const wsConfig = vscode.workspace.getConfiguration("battlestation");
+    const shells = wsConfig.get<Record<string, string>>("shells", {});
+    const shellEnv = shells[item.type]; // e.g. "bash" or "pwsh"
+
+    // Construct options
+    const terminalOptions: vscode.TerminalOptions = {
+      name: `Launchpad${item.workspace ? ` (${item.workspace})` : ""}`,
+      cwd: item.cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    };
+
+    if (shellEnv) {
+      terminalOptions.shellPath = shellEnv;
+    }
+
+    // Try to reuse terminal if not specifically configured otherwise (could be a future setting)
+    // For now, let's create a new one to ensure clean state and correct shell
+    const terminal = vscode.window.createTerminal(terminalOptions);
     terminal.show();
-    terminal.sendText(command);
+    terminal.sendText(item.command);
   }
 
   /* ─── config CRUD (delegates to configService) ─── */
@@ -652,13 +742,14 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   private async handleSetActionColor(item: Action) {
     const THEME_COLORS = [
       { label: "$(symbol-color) Remove Color", value: "" },
+      { label: "$(color-mode) Custom Color...", value: "CUSTOM" },
       { label: "$(circle-filled) Red", value: "var(--vscode-charts-red)" },
       { label: "$(circle-filled) Orange", value: "var(--vscode-charts-orange)" },
       { label: "$(circle-filled) Yellow", value: "var(--vscode-charts-yellow)" },
       { label: "$(circle-filled) Green", value: "var(--vscode-charts-green)" },
       { label: "$(circle-filled) Blue", value: "var(--vscode-charts-blue)" },
       { label: "$(circle-filled) Purple", value: "var(--vscode-charts-purple)" },
-      { label: "$(circle-filled) Pink", value: "var(--vscode-charts-pink)" },
+      { label: "$(circle-filled) Pink", value: "var(--vscode-button-secondaryHoverBackground)" }, // Pink-ish/Hover
     ];
 
     const selected = await vscode.window.showQuickPick(THEME_COLORS, {
@@ -666,18 +757,31 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       title: "Action Color",
     });
 
-    if (selected !== undefined) {
+    if (selected) {
+      let colorToSet = selected.value;
+
+      if (colorToSet === "CUSTOM") {
+        const input = await vscode.window.showInputBox({
+          prompt: "Enter custom CSS color (hex, rgb, var, etc.)",
+          value: item.backgroundColor && !item.backgroundColor.startsWith("var(--vscode-charts") ? item.backgroundColor : "",
+          placeHolder: "e.g. #ff0000 or rgba(255, 100, 100, 0.5)"
+        });
+        if (input === undefined) return; // Cancelled
+        colorToSet = input.trim();
+      }
+
       const config = await this.configService.readConfig();
       const target = config.actions.find((i) => i.name === item.name && i.command === item.command);
+
       if (target) {
-        if (selected.value === "") {
+        if (!colorToSet) {
           delete target.backgroundColor;
         } else {
-          target.backgroundColor = selected.value;
+          target.backgroundColor = colorToSet;
         }
         await this.configService.writeConfig(config);
         void this.refresh();
-        this.showToast(`Color ${selected.value ? "set" : "removed"} for "${item.name}"`);
+        this.showToast(colorToSet ? `Color set for "${item.name}"` : `Color removed for "${item.name}"`);
       }
     }
   }
@@ -765,6 +869,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     showCommand: boolean;
     showGroup: boolean;
     hideIcon?: string;
+    useEmojiLoader?: boolean;
+    loaderEmoji?: string;
   }) {
     const cfg = vscode.workspace.getConfiguration("battlestation");
     await cfg.update("display.showIcon", settings.showIcon, vscode.ConfigurationTarget.Workspace);
@@ -774,6 +880,21 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     if (settings.hideIcon) {
       await cfg.update("display.hideIcon", settings.hideIcon, vscode.ConfigurationTarget.Workspace);
     }
+    if (typeof settings.useEmojiLoader === "boolean") {
+      await cfg.update(
+        "display.useEmojiLoader",
+        settings.useEmojiLoader,
+        vscode.ConfigurationTarget.Workspace
+      );
+    }
+    if (typeof settings.loaderEmoji === "string") {
+      const normalizedEmoji = settings.loaderEmoji.trim() || "🌯";
+      await cfg.update(
+        "display.loaderEmoji",
+        normalizedEmoji,
+        vscode.ConfigurationTarget.Workspace
+      );
+    }
     this.showingForm = false;
     void this.refresh();
     this.showToast("\u2705 Settings saved");
@@ -782,113 +903,284 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   /* ─── generate / delete config handlers ─── */
 
   private async handleShowGenerateConfig() {
-    const hasNpm = await this.configService.fileExistsInWorkspace("package.json");
-    const hasTasks = await this.configService.fileExistsInWorkspace(".vscode/tasks.json");
-    const hasLaunch = await this.configService.fileExistsInWorkspace(".vscode/launch.json");
-    
-    // Use hybrid detection by default for initial load
-    const availability = await this.toolDetectionService.detectToolAvailability("hybrid");
-    const enhancedMode = {
-      hasDocker: availability.docker,
-      hasDockerCompose: availability.dockerCompose,
-      hasPython: availability.python,
-      hasGo: availability.go,
-      hasRust: availability.rust,
-      hasMakefile: availability.make,
-      hasGradle: availability.gradle,
-      hasMaven: availability.maven,
-      hasCMake: availability.cmake,
-      hasGit: availability.git,
-    };
-    
-    this.showingForm = "generateConfig";
-    this.generateFormParams = { hasNpm, hasTasks, hasLaunch, enhancedMode };
-    void this.refresh();
+    await vscode.window.withProgress(
+      {
+        location: { viewId: "battlestation.view" },
+        title: "Detecting tools...",
+        cancellable: false,
+      },
+      async (progress) => {
+        progress.report({ increment: 10, message: "Checking workspace files..." });
+        const hasNpm = await this.configService.hasSource("npm");
+        const hasTasks = await this.configService.hasSource("tasks");
+        const hasLaunch = await this.configService.hasSource("launch");
+
+        progress.report({ increment: 30, message: "Scanning for development tools..." });
+        const wsConfig = vscode.workspace.getConfiguration("battlestation");
+        const enableEnhancedMode = wsConfig.get<boolean>("experimental.enableEnhancedMode", false);
+
+        // Use hybrid detection by default for initial load
+        const enhancedMode = enableEnhancedMode
+          ? (() => {
+            const availability = this.toolDetectionService.detectToolAvailability("hybrid");
+            return availability.then((tools) => ({
+              hasDocker: tools.docker,
+              hasDockerCompose: tools.dockerCompose,
+              hasPython: tools.python,
+              hasGo: tools.go,
+              hasRust: tools.rust,
+              hasMakefile: tools.make,
+              hasGradle: tools.gradle,
+              hasMaven: tools.maven,
+              hasCMake: tools.cmake,
+              hasGit: tools.git,
+            }));
+          })()
+          : undefined;
+
+        progress.report({ increment: 50, message: "Preparing options..." });
+        this.showingForm = "generateConfig";
+        this.generateFormParams = {
+          hasNpm,
+          hasTasks,
+          hasLaunch,
+          enhancedMode: enhancedMode ? await enhancedMode : undefined,
+        };
+
+        progress.report({ increment: 10, message: "Done" });
+        void this.refresh();
+      }
+    );
+  }
+
+  private async handleCreateBlankConfig() {
+    await vscode.window.withProgress(
+      {
+        location: { viewId: "battlestation.view" },
+        title: "Creating blank config...",
+        cancellable: false,
+      },
+      async (progress) => {
+        try {
+          progress.report({ increment: 50, message: "Creating file..." });
+          await this.configService.createMinimalConfig(BattlestationViewProvider.defaultIcons);
+
+          progress.report({ increment: 40, message: "Opening file..." });
+          await this.configService.openConfigFile();
+
+          progress.report({ increment: 10, message: "Done" });
+          this.showingForm = false;
+          void this.refresh();
+          this.showToast("📝 Created blank battle.config");
+        } catch (error) {
+          vscode.window.showErrorMessage(
+            `Failed to create config: ${(error as Error).message}`
+          );
+        }
+      }
+    );
+  }
+
+  private async handleCreateExampleConfig() {
+    await vscode.window.withProgress(
+      {
+        location: { viewId: "battlestation.view" },
+        title: "Creating example config...",
+        cancellable: false,
+      },
+      async (progress) => {
+        try {
+          progress.report({ increment: 50, message: "Creating example file..." });
+          await this.configService.createExampleConfig(BattlestationViewProvider.defaultIcons);
+
+          progress.report({ increment: 40, message: "Opening file..." });
+          await this.configService.openConfigFile();
+
+          progress.report({ increment: 10, message: "Done" });
+          this.showingForm = false;
+          void this.refresh();
+          this.showToast("✨ Created example battle.config - customize it to your needs!");
+        } catch (error) {
+          vscode.window.showErrorMessage(
+            `Failed to create config: ${(error as Error).message}`
+          );
+        }
+      }
+    );
   }
 
   private async handleRedetectTools(detectionMethod: "file" | "command" | "hybrid") {
     if (this.showingForm !== "generateConfig") return;
-    
-    const availability = await this.toolDetectionService.detectToolAvailability(detectionMethod);
-    const enhancedMode = {
-      hasDocker: availability.docker,
-      hasDockerCompose: availability.dockerCompose,
-      hasPython: availability.python,
-      hasGo: availability.go,
-      hasRust: availability.rust,
-      hasMakefile: availability.make,
-      hasGradle: availability.gradle,
-      hasMaven: availability.maven,
-      hasCMake: availability.cmake,
-      hasGit: availability.git,
-    };
-    
-    if (this.generateFormParams) {
-      this.generateFormParams.enhancedMode = enhancedMode;
-    }
-    void this.refresh();
+
+    await vscode.window.withProgress(
+      {
+        location: { viewId: "battlestation.view" },
+        title: "Re-detecting tools...",
+        cancellable: false,
+      },
+      async (progress) => {
+        progress.report({ increment: 20, message: `Using ${detectionMethod} detection...` });
+        const availability = await this.toolDetectionService.detectToolAvailability(detectionMethod);
+
+        progress.report({ increment: 70, message: "Updating options..." });
+        const enhancedMode = {
+          hasDocker: availability.docker,
+          hasDockerCompose: availability.dockerCompose,
+          hasPython: availability.python,
+          hasGo: availability.go,
+          hasRust: availability.rust,
+          hasMakefile: availability.make,
+          hasGradle: availability.gradle,
+          hasMaven: availability.maven,
+          hasCMake: availability.cmake,
+          hasGit: availability.git,
+        };
+
+        if (this.generateFormParams) {
+          this.generateFormParams.enhancedMode = enhancedMode;
+        }
+
+        progress.report({ increment: 10, message: "Done" });
+        void this.refresh();
+      }
+    );
   }
 
   private async handleCreateConfig(
-    sources: { npm?: boolean; tasks?: boolean; launch?: boolean },
+    sources: Record<string, boolean>,
     enableGrouping: boolean,
-    enhancedSources: any,
-    detectionMethod: "file" | "command" | "hybrid"
+    _ignoredEnhancedSources: any, // Kept for backward compat if needed, but unused now
+    detectionMethod: "file" | "command" | "hybrid",
+    enableColoring: boolean = false
   ) {
-    this.isLoading = true;
-    void this.refresh();
+    await vscode.window.withProgress(
+      {
+        location: { viewId: "battlestation.view" },
+        title: "Generating config...",
+        cancellable: false,
+      },
+      async (progress) => {
+        try {
+          // Get enhanced actions from the unified sources object
+          // scanEnhanced only checks for specific keys (docker, git, etc) so we can pass the whole object
+          let enhancedActions: Action[] = [];
 
-    try {
-      // Get enhanced actions if any enhanced sources are enabled
-      let enhancedActions: Action[] = [];
-      if (enhancedSources && Object.values(enhancedSources).some((v) => v === true)) {
-        enhancedActions = await this.toolDetectionService.scanEnhanced(
-          enhancedSources,
-          detectionMethod
-        );
+          // Check if any enhanced source keys are present and true
+          const enhancedKeys = [
+            "docker", "dockerCompose", "python", "go", "rust",
+            "make", "gradle", "maven", "cmake", "git"
+          ];
+          const hasEnhanced = enhancedKeys.some(k => sources[k] === true);
+
+          if (hasEnhanced) {
+            progress.report({ increment: 20, message: "Scanning for tools..." });
+            enhancedActions = await this.toolDetectionService.scanEnhanced(
+              sources,
+              detectionMethod
+            );
+          }
+
+          progress.report({ increment: 40, message: "Building configuration..." });
+
+          // Extract basic sources from the unified object
+          const basicSources = {
+            npm: sources.npm,
+            tasks: sources.tasks,
+            launch: sources.launch
+          };
+
+          await this.configService.createAutoConfig(
+            basicSources,
+            enableGrouping,
+            BattlestationViewProvider.defaultIcons,
+            enhancedActions,
+            enableColoring
+          );
+
+          progress.report({ increment: 30, message: "Opening config file..." });
+          // Open the config file for review
+          await this.configService.openConfigFile();
+
+          progress.report({ increment: 10, message: "Done" });
+        } finally {
+          this.showingForm = false;
+          void this.refresh();
+        }
       }
-
-      await this.configService.createAutoConfig(
-        sources,
-        enableGrouping,
-        BattlestationViewProvider.defaultIcons,
-        enhancedActions
-      );
-      // Open the config file for review
-      await this.configService.openConfigFile();
-    } finally {
-      this.isLoading = false;
-      this.showingForm = false;
-      void this.refresh();
-    }
+    );
   }
 
   private async handleDeleteConfig() {
-    const choice = await vscode.window.showWarningMessage(
-      "Delete battle.config? This cannot be undone.",
-      { modal: true },
-      "Delete",
-      "Cancel"
-    );
-    if (choice === "Delete") {
-      try {
-        const result = await this.configService.deleteConfig();
-        if (result.deleted) {
-          this.showingForm = false;
-          void this.refresh();
-          this.showToast(`\ud83d\uddd1\ufe0f Deleted ${result.location}`);
-          vscode.window.showInformationMessage(`Config file deleted: ${result.location}`);
-        } else {
-          vscode.window.showWarningMessage(
-            "Config file not found. It may have already been deleted."
-          );
-        }
-      } catch (error) {
-        vscode.window.showErrorMessage(
-          `Failed to delete config: ${(error as Error).message}`
+    try {
+      const result = await this.configService.deleteConfig();
+      if (result.deleted) {
+        this.showingForm = false;
+        void this.refresh();
+        this.showToast(`\ud83d\uddd1\ufe0f Deleted ${result.location}`);
+        vscode.window.showInformationMessage(`Config file deleted: ${result.location}`);
+      } else {
+        vscode.window.showWarningMessage(
+          "Config file not found. It may have already been deleted."
         );
       }
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Failed to delete config: ${(error as Error).message}`
+      );
     }
+  }
+
+  private async handleRestoreConfig() {
+    const versions = await this.configService.listConfigVersions();
+    if (versions.length === 0) {
+      vscode.window.showInformationMessage("No previous configs available to restore.");
+      return;
+    }
+
+    const picks = versions.map((v) => ({
+      label: v.label,
+      description: new Date(v.timestamp).toLocaleString(),
+      timestamp: v.timestamp,
+    }));
+
+    const selection = await vscode.window.showQuickPick(picks, {
+      title: "Restore battle.config",
+      placeHolder: "Select a previous config to restore",
+      matchOnDescription: true,
+    });
+
+    if (!selection) return;
+
+    await vscode.window.withProgress(
+      {
+        location: { viewId: "battlestation.view" },
+        title: "Restoring config...",
+        cancellable: false,
+      },
+      async (progress) => {
+        try {
+          progress.report({ increment: 50, message: `Loading ${selection.label}...` });
+          await this.configService.restoreConfigVersion(selection.timestamp);
+
+          progress.report({ increment: 50, message: "Done" });
+          this.showingForm = false;
+          void this.refresh();
+          this.showToast(`🔁 Restored ${selection.label}`);
+          vscode.window.showInformationMessage(`Config restored from ${selection.label}`);
+        } catch (error) {
+          vscode.window.showErrorMessage(
+            `Failed to restore config: ${(error as Error).message}`
+          );
+        }
+      }
+    );
+  }
+
+  private async handleOpenVisualSettings() {
+    await vscode.commands.executeCommand(
+      "workbench.action.openSettings",
+      "@ext:cc-dayers.battlestation"
+    );
   }
 
   /* ─── toast ─── */

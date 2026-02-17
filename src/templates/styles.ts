@@ -271,10 +271,65 @@ export const colorPickerStyles = `
 `;
 
 export const checkboxStyles = `
-  .lp-checkbox-row { display: flex; align-items: center; margin: 4px 0; }
-  .lp-checkbox-row input { margin: 0 6px 0 0; cursor: pointer; }
-  .lp-checkbox-row label { font-size: 12px; cursor: pointer; user-select: none; }
-  .lp-checkbox-row.disabled { opacity: 0.4; }
-  .lp-checkbox-row.disabled input,
-  .lp-checkbox-row.disabled label { cursor: not-allowed; }
+  .lp-checkbox-row {
+    display: flex;
+    align-items: center;
+    margin: 4px 0;
+    cursor: pointer;
+    user-select: none;
+    font-size: 12px;
+    padding: 4px;
+    border-radius: 3px;
+    transition: background 0.1s;
+  }
+  .lp-checkbox-row:hover {
+    background: var(--vscode-list-hoverBackground);
+  }
+  .lp-checkbox-row input {
+    margin: 0 8px 0 0;
+    cursor: pointer;
+  }
+  .lp-checkbox-row.disabled input {
+    cursor: not-allowed;
+  }
+`;
+
+export const optionCardStyles = `
+  .lp-option-card {
+    display: block;
+    margin: 16px 0;
+    padding: 12px;
+    background: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-widget-border);
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+  .lp-option-card:hover {
+    background: var(--vscode-list-hoverBackground);
+    border-color: var(--vscode-focusBorder);
+  }
+  .lp-option-card.selected {
+    background: var(--vscode-inputOption-activeBackground);
+    border-color: var(--vscode-focusBorder);
+    color: var(--vscode-inputOption-activeForeground);
+    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+  }
+  .lp-option-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .lp-option-title {
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .lp-option-desc {
+    margin-left: 24px;
+    margin-top: 4px;
+    font-size: 11px;
+    opacity: 0.8;
+  }
 `;

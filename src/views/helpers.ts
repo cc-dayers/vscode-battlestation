@@ -15,10 +15,10 @@ export function renderCheckbox(
   disabled = false
 ): string {
   return `
-  <div class="lp-checkbox-row ${disabled ? "disabled" : ""}">
+  <label class="lp-checkbox-row ${disabled ? "disabled" : ""}" for="${id}">
     <input type="checkbox" id="${id}" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""}>
-    <label for="${id}">${label}</label>
-  </div>`;
+    <span>${label}</span>
+  </label>`;
 }
 
 export function renderToggleSetting(

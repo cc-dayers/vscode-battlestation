@@ -44,10 +44,17 @@ This is a VS Code extension that provides two webview-based panels:
 - All config and todos operations are async
 
 **Config File Location**
-- New location: `.battle/battle.config` (preferred)
-- Legacy location: `battle.config` (root directory)
-- ConfigService automatically migrates from legacy to new location
-- File watching monitors both locations for changes
+- **Current location**: `.vscode/battle.config` (follows VS Code conventions)
+- **Legacy location 1**: `.battle/battle.config` (auto-migrated on first access)
+- **Legacy location 2**: `battle.config` (root directory, auto-migrated)
+- ConfigService automatically migrates from legacy locations to `.vscode/` on first load
+- File watching monitors `.vscode/battle.config` only
+
+**Config History**
+- Stored in `.vscode/battle.history.jsonl` (JSONL format)
+- Each line is a JSON object containing: `{ timestamp, label, config }`
+- Automatically appended to before each config overwrite
+- Old `.battle/versions/*.json` files migrated to JSONL on first load
 
 **Todos Storage**
 - Stored in `.battle.todos.json` in workspace root
@@ -189,3 +196,45 @@ Actions track their workspace via the optional `workspace` property. This allows
 - Registers webview providers for both panels
 - Todos panel only registers if `battlestation.experimental.enableTodos` is enabled
 - ConfigService sets up FileSystemWatcher on activation to detect config changes
+
+### Loading States and Progress API
+**IMPORTANT**: All async operations that affect the user-visible state MUST use VS Code's Progress API.
+
+**Implementation Pattern**:
+```typescript
+await vscode.window.withProgress(
+  {
+    location: { viewId: "battlestation.view" },
+    title: "Operation description...",
+    cancellable: false,
+  },
+  async (progress) => {
+    progress.report({ increment: 20, message: "Step 1..." });
+    // Do work
+    progress.report({ increment: 50, message: "Step 2..." });
+    // More work
+    progress.report({ increment: 30, message: "Done" });
+  }
+);
+```
+
+**Operations Using Progress API**:
+- Config generation (`handleCreateConfig`)
+- Config restoration (`handleRestoreConfig`)
+- Blank config creation (`handleCreateBlankConfig`)
+- Tool detection (`handleShowGenerateConfig`, `handleRedetectTools`)
+
+**Webview Loading States**:
+- Settings view shows "⚙️ Loading settings..." until state is injected via `window.__SETTINGS__`
+- Check for `window.__SETTINGS__` existence before rendering main content
+
+**What NOT to do**:
+- ❌ Don't use `this.isLoading` flags with custom loading views
+- ❌ Don't replace entire view content with loading spinners
+- ❌ Don't leave async operations without progress feedback
+
+**Benefits**:
+- Consistent with VS Code UX guidelines
+- Non-intrusive (appears in view header)
+- Automatically positioned and styled
+- Users can see progress without losing context

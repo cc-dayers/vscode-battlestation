@@ -96,6 +96,7 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
           <div class="lp-color-picker" id="colorPicker">
             ${colorOptions}
           </div>
+          <input type="text" id="customColor" placeholder="Or enter color (e.g., #ff0000, rgba(...), or var(...))" value="${esc(group.color || "")}" style="margin-top: 6px; width: 100%;">
           <div class="lp-hint">Color for text and icon in group header</div>
         </div>
         <div class="lp-form-group">
@@ -103,6 +104,7 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
           <div class="lp-color-picker" id="bgColorPicker">
             ${bgColorOptions}
           </div>
+          <input type="text" id="customBgColor" placeholder="Or enter color (e.g., #ff0000, rgba(...), or var(...))" value="${esc(group.backgroundColor || "")}" style="margin-top: 6px; width: 100%;">
           <div class="lp-hint">Background color for the group section</div>
         </div>
         <div class="lp-form-group">
@@ -110,6 +112,7 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
           <div class="lp-color-picker" id="borderColorPicker">
             ${borderColorOptions}
           </div>
+          <input type="text" id="customBorderColor" placeholder="Or enter color (e.g., #ff0000, rgba(...), or var(...))" value="${esc(group.borderColor || "")}" style="margin-top: 6px; width: 100%;">
           <div class="lp-hint">Border color around the group section</div>
         </div>
         <div class="lp-form-actions">
@@ -123,41 +126,84 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
         const vscode = acquireVsCodeApi();
         const oldGroup = ${groupJson};
         let selectedIcon = '${esc(group.icon || "")}';
-        let selectedColor = '${esc(group.color || "")}';
-        let selectedBgColor = '${esc(group.backgroundColor || "")}';
-        let selectedBorderColor = '${esc(group.borderColor || "")}';
 
-        document.querySelectorAll('.lp-icon-option').forEach(opt => {
-          opt.addEventListener('click', () => {
+        // Helper to handle color selection logic
+        function handleColorSelection(wrapperId, inputId, selectedValue) {
+          const wrapper = document.getElementById(wrapperId);
+          const input = document.getElementById(inputId);
+          
+          // Clear previous selection
+          wrapper.querySelectorAll('.lp-color-option').forEach(o => o.classList.remove('selected'));
+          
+          // Find if there's a matching preset
+          const matchingPreset = Array.from(wrapper.querySelectorAll('.lp-color-option'))
+            .find(o => o.getAttribute('data-color') === selectedValue);
+            
+          if (matchingPreset) {
+            matchingPreset.classList.add('selected');
+          }
+          
+          // Update input if it doesn't match
+          if (input.value !== selectedValue) {
+             input.value = selectedValue;
+          }
+        }
+
+        // Initialize presets based on current values
+        // We delay slightly to ensure DOM is ready if needed, though usually fine here
+        setTimeout(() => {
+            const color = document.getElementById('customColor').value;
+            const bg = document.getElementById('customBgColor').value;
+            const border = document.getElementById('customBorderColor').value;
+            
+            if (color) handleColorSelection('colorPicker', 'customColor', color);
+            if (bg) handleColorSelection('bgColorPicker', 'customBgColor', bg);
+            if (border) handleColorSelection('borderColorPicker', 'customBorderColor', border);
+        }, 0);
+
+        // Event delegation for all click events
+        document.addEventListener('click', (e) => {
+          const target = e.target.closest('.lp-icon-option, .lp-color-option, #cancelBtn');
+          if (!target) return;
+
+          // Icon selection
+          if (target.classList.contains('lp-icon-option')) {
             document.querySelectorAll('.lp-icon-option').forEach(o => o.classList.remove('selected'));
-            opt.classList.add('selected');
-            selectedIcon = opt.getAttribute('data-icon');
+            target.classList.add('selected');
+            selectedIcon = target.getAttribute('data-icon');
             document.getElementById('customIcon').value = '';
-          });
-        });
+            return;
+          }
 
-        document.querySelectorAll('#colorPicker .lp-color-option').forEach(opt => {
-          opt.addEventListener('click', () => {
-            document.querySelectorAll('#colorPicker .lp-color-option').forEach(o => o.classList.remove('selected'));
-            opt.classList.add('selected');
-            selectedColor = opt.getAttribute('data-color');
-          });
-        });
+          // Color selection
+          if (target.classList.contains('lp-color-option')) {
+            const parent = target.parentElement;
+            const color = target.getAttribute('data-color');
+            
+            if (parent.id === 'colorPicker') {
+              handleColorSelection('colorPicker', 'customColor', color);
+            } else if (parent.id === 'bgColorPicker') {
+              handleColorSelection('bgColorPicker', 'customBgColor', color);
+            } else if (parent.id === 'borderColorPicker') {
+              handleColorSelection('borderColorPicker', 'customBorderColor', color);
+            }
+            return;
+          }
 
-        document.querySelectorAll('#bgColorPicker .lp-color-option').forEach(opt => {
-          opt.addEventListener('click', () => {
-            document.querySelectorAll('#bgColorPicker .lp-color-option').forEach(o => o.classList.remove('selected'));
-            opt.classList.add('selected');
-            selectedBgColor = opt.getAttribute('data-color');
-          });
+          // Cancel button
+          if (target.id === 'cancelBtn') {
+            vscode.postMessage({ command: 'cancelForm' });
+            return;
+          }
         });
-
-        document.querySelectorAll('#borderColorPicker .lp-color-option').forEach(opt => {
-          opt.addEventListener('click', () => {
-            document.querySelectorAll('#borderColorPicker .lp-color-option').forEach(o => o.classList.remove('selected'));
-            opt.classList.add('selected');
-            selectedBorderColor = opt.getAttribute('data-color');
-          });
+        
+        // Listen for manual color input
+        ['customColor', 'customBgColor', 'customBorderColor'].forEach(id => {
+            const pickerId = id === 'customColor' ? 'colorPicker' : (id === 'customBgColor' ? 'bgColorPicker' : 'borderColorPicker');
+            document.getElementById(id).addEventListener('input', (e) => {
+                const val = e.target.value;
+                handleColorSelection(pickerId, id, val);
+            });
         });
 
         document.getElementById('customIcon').addEventListener('input', (e) => {
@@ -165,22 +211,23 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
           selectedIcon = e.target.value;
         });
 
-        document.getElementById('cancelBtn').addEventListener('click', () => {
-          vscode.postMessage({ command: 'cancelForm' });
-        });
-
         document.getElementById('editGroupForm').addEventListener('submit', (e) => {
           e.preventDefault();
           const groupName = document.getElementById('groupName').value.trim();
           const customIcon = document.getElementById('customIcon').value.trim();
           const icon = customIcon || selectedIcon || '';
+          
+          const color = document.getElementById('customColor').value.trim();
+          const backgroundColor = document.getElementById('customBgColor').value.trim();
+          const borderColor = document.getElementById('customBorderColor').value.trim();
+          
           if (!groupName) return;
           const newGroup = { 
             name: groupName, 
             icon: icon || undefined, 
-            color: selectedColor || undefined,
-            backgroundColor: selectedBgColor || undefined,
-            borderColor: selectedBorderColor || undefined
+            color: color || undefined,
+            backgroundColor: backgroundColor || undefined,
+            borderColor: borderColor || undefined
           };
           vscode.postMessage({ command: 'submitEditGroup', oldGroup, newGroup });
         });

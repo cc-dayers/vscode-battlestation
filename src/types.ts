@@ -4,10 +4,11 @@ export interface Action {
   name: string;
   command: string;
   type: string;
+  cwd?: string; // Execution context (root directory)
   group?: string;
   hidden?: boolean;
-  workspace?: string;
-  backgroundColor?: string; // Hex color for action background
+  workspace?: string; // Can be used as secondary grouping key
+  backgroundColor?: string;
 }
 
 export interface IconMapping {
@@ -18,9 +19,16 @@ export interface IconMapping {
 export interface Group {
   name: string;
   icon?: string;
-  color?: string; // Text/icon color (keeping for backwards compatibility)
-  backgroundColor?: string; // Background color for the group
-  borderColor?: string; // Border color for the group
+  color?: string;
+  backgroundColor?: string;
+  borderColor?: string;
+}
+
+export interface SecondaryGroup {
+  icon?: string;
+  color?: string;
+  backgroundColor?: string;
+  borderColor?: string;
 }
 
 export interface Todo {
@@ -37,7 +45,10 @@ export interface TodosData {
 }
 
 export interface Config {
-  icons?: IconMapping[];
-  groups?: Group[];
   actions: Action[];
+  groups?: Group[];
+  icons?: IconMapping[];
+  secondaryGroups?: Record<string, SecondaryGroup>;
+  density?: string; // "compact" or "comfortable"
+  [key: string]: any; // Allow arbitrary keys from config
 }

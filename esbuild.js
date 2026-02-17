@@ -49,7 +49,7 @@ const esbuildProblemMatcherPlugin = {
 };
 
 async function main() {
-  const ctx = await esbuild.context({
+  const extensionCtx = await esbuild.context({
     entryPoints: ["src/extension.ts"],
     bundle: true,
     format: "cjs",
@@ -63,12 +63,27 @@ async function main() {
     plugins: [cssTextLoaderPlugin, esbuildProblemMatcherPlugin],
   });
 
+  const webviewCtx = await esbuild.context({
+    entryPoints: ["src/webview/settingsView.ts"],
+    bundle: true,
+    format: "esm",
+    minify: production,
+    sourcemap: !production,
+    sourcesContent: false,
+    platform: "browser",
+    outdir: "media",
+    logLevel: "silent",
+  });
+
   if (watch) {
-    await ctx.watch();
+    await extensionCtx.watch();
+    await webviewCtx.watch();
     console.log("Watching for changes...");
   } else {
-    await ctx.rebuild();
-    await ctx.dispose();
+    await extensionCtx.rebuild();
+    await webviewCtx.rebuild();
+    await extensionCtx.dispose();
+    await webviewCtx.dispose();
     console.log("Build complete.");
   }
 }

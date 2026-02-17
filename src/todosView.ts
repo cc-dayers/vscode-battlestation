@@ -10,13 +10,22 @@ export class TodoPanelProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private currentView: "list" | "form" = "list";
   private editingTodoId?: string;
+  private readonly disposables: vscode.Disposable[] = [];
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly todosService: TodosService,
     private readonly mainProvider: BattlestationViewProvider
   ) {
-    this.todosService.onDidChange(() => this.refresh());
+    this.disposables.push(
+      this.todosService.onDidChange(() => this.refresh())
+    );
+  }
+
+  /* ─── Disposal ─── */
+
+  public dispose(): void {
+    this.disposables.forEach(d => d.dispose());
   }
 
   public resolveWebviewView(
@@ -26,6 +35,12 @@ export class TodoPanelProvider implements vscode.WebviewViewProvider {
   ) {
     this.view = webviewView;
     webviewView.webview.options = { enableScripts: true };
+    
+    // Show loading state immediately
+    const cspSource = webviewView.webview.cspSource;
+    const nonce = getNonce();
+    webviewView.webview.html = this.renderSimpleLoading(cspSource, nonce);
+    
     webviewView.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
     void this.refresh();
   }
@@ -95,6 +110,36 @@ export class TodoPanelProvider implements vscode.WebviewViewProvider {
     } else {
       this.view.webview.html = await this.renderForm(cspSource, nonce);
     }
+  }
+
+  /* ─── Simple loading view ─── */
+
+  private renderSimpleLoading(cspSource: string, nonce: string): string {
+    return htmlShell({
+      title: "Loading Todos...",
+      cspSource,
+      nonce,
+      styles: `
+        body {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 200px;
+          font-family: var(--vscode-font-family);
+          color: var(--vscode-foreground);
+          opacity: 0.7;
+        }
+        .loading { text-align: center; }
+        .spinner { font-size: 20px; margin-bottom: 8px; }
+      `,
+      body: `
+        <div class="loading">
+          <div class="spinner">⏳</div>
+          <div>Loading todos...</div>
+        </div>
+      `,
+      script: "",
+    });
   }
 
   /* ─── List view ─── */
@@ -247,58 +292,75 @@ const todoListScript = `
       vscode.postMessage({ command: 'showAddForm' });
     });
 
-    document.querySelectorAll('.todo-checkbox').forEach(cb => {
-      cb.addEventListener('change', () => {
-        vscode.postMessage({ command: 'toggleComplete', todoId: cb.dataset.id });
-      });
+    // Event delegation for all todo item interactions
+    document.addEventListener('change', (e) => {
+      if (e.target.matches && e.target.matches('.todo-checkbox')) {
+        vscode.postMessage({ command: 'toggleComplete', todoId: e.target.dataset.id });
+      }
     });
 
-    document.querySelectorAll('.todo-content').forEach(el => {
-      el.addEventListener('click', () => {
-        vscode.postMessage({ command: 'showEditForm', todoId: el.dataset.edit });
-      });
-    });
+    document.addEventListener('click', (e) => {
+      // Todo content click (edit)
+      if (e.target.matches && e.target.matches('.todo-content')) {
+        vscode.postMessage({ command: 'showEditForm', todoId: e.target.dataset.edit });
+        return;
+      }
 
-    document.querySelectorAll('.edit-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        vscode.postMessage({ command: 'showEditForm', todoId: btn.dataset.id });
-      });
-    });
+      // Edit button click
+      const editBtn = e.target.closest('.edit-btn');
+      if (editBtn) {
+        vscode.postMessage({ command: 'showEditForm', todoId: editBtn.dataset.id });
+        return;
+      }
 
-    document.querySelectorAll('.delete-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
+      // Delete button click
+      const deleteBtn = e.target.closest('.delete-btn');
+      if (deleteBtn) {
         if (confirm('Delete this todo?')) {
-          vscode.postMessage({ command: 'deleteTodo', todoId: btn.dataset.id });
+          vscode.postMessage({ command: 'deleteTodo', todoId: deleteBtn.dataset.id });
         }
-      });
+        return;
+      }
     });
 
-    document.querySelectorAll('.todo-item').forEach(item => {
-      item.addEventListener('dragstart', (e) => {
+    // Event delegation for drag and drop
+    document.addEventListener('dragstart', (e) => {
+      const item = e.target.closest('.todo-item');
+      if (item) {
         draggedElement = item;
         item.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
-      });
-      item.addEventListener('dragover', (e) => {
+      }
+    });
+
+    document.addEventListener('dragover', (e) => {
+      const target = e.target.closest('.todo-item');
+      if (target && draggedElement && target !== draggedElement) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        const target = e.target.closest('.todo-item');
-        if (target && target !== draggedElement) {
-          const list = document.getElementById('todoList');
-          const items = Array.from(list.children);
-          const dIdx = items.indexOf(draggedElement);
-          const tIdx = items.indexOf(target);
-          if (dIdx < tIdx) { target.parentNode.insertBefore(draggedElement, target.nextSibling); }
-          else { target.parentNode.insertBefore(draggedElement, target); }
-        }
-      });
-      item.addEventListener('drop', (e) => { e.stopPropagation(); });
-      item.addEventListener('dragend', () => {
+        const list = document.getElementById('todoList');
+        const items = Array.from(list.children);
+        const dIdx = items.indexOf(draggedElement);
+        const tIdx = items.indexOf(target);
+        if (dIdx < tIdx) { target.parentNode.insertBefore(draggedElement, target.nextSibling); }
+        else { target.parentNode.insertBefore(draggedElement, target); }
+      }
+    });
+
+    document.addEventListener('drop', (e) => {
+      if (e.target.closest('.todo-item')) {
+        e.stopPropagation();
+      }
+    });
+
+    document.addEventListener('dragend', (e) => {
+      const item = e.target.closest('.todo-item');
+      if (item) {
         item.classList.remove('dragging');
         const list = document.getElementById('todoList');
         const ids = Array.from(list.children).map(el => el.dataset.id);
         vscode.postMessage({ command: 'reorderTodos', todoIds: ids });
-      });
+      }
     });
   })();
 `;

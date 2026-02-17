@@ -14,6 +14,7 @@ export interface DetectionOptions {
   maven?: boolean;
   cmake?: boolean;
   git?: boolean;
+  [key: string]: boolean | undefined;
 }
 
 /**
@@ -21,7 +22,7 @@ export interface DetectionOptions {
  * Supports file-based, command-based, and hybrid detection methods.
  */
 export class ToolDetectionService {
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(private readonly context: vscode.ExtensionContext) { }
 
   /* ─── Workspace helpers ─── */
 
@@ -152,7 +153,7 @@ export class ToolDetectionService {
     // Check common installation paths or use which/where command
     const isWindows = process.platform === "win32";
     const checkCmd = isWindows ? `where ${command}` : `which ${command}`;
-    
+
     try {
       const { exec } = require("child_process");
       return await new Promise<boolean>((resolve) => {
@@ -235,7 +236,7 @@ export class ToolDetectionService {
           cmake: await this.hasCMake(),
           git: await this.hasGit(),
         };
-      
+
       case "command":
         return {
           docker: await this.hasDockerCommand(),
@@ -249,7 +250,7 @@ export class ToolDetectionService {
           cmake: await this.hasCMakeCommand(),
           git: await this.hasGitCommand(),
         };
-      
+
       case "hybrid":
         // For hybrid, both file AND command must be present
         const fileResults = await this.detectToolAvailability("file");

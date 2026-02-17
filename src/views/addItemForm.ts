@@ -18,10 +18,25 @@ export interface AddActionContext {
   typeOptions: string;
 }
 
+const THEME_COLORS = [
+  { name: "Blue", value: "var(--vscode-charts-blue)" },
+  { name: "Red", value: "var(--vscode-charts-red)" },
+  { name: "Green", value: "var(--vscode-charts-green)" },
+  { name: "Yellow", value: "var(--vscode-charts-yellow)" },
+  { name: "Orange", value: "var(--vscode-charts-orange)" },
+  { name: "Purple", value: "var(--vscode-charts-purple)" },
+  { name: "Foreground", value: "var(--vscode-foreground)" },
+];
+
 export function renderAddActionForm(ctx: AddActionContext): string {
   const iconGrid = COMMON_CODICONS.map(
     (icon) =>
       `<div class="lp-icon-option" data-icon="${icon}" title="${icon}"><span class="codicon codicon-${icon}"></span></div>`
+  ).join("");
+
+  const colorOptions = THEME_COLORS.map(
+    (color) =>
+      `<div class="lp-color-option" data-color="${color.value}" style="background: ${color.value};" title="${color.name}"></div>`
   ).join("");
 
   return htmlShell({
@@ -46,6 +61,12 @@ export function renderAddActionForm(ctx: AddActionContext): string {
       .lp-icon-option.selected { opacity: 1; }
       .lp-icon-grid { max-height: 150px; }
       #customIconInput { margin-top: 8px; font-family: var(--vscode-editor-font-family); }
+      
+      .lp-color-picker { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+      .lp-color-option { width: 20px; height: 20px; border-radius: 4px; cursor: pointer; border: 1px solid var(--vscode-widget-border); opacity: 0.7; transition: all 0.2s; }
+      .lp-color-option:hover { opacity: 1; transform: scale(1.1); }
+      .lp-color-option.selected { border-color: var(--vscode-focusBorder); opacity: 1; transform: scale(1.1); box-shadow: 0 0 0 2px var(--vscode-focusBorder); }
+
       ${buttonStyles}
     `,
     body: `
@@ -76,6 +97,14 @@ export function renderAddActionForm(ctx: AddActionContext): string {
           </div>
         </div>
         <div class="lp-form-group">
+            <label>Button Background Color</label>
+            <div class="lp-color-picker" id="bgColorPicker">
+                ${colorOptions}
+            </div>
+            <input type="text" id="customBgColor" placeholder="Or enter color (e.g., #ff0000, rgba(...), or var(...))" style="margin-top: 6px; width: 100%;">
+            <div class="lp-hint">Background color for the action button</div>
+        </div>
+        <div class="lp-form-group">
           <label for="command">Command *</label>
           <input type="text" id="command" placeholder="e.g., npm run build" required>
           <div class="lp-hint" id="commandHint">Shell command to execute</div>
@@ -99,6 +128,28 @@ export function renderAddActionForm(ctx: AddActionContext): string {
         const commandHint = document.getElementById('commandHint');
         let selectedIcon = null;
 
+        // Helper to handle color selection logic
+        function handleColorSelection(wrapperId, inputId, selectedValue) {
+          const wrapper = document.getElementById(wrapperId);
+          const input = document.getElementById(inputId);
+          
+          // Clear previous selection
+          wrapper.querySelectorAll('.lp-color-option').forEach(o => o.classList.remove('selected'));
+          
+          // Find if there's a matching preset
+          const matchingPreset = Array.from(wrapper.querySelectorAll('.lp-color-option'))
+            .find(o => o.getAttribute('data-color') === selectedValue);
+            
+          if (matchingPreset) {
+            matchingPreset.classList.add('selected');
+          }
+          
+          // Update input if it doesn't match
+          if (input.value !== selectedValue) {
+             input.value = selectedValue;
+          }
+        }
+
         iconGrid.addEventListener('click', (e) => {
           const option = e.target.closest('.lp-icon-option');
           if (!option) return;
@@ -106,6 +157,19 @@ export function renderAddActionForm(ctx: AddActionContext): string {
           option.classList.add('selected');
           selectedIcon = option.dataset.icon;
           customIconInput.value = selectedIcon;
+        });
+
+        // Color picker event listener
+        document.getElementById('bgColorPicker').addEventListener('click', (e) => {
+            const target = e.target.closest('.lp-color-option');
+            if (target) {
+                const color = target.getAttribute('data-color');
+                handleColorSelection('bgColorPicker', 'customBgColor', color);
+            }
+        });
+
+        document.getElementById('customBgColor').addEventListener('input', (e) => {
+            handleColorSelection('bgColorPicker', 'customBgColor', e.target.value);
         });
 
         customIconInput.addEventListener('input', () => {
@@ -154,7 +218,8 @@ export function renderAddActionForm(ctx: AddActionContext): string {
           const item = {
             name: document.getElementById('name').value.trim(),
             type: itemType,
-            command: document.getElementById('command').value.trim()
+            command: document.getElementById('command').value.trim(),
+            backgroundColor: document.getElementById('customBgColor').value.trim() || undefined
           };
           if (item.name && item.command) {
             const customIconValue = customIconInput ? customIconInput.value.trim() : null;

@@ -7,6 +7,7 @@ export interface LayoutOptions {
   body: string;
   script: string;
   scriptUri?: string;
+  cssUri?: string;
 }
 
 /**
@@ -22,6 +23,10 @@ export function htmlShell(opts: LayoutOptions): string {
     ? `<script nonce="${opts.nonce}" type="module" src="${opts.scriptUri}"></script>`
     : "";
 
+  const externalCss = opts.cssUri
+    ? `<link href="${opts.cssUri}" rel="stylesheet" />`
+    : "";
+
   return /*html*/ `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -30,6 +35,7 @@ export function htmlShell(opts: LayoutOptions): string {
     content="default-src 'none'; style-src ${opts.cspSource} 'unsafe-inline'; font-src ${opts.cspSource}; script-src ${opts.cspSource} 'nonce-${opts.nonce}';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   ${codiconBlock}
+  ${externalCss}
   <title>${opts.title}</title>
   <style>${opts.styles}</style>
 </head>

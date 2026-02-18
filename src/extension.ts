@@ -6,7 +6,7 @@ import { TodosService } from "./services/todosService";
 
 export function activate(context: vscode.ExtensionContext) {
   const configService = new ConfigService(context);
-  const todosService = new TodosService(context);
+  const todosService = new TodosService(context, configService);
   const provider = new BattlestationViewProvider(context, configService, todosService);
   const todosProvider = new TodoPanelProvider(context, todosService, provider);
 
@@ -61,4 +61,4 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-export function deactivate() {}
+export function deactivate() { }

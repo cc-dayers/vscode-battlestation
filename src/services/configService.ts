@@ -161,6 +161,10 @@ export class ConfigService {
       normalized.icons = raw.icons;
     }
 
+    if (Array.isArray(raw.todos)) {
+      normalized.todos = raw.todos;
+    }
+
     return normalized;
   }
 

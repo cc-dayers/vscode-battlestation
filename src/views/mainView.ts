@@ -10,6 +10,8 @@ export interface MainViewContext {
   codiconStyles: string;
   config: Config;
   showHidden: boolean;
+  searchVisible: boolean;
+  cssUri?: string;
 }
 
 /* ─── renderButton ─── */
@@ -295,110 +297,35 @@ export function renderMainView(ctx: MainViewContext): string {
     body: `
       <div id="toast" class="lp-toast"></div>
       ${visibleActions.length > 0 ? `
-        <input type="text" class="lp-search-box" id="searchBox" placeholder="🔍 Search (try: workspace:coordinator, group:npm, -type:shell, -test)..." autocomplete="off">
-        <div id="searchActions" style="display: none;" class="lp-search-actions">
-          <button class="lp-search-btn" id="hideAllBtn" style="display: none;">Hide All</button>
-          <button class="lp-search-btn" id="showAllBtn" style="display: none;">Show All</button>
-          <button class="lp-search-btn" id="selectMultipleBtn" style="display: none;">Select Multiple</button>
+        <div id="searchContainer" class="${ctx.searchVisible ? 'block' : 'hidden'}">
+          <input type="text" 
+            class="w-full px-2 py-1.5 mb-2 text-xs bg-vscode-input-bg text-vscode-input-fg border border-vscode-input-border rounded-sm focus:outline-none focus:ring-1 focus:ring-vscode-focusBorder"
+            id="searchBox" 
+            placeholder="🔍 Search (try: workspace:coordinator, group:npm, -type:shell, -test)..." 
+            autocomplete="off">
+          <div id="searchActions" class="hidden flex gap-1.5 mb-2">
+          <button class="flex-1 px-2 py-1 text-[11px] border-none rounded-sm cursor-pointer bg-vscode-button-sec-bg text-vscode-button-sec-fg hover:bg-vscode-button-sec-hover" id="hideAllBtn">Hide All</button>
+          <button class="flex-1 px-2 py-1 text-[11px] border-none rounded-sm cursor-pointer bg-vscode-button-sec-bg text-vscode-button-sec-fg hover:bg-vscode-button-sec-hover" id="showAllBtn">Show All</button>
+          <button class="flex-1 px-2 py-1 text-[11px] border-none rounded-sm cursor-pointer bg-vscode-button-sec-bg text-vscode-button-sec-fg hover:bg-vscode-button-sec-hover" id="selectMultipleBtn">Select Multiple</button>
         </div>
-        <div id="selectionActions" style="display: none;" class="lp-search-actions">
-          <button class="lp-search-btn" id="hideSelectedBtn">Hide Selected</button>
-          <button class="lp-search-btn" id="showSelectedBtn">Show Selected</button>
-          <button class="lp-search-btn lp-btn-secondary" id="cancelSelectionBtn">Cancel</button>
+        <div id="selectionActions" class="hidden flex gap-1.5 mb-2">
+          <button class="flex-1 px-2 py-1 text-[11px] border-none rounded-sm cursor-pointer bg-vscode-button-sec-bg text-vscode-button-sec-fg hover:bg-vscode-button-sec-hover" id="hideSelectedBtn">Hide Selected</button>
+          <button class="flex-1 px-2 py-1 text-[11px] border-none rounded-sm cursor-pointer bg-vscode-button-sec-bg text-vscode-button-sec-fg hover:bg-vscode-button-sec-hover" id="showSelectedBtn">Show Selected</button>
+          <button class="flex-1 px-2 py-1 text-[11px] border-none rounded-sm cursor-pointer bg-vscode-button-sec-bg text-vscode-button-sec-fg hover:bg-vscode-button-sec-hover" id="cancelSelectionBtn">Cancel</button>
         </div>
-      ` : ''}
-      ${hiddenCount > 0 ? `<div class="lp-toolbar"><label class="lp-toggle"><input type="checkbox" id="toggleHidden" ${ctx.showHidden ? "checked" : ""}><span>Show hidden (${hiddenCount})</span></label></div>` : ""}
+      </div>` : ''}
+      ${hiddenCount > 0 ? `<div class="flex items-center justify-between mb-2 p-1 text-[11px]"><label class="flex items-center gap-1 cursor-pointer opacity-80 hover:opacity-100 select-none"><input type="checkbox" id="toggleHidden" ${ctx.showHidden ? "checked" : ""}><span>Show hidden (${hiddenCount})</span></label></div>` : ""}
       <div class="lp-grid ${density}" id="contentGrid">
         ${content}
       </div>
     `,
     script: mainViewScript(visibleActions, iconMap, config),
+    cssUri: ctx.cssUri,
   });
 }
 
 /* ─── styles ─── */
 const mainViewStyles = `
-  * { box-sizing: border-box; }
-  body {
-    font-family: var(--vscode-font-family);
-    color: var(--vscode-foreground);
-    background: transparent;
-    padding: 8px;
-    margin: 0;
-    overflow-x: hidden;
-  }
-  .lp-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 4px; font-size: 11px; }
-  .lp-search-box { width: 100%; padding: 6px 8px; margin-bottom: 8px; font-size: 12px; font-family: inherit; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, transparent); border-radius: 3px; }
-  .lp-search-box:focus { outline: 1px solid var(--vscode-focusBorder); }
-  .lp-search-actions { display: flex; gap: 6px; margin-bottom: 8px; }
-  .lp-search-btn { flex: 1; padding: 4px 8px; font-size: 11px; font-family: inherit; border: none; border-radius: 3px; cursor: pointer; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
-  .lp-search-btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
-  .lp-toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; opacity: 0.8; user-select: none; }
-  .lp-toggle:hover { opacity: 1; }
-  .lp-toggle input[type="checkbox"] { cursor: pointer; }
-  .lp-toggle input[type="checkbox"] { cursor: pointer; }
-  .lp-grid { display: flex; flex-direction: column; gap: 1px; }
-  .lp-group { margin-bottom: 0; }
-  .lp-group > summary { list-style: none; }
-  .lp-group > summary::-webkit-details-marker { display: none; }
-  .lp-group-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 4px 8px; margin-bottom: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; opacity: 0.95; border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35)); position: sticky; top: 0; z-index: 5; background: var(--vscode-editor-background); cursor: pointer; }
-  .lp-group-chevron { font-size: 14px; opacity: 0.7; transition: transform 150ms ease; flex-shrink: 0; }
-  .lp-group:not([open]) .lp-group-chevron { transform: rotate(-90deg); }
-  .lp-group-header-content { display: flex; align-items: center; gap: 6px; flex: 1; }
-  .lp-group-edit-btn { opacity: 0; padding: 2px 6px; background: transparent; border: none; color: var(--vscode-foreground); cursor: pointer; font-size: 14px; transition: opacity 0.2s; }
-  .lp-group-header:hover .lp-group-edit-btn { opacity: 0.6; }
-  .lp-group-edit-btn:hover { opacity: 1 !important; background: var(--vscode-toolbar-hoverBackground); }
-  .lp-group-icon { font-size: 14px; }
-  .lp-group-name { flex: 1; }
-  .lp-group-items { display: flex; flex-direction: column; gap: 6px; }
-  
-  /* Density Styles */
-  .lp-grid.comfortable { gap: 6px; }
-  .lp-grid.comfortable .lp-group { margin-bottom: 8px; }
-  .lp-grid.comfortable .lp-btn-wrapper { min-height: 48px; }
-  .lp-grid.compact { gap: 2px; }
-  .lp-grid.compact .lp-group { margin-bottom: 2px; }
-  .lp-grid.compact .lp-btn-wrapper { min-height: 36px; }
-  
-  .lp-btn-wrapper { position: relative; display: flex; align-items: stretch; transition: opacity 0.15s; }
-  .lp-btn-wrapper:hover { opacity: 1; }
-  .lp-btn-checkbox { position: absolute; left: 44px; top: 50%; transform: translateY(-50%); cursor: pointer; z-index: 1; }
-  .lp-btn.has-checkbox { padding-left: 32px; }
-  .lp-btn { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 10px 14px; padding-right: 90px; border: 1px solid var(--vscode-button-border, var(--vscode-contrastBorder, transparent)); border-left: none; border-radius: 0 4px 4px 0; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); text-align: left; font-family: inherit; font-size: 13px; box-sizing: border-box; }
-  .lp-btn-name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
-  .lp-icon { font-size: 18px; line-height: 1; flex-shrink: 0; }
-  .lp-hidden-badge { font-size: 9px; opacity: 0.5; font-weight: normal; }
-  .lp-btn-meta { font-size: 10px; opacity: 0.7; margin-top: 3px; }
-  .lp-workspace-label { padding: 2px 6px; border-radius: 2px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); font-weight: 600; font-size: 9px; }
-  .lp-play-btn { width: 36px; align-self: stretch; padding: 0; border: 1px solid var(--vscode-button-border, var(--vscode-contrastBorder, "transparent")); border-right: none; border-radius: 4px 0 0 4px; background: var(--lp-play-btn-bg, transparent); color: var(--vscode-foreground); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease; flex-shrink: 0; }
-  .lp-play-btn:hover { background: var(--vscode-toolbar-hoverBackground); color: var(--vscode-charts-green); }
-  .lp-hide-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; padding: 0; border: none; border-radius: 3px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; opacity: 0; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-  .lp-edit-btn { position: absolute; right: 26px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; padding: 0; border: none; border-radius: 3px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; opacity: 0; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-  .lp-color-btn { position: absolute; right: 48px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; padding: 0; border: none; border-radius: 3px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; opacity: 0; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-  .lp-group-btn, .lp-ungroup-btn { position: absolute; right: 70px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; padding: 0; border: none; border-radius: 3px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; opacity: 0; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-  .lp-btn-wrapper:hover .lp-hide-btn, .lp-btn-wrapper:hover .lp-edit-btn, .lp-btn-wrapper:hover .lp-color-btn, .lp-btn-wrapper:hover .lp-group-btn, .lp-btn-wrapper:hover .lp-ungroup-btn { opacity: 1; }
-  .lp-group-btn:hover, .lp-ungroup-btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
-  .lp-hide-btn:hover, .lp-edit-btn:hover, .lp-color-btn:hover { background: var(--vscode-inputOption-hoverBackground); }
-  .lp-group-dropdown { position: absolute; right: 88px; top: calc(50% + 14px); background: var(--vscode-dropdown-background); border: 1px solid var(--vscode-dropdown-border, var(--vscode-contrastBorder)); border-radius: 3px; padding: 4px 0; z-index: 100; min-width: 150px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
-  .lp-group-option { padding: 4px 12px; font-size: 11px; cursor: pointer; white-space: nowrap; }
-  .lp-group-option:hover { background: var(--vscode-list-hoverBackground); }
-  .lp-hide-icon { font-size: 14px; line-height: 1; }
-  .lp-empty { opacity: 0.6; font-style: italic; font-size: 12px; margin: 0; text-align: center; }
-  .lp-btn-secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
-  .lp-empty-state { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px dashed var(--vscode-widget-border); border-radius: 4px; background: var(--vscode-editor-background); }
-  .lp-welcome { text-align: center; }
-  .lp-welcome-title { margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: var(--vscode-foreground); }
-  .lp-welcome-text { margin: 0; font-size: 12px; opacity: 0.8; line-height: 1.3; }
-  .lp-empty-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-  .lp-empty-btn { padding: 8px 10px; border: 1px solid var(--vscode-button-border, transparent); border-radius: 4px; cursor: pointer; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); transition: all 0.15s ease; display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1 1 160px; min-width: 0; max-width: 240px; }
-  .lp-empty-btn:hover { background: var(--vscode-button-secondaryHoverBackground); border-color: var(--vscode-focusBorder); transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); }
-  .lp-empty-primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-button-background); }
-  .lp-empty-primary:hover { background: var(--vscode-button-hoverBackground); border-color: var(--vscode-button-hoverBackground); }
-  .lp-empty-secondary { background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border); }
-  .lp-empty-secondary:hover { background: var(--vscode-list-hoverBackground); border-color: var(--vscode-focusBorder); }
-  .lp-empty-btn .codicon { font-size: 20px; }
-  .lp-btn-label { font-size: 12px; font-weight: 600; }
-  .lp-btn-hint { font-size: 10px; opacity: 0.7; text-align: center; line-height: 1.2; word-wrap: break-word; }
   ${toastStyles}
 `;
 
@@ -455,6 +382,18 @@ function mainViewScript(
       window.addEventListener('message', event => {
         const message = event.data;
         if (message.command === 'showToast') { showToast(message.message); }
+        if (message.command === 'toggleSearch') {
+          const container = document.getElementById('searchContainer');
+          if (container) {
+            if (message.visible) {
+              container.classList.remove('hidden');
+              const box = document.getElementById('searchBox');
+              if (box) box.focus();
+            } else {
+              container.classList.add('hidden');
+            }
+          }
+        }
       });
       const updateCollapsedState = () => {
         const current = vscode.getState() || {};
@@ -537,14 +476,24 @@ function mainViewScript(
       };
 
       const updateSearchActions = (term) => {
-        if (!searchActions || !selectionActions) return; // Don't update if elements don't exist
-        if (!term) { searchActions.style.display = 'none'; selectionActions.style.display = 'none'; return; }
+        if (!searchActions || !selectionActions) return;
+        if (!term) { 
+          searchActions.classList.add('hidden'); 
+          selectionActions.classList.add('hidden'); 
+          return; 
+        }
         const vis = getVisibleActions();
         const hasHidden = vis.some(i => i.hidden);
         const hasVisible = vis.some(i => !i.hidden);
-        if (selectionMode) { searchActions.style.display = 'none'; selectionActions.style.display = 'flex'; }
-        else {
-          searchActions.style.display = 'flex'; selectionActions.style.display = 'none';
+        
+        if (selectionMode) { 
+          searchActions.classList.add('hidden'); 
+          selectionActions.classList.remove('hidden'); 
+          selectionActions.style.display = 'flex';
+        } else {
+          searchActions.classList.remove('hidden'); 
+          selectionActions.classList.add('hidden');
+          
           if (hideAllBtn) hideAllBtn.style.display = hasVisible ? 'block' : 'none';
           if (showAllBtn) showAllBtn.style.display = hasHidden ? 'block' : 'none';
           if (selectMultipleBtn) selectMultipleBtn.style.display = 'block';

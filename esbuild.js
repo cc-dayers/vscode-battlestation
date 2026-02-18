@@ -75,15 +75,39 @@ async function main() {
     logLevel: "silent",
   });
 
+  // Copy media assets
+  try {
+    require("fs").cpSync("node_modules/@vscode/codicons/dist/codicon.ttf", "media/codicon.ttf");
+    require("fs").cpSync("node_modules/@vscode/codicons/dist/codicon.css", "media/codicon.css");
+  } catch (e) {
+    console.error("Failed to copy codicons:", e);
+  }
+
+  const { sassPlugin } = require("esbuild-sass-plugin");
+  const cssCtx = await esbuild.context({
+    entryPoints: ["src/style.scss"],
+    bundle: true,
+    minify: production,
+    outfile: "media/output.css",
+    plugins: [sassPlugin(), esbuildProblemMatcherPlugin],
+    external: ["*.ttf"],
+    logLevel: "info",
+  });
+
   if (watch) {
     await extensionCtx.watch();
     await webviewCtx.watch();
-    console.log("Watching for changes...");
+    await cssCtx.watch();
+    console.log("[watch] Watching for changes...");
   } else {
     await extensionCtx.rebuild();
     await webviewCtx.rebuild();
+    await cssCtx.rebuild();
+
     await extensionCtx.dispose();
     await webviewCtx.dispose();
+    await cssCtx.dispose();
+
     console.log("Build complete.");
   }
 }
@@ -92,3 +116,4 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
+

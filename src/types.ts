@@ -48,6 +48,7 @@ export interface Config {
   actions: Action[];
   groups?: Group[];
   icons?: IconMapping[];
+  todos?: Todo[];
   secondaryGroups?: Record<string, SecondaryGroup>;
   density?: string; // "compact" or "comfortable"
   [key: string]: any; // Allow arbitrary keys from config

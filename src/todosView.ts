@@ -35,12 +35,12 @@ export class TodoPanelProvider implements vscode.WebviewViewProvider {
   ) {
     this.view = webviewView;
     webviewView.webview.options = { enableScripts: true };
-    
+
     // Show loading state immediately
     const cspSource = webviewView.webview.cspSource;
     const nonce = getNonce();
     webviewView.webview.html = this.renderSimpleLoading(cspSource, nonce);
-    
+
     webviewView.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
     void this.refresh();
   }
@@ -68,6 +68,9 @@ export class TodoPanelProvider implements vscode.WebviewViewProvider {
         break;
       case "reorderTodos":
         void this.todosService.reorderTodos(message.todoIds);
+        break;
+      case "generateTodos":
+        void this.todosService.generateDefaults();
         break;
       case "cancelForm":
         this.currentView = "list";
@@ -146,18 +149,6 @@ export class TodoPanelProvider implements vscode.WebviewViewProvider {
 
   private async renderList(cspSource: string, nonce: string): Promise<string> {
     const data = await this.todosService.readTodos();
-    const codiconFontUri = this.view?.webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, "media", "codicon.ttf")
-    );
-
-    const codiconCss = `
-      @font-face { font-family: "codicon"; font-display: block; src: url("${codiconFontUri}") format("truetype"); }
-      .codicon { font: normal normal normal 16px/1 codicon; display: inline-block; text-decoration: none; text-rendering: auto; text-align: center; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; user-select: none; }
-      .codicon-add:before { content: "\\ea60"; }
-      .codicon-edit:before { content: "\\ea73"; }
-      .codicon-trash:before { content: "\\ea81"; }
-    `;
-
     const items = data.todos
       .map(
         (todo) => `
@@ -179,8 +170,15 @@ export class TodoPanelProvider implements vscode.WebviewViewProvider {
 
     const body =
       data.todos.length === 0
-        ? `<div class="todo-header"><h2>\ud83d\udcdd Todos</h2><button class="add-btn" id="addBtn" title="Add Todo"><span class="codicon codicon-add"></span></button></div>
-           <div class="empty-state">No todos yet. Click + to add one!</div>`
+        ? `<div class="todo-header">
+              <h2>\ud83d\udcdd Todos</h2>
+              <button class="add-btn" id="addBtn" title="Add Todo"><span class="codicon codicon-add"></span></button>
+            </div>
+            <div class="empty-state">
+              <div class="empty-icon">\ud83d\udcdd</div>
+              <div class="empty-text">No todos found in battle.json</div>
+              <button class="generate-btn" id="generateBtn">Generate Examples</button>
+            </div>`
         : `<div class="todo-header"><h2>\ud83d\udcdd Todos</h2><button class="add-btn" id="addBtn" title="Add Todo"><span class="codicon codicon-add"></span></button></div>
            <ul class="todo-list" id="todoList">${items}</ul>`;
 
@@ -188,9 +186,10 @@ export class TodoPanelProvider implements vscode.WebviewViewProvider {
       title: "Todos",
       cspSource,
       nonce,
-      styles: `${codiconCss}${todoListStyles}`,
+      styles: todoListStyles,
       body,
       script: todoListScript,
+      cssUri: this.view?.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "output.css")).toString(),
     });
   }
 
@@ -202,11 +201,14 @@ export class TodoPanelProvider implements vscode.WebviewViewProvider {
       ? data.todos.find((t) => t.id === this.editingTodoId)
       : null;
 
+    const cssUri = this.view?.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "output.css")).toString();
+
     return htmlShell({
       title: editingTodo ? "Edit Todo" : "Add Todo",
       cspSource,
       nonce,
       styles: todoFormStyles,
+      cssUri,
       body: `
         <div class="form-header">
           <h2>${editingTodo ? "\u270f\ufe0f Edit Todo" : "\u2795 Add Todo"}</h2>
@@ -257,31 +259,8 @@ export class TodoPanelProvider implements vscode.WebviewViewProvider {
 
 /* ─── Styles ─── */
 
-const todoListStyles = `
-  body { padding: 10px; color: var(--vscode-foreground); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
-  .todo-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-  .todo-header h2 { margin: 0; font-size: 16px; }
-  .add-btn { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 6px 10px; cursor: pointer; border-radius: 2px; display: flex; align-items: center; justify-content: center; }
-  .add-btn:hover { background: var(--vscode-button-hoverBackground); }
-  .empty-state { text-align: center; padding: 40px 20px; color: var(--vscode-descriptionForeground); }
-  .todo-list { list-style: none; padding: 0; margin: 0; }
-  .todo-item { display: flex; align-items: center; padding: 10px; margin-bottom: 8px; background: var(--vscode-editor-background); border-radius: 4px; cursor: move; border-left: 3px solid transparent; }
-  .todo-item:hover { background: var(--vscode-list-hoverBackground); }
-  .todo-item.priority-high { border-left-color: #f85149; }
-  .todo-item.priority-medium { border-left-color: #d29922; }
-  .todo-item.priority-low { border-left-color: #3fb950; }
-  .todo-item.completed { opacity: 0.6; }
-  .todo-item.completed .todo-name { text-decoration: line-through; }
-  .todo-checkbox { margin-right: 10px; cursor: pointer; }
-  .todo-content { flex: 1; min-width: 0; cursor: pointer; }
-  .todo-name { font-weight: 500; margin-bottom: 2px; }
-  .todo-detail { font-size: 12px; color: var(--vscode-descriptionForeground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .todo-actions { display: none; gap: 8px; }
-  .todo-item:hover .todo-actions { display: flex; }
-  .icon-btn { background: transparent; border: none; color: var(--vscode-foreground); cursor: pointer; padding: 2px; opacity: 0.7; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 2px; }
-  .icon-btn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
-  .dragging { opacity: 0.5; }
-`;
+const todoListStyles = '';
+const todoFormStyles = '';
 
 const todoListScript = `
   (function() {
@@ -290,6 +269,10 @@ const todoListScript = `
 
     document.getElementById('addBtn')?.addEventListener('click', () => {
       vscode.postMessage({ command: 'showAddForm' });
+    });
+
+    document.getElementById('generateBtn')?.addEventListener('click', () => {
+      vscode.postMessage({ command: 'generateTodos' });
     });
 
     // Event delegation for all todo item interactions
@@ -363,20 +346,4 @@ const todoListScript = `
       }
     });
   })();
-`;
-
-const todoFormStyles = `
-  body { padding: 10px; color: var(--vscode-foreground); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
-  .form-header { margin-bottom: 20px; }
-  .form-header h2 { margin: 0 0 5px 0; font-size: 16px; }
-  .form-group { margin-bottom: 15px; }
-  label { display: block; margin-bottom: 5px; font-weight: 500; }
-  input[type="text"], textarea, select { width: 100%; padding: 6px 8px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 2px; font-family: inherit; font-size: inherit; box-sizing: border-box; }
-  textarea { min-height: 80px; resize: vertical; }
-  .form-actions { display: flex; gap: 10px; margin-top: 20px; }
-  button { flex: 1; padding: 8px 16px; border: none; border-radius: 2px; cursor: pointer; font-size: inherit; }
-  .save-btn { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
-  .save-btn:hover { background: var(--vscode-button-hoverBackground); }
-  .cancel-btn { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
-  .cancel-btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
 `;

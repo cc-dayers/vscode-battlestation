@@ -30,6 +30,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private showingForm: FormState = false;
   private showHidden = false;
+  private searchVisible = false;
   private currentEditGroup?: Group;
   private currentEditAction?: Action;
   private generateFormParams?: {
@@ -248,6 +249,13 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  public toggleSearch() {
+    this.searchVisible = !this.searchVisible;
+    if (this.view) {
+      this.view.webview.postMessage({ command: "toggleSearch", visible: this.searchVisible });
+    }
+  }
+
   /* ─── public API for TodoPanelProvider ─── */
 
   public async getTodosData() {
@@ -433,6 +441,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       codiconStyles: this.getCodiconStyles(),
       config: enrichedConfig,
       showHidden: this.showHidden,
+      searchVisible: this.searchVisible,
+      cssUri: this.view?.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "output.css")).toString(),
     });
   }
 

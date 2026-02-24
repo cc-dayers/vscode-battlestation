@@ -43,20 +43,22 @@ suite('Color Rules Test Suite', () => {
 
         const actions = await configService.scanNpmScripts();
         // Check first action from subfolder if any
-        const subAction = actions.find(a => a.name.includes(':')); // usually sub-workspace scripts have 'npm: script'
+        const subAction = actions.find(a => a.workspace); // sub-workspace scripts have workspace field
         if (subAction) {
-            assert.strictEqual(subAction.backgroundColor, undefined, 'Background color should be undefined when auto-color is false');
+            assert.strictEqual(subAction.workspaceColor, undefined, 'Workspace color should be undefined when auto-color is false');
         }
     });
 
-    test('Enable auto colors', async () => {
+    test('Enable auto colors for workspaces', async () => {
         const config = vscode.workspace.getConfiguration('battlestation');
         await config.update('display.enableAutoActionColors', true, vscode.ConfigurationTarget.Global);
 
         const actions = await configService.scanNpmScripts();
         const subAction = actions.find(a => a.workspace);
         if (subAction) {
-            assert.ok(subAction.backgroundColor, 'Background color should be set when auto-color is true');
+            assert.ok(subAction.workspaceColor, 'Workspace color should be set when auto-color is true');
+            // Should use a VS Code chart color variable
+            assert.ok(subAction.workspaceColor.includes('var(--vscode-charts-'), 'Should use VS Code chart color');
         }
     });
 

@@ -24,13 +24,17 @@ const cssTextLoaderPlugin = {
 /**
  * This plugin hooks into the build process to print errors in a format that the problem matcher
  * in VS Code can understand.
- * @type {import('esbuild').Plugin}
+ * @param {string} name - Context name
+ * @param {boolean} silentStatus - If true, suppressed start/end messages (errors still shown)
+ * @returns {import('esbuild').Plugin}
  */
-const esbuildProblemMatcherPlugin = {
+const createProblemMatcherPlugin = (name, silentStatus = false) => ({
   name: "esbuild-problem-matcher",
   setup(build) {
     build.onStart(() => {
-      console.log("[watch] build started");
+      if (!silentStatus) {
+        console.log(`[watch] build started`);
+      }
     });
     build.onEnd((result) => {
       result.errors.forEach(({ text, location }) => {
@@ -39,14 +43,16 @@ const esbuildProblemMatcherPlugin = {
           console.error(`    ${location.file}:${location.line}:${location.column}:`);
         }
       });
-      if (result.errors.length === 0) {
-        console.log("[watch] build finished ✓");
-      } else {
-        console.log("[watch] build finished with errors");
+      if (!silentStatus) {
+        if (result.errors.length === 0) {
+          console.log(`[watch] build finished ✓`);
+        } else {
+          console.log(`[watch] build finished with errors`);
+        }
       }
     });
   },
-};
+});
 
 async function main() {
   const extensionCtx = await esbuild.context({
@@ -60,11 +66,11 @@ async function main() {
     outfile: "dist/extension.js",
     external: ["vscode"],
     logLevel: "silent",
-    plugins: [cssTextLoaderPlugin, esbuildProblemMatcherPlugin],
+    plugins: [cssTextLoaderPlugin, createProblemMatcherPlugin("extension", false)],
   });
 
   const webviewCtx = await esbuild.context({
-    entryPoints: ["src/webview/settingsView.ts"],
+    entryPoints: ["src/webview/settingsView.ts", "src/webview/mainView.ts"],
     bundle: true,
     format: "esm",
     minify: production,
@@ -89,9 +95,9 @@ async function main() {
     bundle: true,
     minify: production,
     outfile: "media/output.css",
-    plugins: [sassPlugin(), esbuildProblemMatcherPlugin],
+    plugins: [sassPlugin(), createProblemMatcherPlugin("css", true)],
     external: ["*.ttf"],
-    logLevel: "info",
+    logLevel: "silent",
   });
 
   if (watch) {

@@ -45,6 +45,24 @@ suite('ConfigService Test Suite', () => {
         assert.ok(watchTask, 'Should find "watch" task');
     });
 
+    test('scanTasks should respect task group field from tasks.json', async () => {
+        const mockContext = {
+            globalState: { get: () => { }, update: () => { } },
+            extensionUri: vscode.Uri.file(__dirname),
+            subscriptions: []
+        } as any;
+        const configService = new ConfigService(mockContext);
+        const tasks = await configService.scanTasks();
+        
+        // The watch task has group: { kind: "build", isDefault: true }
+        const watchTask = tasks.find(t => t.name === 'Task: watch');
+        assert.ok(watchTask, 'Should find "watch" task');
+        // Group from tasks.json should be in workspace field (secondary grouping)
+        assert.strictEqual(watchTask.workspace, 'Build', 'Watch task should have Build in workspace field (secondary grouping)');
+        // Type should still be task
+        assert.strictEqual(watchTask.type, 'task', 'Watch task should have task type');
+    });
+
     // launch.json might not exist or be populated in strictly test environ depending on how we launch
     // But let's try
     test('scanLaunchConfigs should detect configurations', async () => {

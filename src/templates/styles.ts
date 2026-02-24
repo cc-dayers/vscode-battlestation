@@ -231,42 +231,140 @@ export const settingsToggleStyles = `
 `;
 
 export const colorPickerStyles = `
-  .lp-color-picker {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+  .lp-color-picker-container {
+    padding: 10px;
+    background: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-widget-border);
+    border-radius: 4px;
+  }
+  .lp-picker-label {
+    display: block;
+    font-size: 11px;
+    margin-bottom: 8px;
+    opacity: 0.9;
+  }
+  .lp-color-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .lp-color-section {
+    display: flex;
+    flex-direction: column;
     gap: 6px;
-    padding: 8px;
-    background: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border, transparent);
-    border-radius: 3px;
+  }
+  .lp-color-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.85;
+  }
+  .lp-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.8;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .lp-color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(24px, 24px));
+    gap: 6px;
+  }
+  .lp-add-color-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 4px;
+    border: 1px solid var(--vscode-button-border, var(--vscode-contrastBorder, transparent));
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+  }
+  .lp-add-color-btn:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
   }
   .lp-color-option {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     border-radius: 4px;
     cursor: pointer;
-    border: 2px solid transparent;
-    transition: all 0.15s;
+    border: 1px solid transparent;
+    transition: all 0.1s;
     position: relative;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   }
   .lp-color-option:hover {
-    transform: scale(1.1);
+    transform: scale(1.15);
+    z-index: 1;
     border-color: var(--vscode-focusBorder);
   }
   .lp-color-option.selected {
     border-color: var(--vscode-focusBorder);
-    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+    box-shadow: 0 0 0 2px var(--vscode-focusBorder);
+    z-index: 2;
   }
-  .lp-color-option.selected::after {
-    content: "✓";
+  .lp-no-custom-colors {
+    font-size: 11px;
+    font-style: italic;
+    opacity: 0.6;
+    padding: 4px 0 2px;
+  }
+  .lp-color-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--vscode-widget-border);
+  }
+  .lp-color-preview {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    border: 1px solid var(--vscode-widget-border);
+    background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), 
+                      linear-gradient(-45deg, #ccc 25%, transparent 25%), 
+                      linear-gradient(45deg, transparent 75%, #ccc 75%), 
+                      linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 10px 10px;
+    background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
+  }
+  .lp-color-text-input {
+    flex: 1;
+    font-family: var(--vscode-editor-font-family, monospace);
+  }
+  .lp-native-picker-wrapper {
+    position: relative;
+    width: 28px;
+    height: 28px;
+    overflow: hidden;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--vscode-button-secondaryBackground);
+    border-radius: 3px;
+  }
+  .lp-native-picker-wrapper:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+  }
+  .lp-native-picker-wrapper input[type="color"] {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: var(--vscode-editor-background);
-    font-weight: bold;
-    font-size: 16px;
-    text-shadow: 0 0 2px rgba(0,0,0,0.5);
+    top: -10px;
+    left: -10px;
+    width: 50px;
+    height: 50px;
+    opacity: 0;
+    cursor: pointer;
   }
 `;
 

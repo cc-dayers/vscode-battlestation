@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { Config, Action, Group, IconMapping } from "../types";
+import type { Config, Action, Group, IconMapping, SecondaryGroup } from "../types";
 
 interface HistoryEntry {
   timestamp: number;
@@ -54,10 +54,33 @@ export class ConfigService {
     return root ? vscode.Uri.joinPath(root, ".vscode") : undefined;
   }
 
-  /** New location: .vscode/battle.json */
-  private getConfigUri(): vscode.Uri | undefined {
+  private static readonly CUSTOM_PATH_KEY = 'battlestation.customConfigPath';
+
+  /** Get the user-selected custom config directory, if any */
+  getCustomConfigPath(): string | undefined {
+    return this.context?.workspaceState?.get<string>(ConfigService.CUSTOM_PATH_KEY);
+  }
+
+  /** Persist the custom config directory and refresh the file watcher */
+  async setCustomConfigPath(dirPath: string | undefined): Promise<void> {
+    await this.context?.workspaceState?.update(ConfigService.CUSTOM_PATH_KEY, dirPath);
+    this.invalidateCache();
+    this.refreshFileWatcher();
+  }
+
+  /** Default location: .vscode/battle.json */
+  private getDefaultConfigUri(): vscode.Uri | undefined {
     const folder = this.getVSCodeFolderUri();
     return folder ? vscode.Uri.joinPath(folder, "battle.json") : undefined;
+  }
+
+  /** Active config location — custom dir takes priority over default */
+  private getConfigUri(): vscode.Uri | undefined {
+    const custom = this.getCustomConfigPath();
+    if (custom) {
+      return vscode.Uri.joinPath(vscode.Uri.file(custom), "battle.json");
+    }
+    return this.getDefaultConfigUri();
   }
 
   /** Old location: .vscode/battle.config */
@@ -93,15 +116,31 @@ export class ConfigService {
   /* ─── File watcher ─── */
 
   private setupFileWatcher(): void {
-    const root = this.getWorkspaceRoot();
-    if (!root) return;
+    this.refreshFileWatcher();
+  }
 
-    this.fileWatcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(
+  private refreshFileWatcher(): void {
+    // Dispose previous watcher
+    this.fileWatcher?.dispose();
+
+    const custom = this.getCustomConfigPath();
+    let pattern: vscode.RelativePattern | string;
+
+    if (custom) {
+      pattern = new vscode.RelativePattern(
+        vscode.Uri.file(custom),
+        "battle.json"
+      );
+    } else {
+      const root = this.getWorkspaceRoot();
+      if (!root) return;
+      pattern = new vscode.RelativePattern(
         vscode.workspace.workspaceFolders![0],
         ".vscode/battle.json"
-      )
-    );
+      );
+    }
+
+    this.fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
 
     const notify = () => {
       this.invalidateCache();
@@ -113,8 +152,26 @@ export class ConfigService {
     this.fileWatcher.onDidDelete(notify);
 
     if (this.context) {
-      this.context.subscriptions.push(this.fileWatcher, this._onDidChange);
+      this.context.subscriptions.push(this.fileWatcher);
     }
+  }
+
+  /** Copy an external JSON file into the active config location */
+  async importConfig(sourceUri: vscode.Uri): Promise<void> {
+    const destUri = this.getConfigUri();
+    if (!destUri) {
+      throw new Error('No workspace open');
+    }
+    // Ensure destination directory exists
+    const destDir = vscode.Uri.joinPath(destUri, '..');
+    await this.ensureDir(destDir);
+    // Backup existing config first
+    if (await this.fileExists(destUri)) {
+      const existing = JSON.parse(await this.readText(destUri));
+      await this.appendToHistory(existing, `Before import ${this.getTimestampLabel()}`);
+    }
+    await vscode.workspace.fs.copy(sourceUri, destUri, { overwrite: true });
+    this.invalidateCache();
   }
 
   /* ─── Async FS helpers ─── */
@@ -161,8 +218,35 @@ export class ConfigService {
       normalized.icons = raw.icons;
     }
 
-    if (Array.isArray(raw.todos)) {
+    // Migration: Legacy todos array -> ignore or migrate if needed
+    // Current: todos object -> Keep for backward compatibility but migrate to todoLists if missing
+    if (raw.todos && typeof raw.todos === "object" && !Array.isArray(raw.todos)) {
       normalized.todos = raw.todos;
+    }
+
+    if (raw.todoLists && typeof raw.todoLists === "object") {
+      normalized.todoLists = raw.todoLists;
+      normalized.activeTodoList = raw.activeTodoList;
+    } else if (normalized.todos) {
+      // Auto-migrate legacy single list to "default" list
+      const defaultListId = "default";
+      normalized.todoLists = {
+        [defaultListId]: {
+          id: defaultListId,
+          name: "Main List",
+          todos: normalized.todos,
+          icon: "list-flat"
+        }
+      };
+      normalized.activeTodoList = defaultListId;
+    }
+
+    if (raw.secondaryGroups) {
+      normalized.secondaryGroups = raw.secondaryGroups;
+    }
+
+    if (Array.isArray(raw.customColors)) {
+      normalized.customColors = raw.customColors;
     }
 
     return normalized;
@@ -475,6 +559,26 @@ export class ConfigService {
     await vscode.window.showTextDocument(doc);
   }
 
+  async openConfigFolder(): Promise<void> {
+    const customPath = this.getCustomConfigPath();
+    const folderUri = customPath
+      ? vscode.Uri.file(customPath)
+      : this.getVSCodeFolderUri();
+
+    if (!folderUri) {
+      vscode.window.showWarningMessage('No workspace folder is open.');
+      return;
+    }
+
+    await this.ensureDir(folderUri);
+
+    try {
+      await vscode.env.openExternal(folderUri);
+    } catch {
+      await vscode.commands.executeCommand('revealFileInOS', folderUri);
+    }
+  }
+
   invalidateCache(): void {
     this.configCache = undefined;
   }
@@ -669,7 +773,7 @@ export class ConfigService {
                     type: "npm",
                     cwd: subDirUri.fsPath,
                     workspace: workspaceLabel,
-                    backgroundColor: color
+                    workspaceColor: color
                   };
                   this.applyColorRules(action);
                   actions.push(action);
@@ -747,11 +851,33 @@ export class ConfigService {
             const label = t.label || t.script || t.command;
             if (!label) return;
 
+            // Extract group from task if present - this becomes SECONDARY grouping
+            let secondaryGroup: string | undefined;
+            if (t.group) {
+              // group can be a string or { kind: "build", isDefault: true }
+              if (typeof t.group === 'string') {
+                secondaryGroup = t.group.charAt(0).toUpperCase() + t.group.slice(1);
+              } else if (t.group.kind) {
+                secondaryGroup = t.group.kind.charAt(0).toUpperCase() + t.group.kind.slice(1);
+              }
+            }
+
+            // Use workspace field for secondary grouping
+            // If we have both a workspace folder and a task group, combine them
+            let workspaceValue: string | undefined;
+            if (!isRootWorkspace && secondaryGroup) {
+              workspaceValue = `${folder.name} - ${secondaryGroup}`;
+            } else if (secondaryGroup) {
+              workspaceValue = secondaryGroup;
+            } else if (!isRootWorkspace) {
+              workspaceValue = folder.name;
+            }
+
             const action: Action = {
               name: `Task: ${label}`,
               command: `workbench.action.tasks.runTask|${label}`,
               type: "task",
-              workspace: isRootWorkspace ? undefined : folder.name,
+              workspace: workspaceValue,
             };
             this.applyColorRules(action);
             allActions.push(action);
@@ -942,7 +1068,7 @@ export class ConfigService {
       }
 
       const typeGroups = new Map<string, Action[]>();
-      // ... existing grouping logic ...
+      // Group actions by type (npm, task, launch, etc.)
       actions.forEach(a => {
         let type = a.type || 'other';
         if (a.name.startsWith('npm: ')) type = 'npm';
@@ -1076,10 +1202,37 @@ export class ConfigService {
       }
     }
 
+    // Build secondaryGroups from workspace values
+    const secondaryGroups: Record<string, SecondaryGroup> = {};
+    finalActions.forEach(action => {
+      if (action.workspace && !secondaryGroups[action.workspace]) {
+        // Determine color and icon for secondary group
+        let color: string | undefined;
+        let backgroundColor: string | undefined;
+        
+        if (enableColoring) {
+          if (action.workspaceColor) {
+            // Use workspace color if available (from npm workspace detection)
+            backgroundColor = action.workspaceColor;
+          } else {
+            // Use default color based on name
+            color = this.getDefaultColorForGroup(action.workspace);
+          }
+        }
+
+        secondaryGroups[action.workspace] = {
+          icon: this.getDefaultIconForGroup(action.workspace),
+          color,
+          backgroundColor
+        };
+      }
+    });
+
     const config: Config = {
       actions: finalActions,
       groups: finalGroups,
       icons: finalIcons,
+      secondaryGroups: Object.keys(secondaryGroups).length > 0 ? secondaryGroups : undefined,
     };
     await this.writeConfig(config);
   }
@@ -1094,11 +1247,26 @@ export class ConfigService {
     if (lower.includes('docker') || lower.includes('container')) return "var(--vscode-charts-blue)";
     if (lower.includes('python')) return "var(--vscode-charts-yellow)";
     if (lower.includes('go')) return "var(--vscode-charts-blue)"; // Go gopher is blue-ish
-    if (lower.includes('rust')) return "var(--vscode-charts-orange)"; // Rust is orange-ish
-    if (lower.includes('test')) return "var(--vscode-charts-green)";
-    if (lower.includes('build')) return "var(--vscode-charts-purple)";
-    if (lower.includes('git')) return "var(--vscode-charts-purple)";
+    if (lower.includes('rust')) return "var(--vscode-charts-red)"; // Rust is red/orange
+    if (lower.includes('test')) return "var(--vscode-charts-yellow)";
+    if (lower.includes('build')) return "var(--vscode-charts-red)"; // Build gets red to differentiate from NPM purple
+    if (lower.includes('git')) return "var(--vscode-charts-green)";
     return undefined;
+  }
+
+  private getDefaultIconForGroup(name: string): string {
+    const lower = name.toLowerCase();
+    if (lower.includes('npm') || lower.includes('node')) return "package";
+    if (lower.includes('task')) return "checklist";
+    if (lower.includes('launch') || lower.includes('debug')) return "rocket";
+    if (lower.includes('docker') || lower.includes('container')) return "server";
+    if (lower.includes('python')) return "snake";
+    if (lower.includes('go')) return "go";
+    if (lower.includes('rust')) return "gear";
+    if (lower.includes('test')) return "beaker";
+    if (lower.includes('build')) return "tools";
+    if (lower.includes('git')) return "git-branch";
+    return "folder";
   }
 
   private async migrateConfig(

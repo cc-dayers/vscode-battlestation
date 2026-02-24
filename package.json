@@ -2,7 +2,7 @@
   "name": "battlestation",
   "displayName": "Battlestation",
   "description": "A configurable panel with action buttons driven by battle.json",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "cc-dayers",
   "repository": {
     "type": "git",
@@ -52,6 +52,26 @@
         "command": "battlestation.toggleSearch",
         "title": "Battlestation: Toggle Search",
         "icon": "$(search)"
+      },
+      {
+        "command": "battlestation.toggleHidden",
+        "title": "Battlestation: Show Hidden Items",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "battlestation.hideHidden",
+        "title": "Battlestation: Hide Hidden Items",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "battlestation.collapseAllGroups",
+        "title": "Battlestation: Collapse All Groups",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "battlestation.expandAllGroups",
+        "title": "Battlestation: Expand All Groups",
+        "icon": "$(expand-all)"
       }
     ],
     "viewsContainers": {
@@ -69,8 +89,9 @@
         {
           "type": "webview",
           "id": "battlestation.view",
-          "name": "Battlestation",
-          "icon": "media/icon.svg"
+          "name": "Actions",
+          "icon": "media/icon.svg",
+          "contextualTitle": "Battlestation"
         },
         {
           "type": "webview",
@@ -84,29 +105,49 @@
     "menus": {
       "view/title": [
         {
-          "command": "battlestation.addItem",
+          "command": "battlestation.toggleSearch",
           "when": "view == battlestation.view",
           "group": "navigation@1"
         },
         {
+          "command": "battlestation.addItem",
+          "when": "view == battlestation.view",
+          "group": "navigation@2"
+        },
+        {
           "command": "battlestation.addGroup",
           "when": "view == battlestation.view && battlestation.hasConfig",
-          "group": "navigation@2"
+          "group": "navigation@3"
+        },
+        {
+          "command": "battlestation.collapseAllGroups",
+          "when": "view == battlestation.view && battlestation.hasConfig && !battlestation.allGroupsCollapsed",
+          "group": "navigation@4"
+        },
+        {
+          "command": "battlestation.expandAllGroups",
+          "when": "view == battlestation.view && battlestation.hasConfig && battlestation.allGroupsCollapsed",
+          "group": "navigation@4"
+        },
+        {
+          "command": "battlestation.toggleHidden",
+          "when": "view == battlestation.view && !battlestation.showHidden",
+          "group": "navigation@5"
+        },
+        {
+          "command": "battlestation.hideHidden",
+          "when": "view == battlestation.view && battlestation.showHidden",
+          "group": "navigation@5"
         },
         {
           "command": "battlestation.refresh",
           "when": "view == battlestation.view",
-          "group": "navigation@3"
-        },
-        {
-          "command": "battlestation.toggleSearch",
-          "when": "view == battlestation.view",
-          "group": "navigation@0"
+          "group": "navigation@6"
         },
         {
           "command": "battlestation.openSettings",
           "when": "view == battlestation.view",
-          "group": "navigation@4"
+          "group": "navigation@7"
         }
       ]
     },
@@ -255,6 +296,14 @@
     "build": "npm run check-types && node esbuild.js --production",
     "watch": "node --no-deprecation esbuild.js --watch",
     "test": "vscode-test",
+    "test:ui": "vscode-test --grep \"Manual\"",
+    "test:ui-server": "node scripts/serve-ui.js",
+    "test:unit": "vscode-test --grep -v \"Manual\"",
+    "test:settings": "vscode-test --grep \"Settings\"",
+    "test:settings:manual": "vscode-test --grep \"Manual test: Open settings panel\"",
+    "test:actions": "vscode-test --grep \"Action UI\"",
+    "test:drag": "vscode-test --grep \"Drag and Drop\"",
+    "test:groups": "vscode-test --grep \"Group Management\"",
     "check-types": "tsc --noEmit",
     "lint": "eslint src --ext ts",
     "package": "npm run build && vsce package",

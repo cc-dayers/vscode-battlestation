@@ -1,22 +1,8 @@
 import { htmlShell } from "../templates/layout";
-import { buttonStyles, formStyles, iconPickerStyles, colorPickerStyles } from "../templates/styles";
+import { buttonStyles, formStyles, iconPickerStyles } from "../templates/styles";
 import { esc } from "./helpers";
 import type { Group } from "../types";
-
-const THEME_COLORS = [
-  { name: "Red", value: "var(--vscode-charts-red)" },
-  { name: "Orange", value: "var(--vscode-charts-orange)" },
-  { name: "Yellow", value: "var(--vscode-charts-yellow)" },
-  { name: "Green", value: "var(--vscode-charts-green)" },
-  { name: "Blue", value: "var(--vscode-charts-blue)" },
-  { name: "Purple", value: "var(--vscode-charts-purple)" },
-  { name: "Pink", value: "var(--vscode-charts-pink)" },
-  { name: "Foreground", value: "var(--vscode-foreground)" },
-  { name: "Error", value: "var(--vscode-errorForeground)" },
-  { name: "Warning", value: "var(--vscode-editorWarning-foreground)" },
-  { name: "Info", value: "var(--vscode-editorInfo-foreground)" },
-  { name: "Success", value: "var(--vscode-testing-iconPassed)" },
-];
+import { renderColorPicker, colorPickerScript } from "./components/colorPicker";
 
 export interface EditGroupContext {
   cspSource: string;
@@ -24,36 +10,16 @@ export interface EditGroupContext {
   codiconStyles: string;
   group: Group;
   availableIcons: string[];
+  customColors: string[];
 }
 
 export function renderEditGroupForm(ctx: EditGroupContext): string {
-  const { group } = ctx;
+  const { group, customColors } = ctx;
   const groupJson = JSON.stringify(group);
   const iconOptions = ctx.availableIcons
     .map(
       (icon) =>
         `<div class="lp-icon-option ${icon === group.icon ? "selected" : ""}" data-icon="${icon}"><span class="codicon codicon-${icon}"></span></div>`
-    )
-    .join("");
-
-  const colorOptions = THEME_COLORS
-    .map(
-      (color) =>
-        `<div class="lp-color-option ${color.value === group.color ? "selected" : ""}" data-color="${color.value}" style="background: ${color.value};" title="${color.name}"></div>`
-    )
-    .join("");
-
-  const bgColorOptions = THEME_COLORS
-    .map(
-      (color) =>
-        `<div class="lp-color-option ${color.value === group.backgroundColor ? "selected" : ""}" data-color="${color.value}" style="background: ${color.value};" title="${color.name}"></div>`
-    )
-    .join("");
-
-  const borderColorOptions = THEME_COLORS
-    .map(
-      (color) =>
-        `<div class="lp-color-option ${color.value === group.borderColor ? "selected" : ""}" data-color="${color.value}" style="background: ${color.value};" title="${color.name}"></div>`
     )
     .join("");
 
@@ -73,7 +39,6 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
       h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; }
       ${formStyles}
       ${iconPickerStyles}
-      ${colorPickerStyles}
       ${buttonStyles}
     `,
     body: `
@@ -91,30 +56,37 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
           <input type="text" id="customIcon" placeholder="Or enter codicon name (e.g., 'folder') or emoji" value="${esc(group.icon || "")}" style="margin-top: 6px; width: 100%;">
           <div class="lp-hint">Click an icon above or type codicon name/emoji</div>
         </div>
+
         <div class="lp-form-group">
-          <label>Text/Icon Color (optional)</label>
-          <div class="lp-color-picker" id="colorPicker">
-            ${colorOptions}
-          </div>
-          <input type="text" id="customColor" placeholder="Or enter color (e.g., #ff0000, rgba(...), or var(...))" value="${esc(group.color || "")}" style="margin-top: 6px; width: 100%;">
-          <div class="lp-hint">Color for text and icon in group header</div>
+          ${renderColorPicker({
+      id: "customColor",
+      value: group.color,
+      customColors,
+      label: "Text/Icon Color (optional)",
+      placeholder: "e.g. #ff0000 or var(--color)"
+    })}
         </div>
+        
         <div class="lp-form-group">
-          <label>Background Color (optional)</label>
-          <div class="lp-color-picker" id="bgColorPicker">
-            ${bgColorOptions}
-          </div>
-          <input type="text" id="customBgColor" placeholder="Or enter color (e.g., #ff0000, rgba(...), or var(...))" value="${esc(group.backgroundColor || "")}" style="margin-top: 6px; width: 100%;">
-          <div class="lp-hint">Background color for the group section</div>
+          ${renderColorPicker({
+      id: "customBgColor",
+      value: group.backgroundColor,
+      customColors,
+      label: "Background Color (optional)",
+      placeholder: "e.g. #ff0000 or var(--color)"
+    })}
         </div>
+
         <div class="lp-form-group">
-          <label>Border Color (optional)</label>
-          <div class="lp-color-picker" id="borderColorPicker">
-            ${borderColorOptions}
-          </div>
-          <input type="text" id="customBorderColor" placeholder="Or enter color (e.g., #ff0000, rgba(...), or var(...))" value="${esc(group.borderColor || "")}" style="margin-top: 6px; width: 100%;">
-          <div class="lp-hint">Border color around the group section</div>
+           ${renderColorPicker({
+      id: "customBorderColor",
+      value: group.borderColor,
+      customColors,
+      label: "Border Color (optional)",
+      placeholder: "e.g. #ff0000 or var(--color)"
+    })}
         </div>
+
         <div class="lp-form-actions">
           <button type="button" class="lp-btn lp-btn-secondary" id="cancelBtn">Cancel</button>
           <button type="submit" class="lp-btn lp-btn-primary">Save Changes</button>
@@ -122,48 +94,20 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
       </form>
     `,
     script: `
+      ${colorPickerScript}
       (function () {
         const vscode = acquireVsCodeApi();
         const oldGroup = ${groupJson};
         let selectedIcon = '${esc(group.icon || "")}';
 
-        // Helper to handle color selection logic
-        function handleColorSelection(wrapperId, inputId, selectedValue) {
-          const wrapper = document.getElementById(wrapperId);
-          const input = document.getElementById(inputId);
-          
-          // Clear previous selection
-          wrapper.querySelectorAll('.lp-color-option').forEach(o => o.classList.remove('selected'));
-          
-          // Find if there's a matching preset
-          const matchingPreset = Array.from(wrapper.querySelectorAll('.lp-color-option'))
-            .find(o => o.getAttribute('data-color') === selectedValue);
-            
-          if (matchingPreset) {
-            matchingPreset.classList.add('selected');
-          }
-          
-          // Update input if it doesn't match
-          if (input.value !== selectedValue) {
-             input.value = selectedValue;
-          }
-        }
+        // Initialize color pickers
+        window.initColorPicker('customColor');
+        window.initColorPicker('customBgColor');
+        window.initColorPicker('customBorderColor');
 
-        // Initialize presets based on current values
-        // We delay slightly to ensure DOM is ready if needed, though usually fine here
-        setTimeout(() => {
-            const color = document.getElementById('customColor').value;
-            const bg = document.getElementById('customBgColor').value;
-            const border = document.getElementById('customBorderColor').value;
-            
-            if (color) handleColorSelection('colorPicker', 'customColor', color);
-            if (bg) handleColorSelection('bgColorPicker', 'customBgColor', bg);
-            if (border) handleColorSelection('borderColorPicker', 'customBorderColor', border);
-        }, 0);
-
-        // Event delegation for all click events
+        // Event delegation for icon picker and cancel
         document.addEventListener('click', (e) => {
-          const target = e.target.closest('.lp-icon-option, .lp-color-option, #cancelBtn');
+          const target = e.target.closest('.lp-icon-option, #cancelBtn');
           if (!target) return;
 
           // Icon selection
@@ -175,40 +119,26 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
             return;
           }
 
-          // Color selection
-          if (target.classList.contains('lp-color-option')) {
-            const parent = target.parentElement;
-            const color = target.getAttribute('data-color');
-            
-            if (parent.id === 'colorPicker') {
-              handleColorSelection('colorPicker', 'customColor', color);
-            } else if (parent.id === 'bgColorPicker') {
-              handleColorSelection('bgColorPicker', 'customBgColor', color);
-            } else if (parent.id === 'borderColorPicker') {
-              handleColorSelection('borderColorPicker', 'customBorderColor', color);
-            }
-            return;
-          }
-
           // Cancel button
           if (target.id === 'cancelBtn') {
             vscode.postMessage({ command: 'cancelForm' });
             return;
           }
         });
-        
-        // Listen for manual color input
-        ['customColor', 'customBgColor', 'customBorderColor'].forEach(id => {
-            const pickerId = id === 'customColor' ? 'colorPicker' : (id === 'customBgColor' ? 'bgColorPicker' : 'borderColorPicker');
-            document.getElementById(id).addEventListener('input', (e) => {
-                const val = e.target.value;
-                handleColorSelection(pickerId, id, val);
-            });
-        });
 
         document.getElementById('customIcon').addEventListener('input', (e) => {
           document.querySelectorAll('.lp-icon-option').forEach(o => o.classList.remove('selected'));
           selectedIcon = e.target.value;
+        });
+
+        // Watch for custom color inputs to save them
+        ['customColor', 'customBgColor', 'customBorderColor'].forEach(id => {
+           document.getElementById(id).addEventListener('change', (e) => {
+               const val = e.target.value;
+               if (val && !val.startsWith('var(')) {
+                   vscode.postMessage({ command: 'saveCustomColor', color: val });
+               }
+           });
         });
 
         document.getElementById('editGroupForm').addEventListener('submit', (e) => {

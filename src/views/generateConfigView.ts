@@ -31,12 +31,12 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
     ? `<div class="lp-setup">
         <h2>Welcome to Battlestation</h2>
         <p>No <code>battle.json</code> found.</p>
-        <p style="margin-bottom: 20px;">Create one automatically or manually to get started.</p>
+        <p class="lp-setup-desc">Create one automatically or manually to get started.</p>
       </div>`
     : '<h2>🚀 Generate Configuration</h2><p>Auto-detect commands from your workspace.</p>';
 
   const actions = ctx.showWelcome
-    ? `<div class="lp-form-actions" style="margin-top: 20px;">
+    ? `<div class="lp-form-actions lp-form-actions--welcome">
         <button type="button" class="lp-btn lp-btn-secondary" id="createBlankBtn">Create Blank</button>
         <button type="button" class="lp-btn lp-btn-primary" id="generateBtn">Generate</button>
       </div>`
@@ -53,23 +53,23 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
         Enhanced Mode (Advanced Options)
       </summary>
       <div class="lp-enhanced-content">
-        <div class="lp-sources" style="border-bottom: 1px solid var(--vscode-widget-border); padding-bottom: 10px; margin-bottom: 10px;">
+        <div class="lp-sources lp-sources--detection">
           <div class="lp-sources-title">Detection Method:</div>
-          <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px;">
+          <div class="lp-radio-group">
             <label class="lp-checkbox-row">
-              <input type="radio" name="detectionMethod" value="hybrid" checked style="cursor: pointer;" id="hybridRadio">
+              <input type="radio" name="detectionMethod" value="hybrid" checked class="lp-radio-input" id="hybridRadio">
               <span>Hybrid (File + Command) - Recommended</span>
             </label>
             <label class="lp-checkbox-row">
-              <input type="radio" name="detectionMethod" value="file" style="cursor: pointer;" id="fileRadio">
+              <input type="radio" name="detectionMethod" value="file" class="lp-radio-input" id="fileRadio">
               <span>File-based (Fast)</span>
             </label>
             <label class="lp-checkbox-row">
-              <input type="radio" name="detectionMethod" value="command" style="cursor: pointer;" id="commandRadio">
+              <input type="radio" name="detectionMethod" value="command" class="lp-radio-input" id="commandRadio">
               <span>Command-based (Accurate)</span>
             </label>
           </div>
-          <div style="font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 6px; font-style: italic;">
+          <div class="lp-detection-hint">
             ℹ️ Changing detection method will re-scan available tools
           </div>
         </div>
@@ -161,6 +161,54 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
       .lp-enhanced-content .lp-sources:last-child {
         margin-bottom: 0;
       }
+      .lp-sources--detection {
+        border-bottom: 1px solid var(--vscode-widget-border);
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+      }
+      .lp-radio-group {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin-top: 4px;
+      }
+      .lp-radio-input {
+        cursor: pointer;
+      }
+      .lp-detection-hint {
+        font-size: 11px;
+        color: var(--vscode-descriptionForeground);
+        margin-top: 6px;
+        font-style: italic;
+      }
+      .lp-setup-desc {
+        margin-bottom: 20px;
+      }
+      .lp-form-actions--welcome {
+        margin-top: 20px;
+      }
+      .lp-show-options-check {
+        cursor: pointer;
+        margin: 0;
+      }
+      .lp-options-hidden {
+        display: none;
+      }
+      .lp-generation-overlay {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: color-mix(in srgb, var(--vscode-editor-background) 86%, transparent);
+        z-index: 100;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .lp-generation-overlay.visible {
+        display: inline-flex;
+      }
       ${checkboxStyles}
       ${optionCardStyles}
       .lp-form-actions { display: flex; gap: 8px; }
@@ -171,7 +219,7 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
       
       <label class="lp-option-card" id="showOptionsLabel" for="showOptionsCheck">
         <div class="lp-option-header">
-          <input type="checkbox" id="showOptionsCheck" style="cursor: pointer; margin: 0;">
+          <input type="checkbox" id="showOptionsCheck" class="lp-show-options-check">
           <span class="lp-option-title">Show generation options</span>
         </div>
         <div class="lp-option-desc">
@@ -179,7 +227,7 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
         </div>
       </label>
 
-      <div id="optionsContainer" style="display: none;">
+      <div id="optionsContainer" class="lp-options-hidden">
         <div class="lp-sources">
           <div class="lp-sources-title">Auto-detect from:</div>
           ${renderCheckbox("npmCheck", "npm scripts (package.json)", ctx.hasNpm)}
@@ -195,10 +243,15 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
       </div>
       
       ${actions}
+      <div id="generationOverlay" class="lp-generation-overlay" aria-live="polite" aria-hidden="true">
+        <span class="codicon codicon-loading codicon-modifier-spin"></span>
+        <span>Generating config...</span>
+      </div>
     `,
     script: `
       (function () {
         const vscode = acquireVsCodeApi();
+        const generationOverlay = document.getElementById('generationOverlay');
         
         // Toggle options visibility with visual state
         const showOptionsCheck = document.getElementById('showOptionsCheck');
@@ -218,59 +271,100 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
         // Initialize state
         updateOptionState();
         
+        function setButtonLoading(button, isLoading, loadingText = 'Generating...') {
+          if (!button) return;
+          
+          if (isLoading) {
+            button.disabled = true;
+            button.dataset.originalText = button.textContent;
+            const icon = button.querySelector('.codicon');
+            if (icon) {
+              icon.className = 'codicon codicon-loading codicon-modifier-spin';
+            }
+            const textNode = Array.from(button.childNodes).find(n => n.nodeType === 3);
+            if (textNode) textNode.textContent = loadingText;
+          } else {
+            button.disabled = false;
+            if (button.dataset.originalText) {
+              const textNode = Array.from(button.childNodes).find(n => n.nodeType === 3);
+              if (textNode) textNode.textContent = button.dataset.originalText;
+            }
+          }
+        }
+
+        function setGenerationLoading(isLoading) {
+          if (generationOverlay) {
+            generationOverlay.classList.toggle('visible', isLoading);
+            generationOverlay.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
+          }
+        }
+
+        function clearGenerationLoading() {
+          setGenerationLoading(false);
+          setButtonLoading(document.getElementById('generateBtn'), false);
+          setButtonLoading(document.getElementById('createBtn'), false);
+          setButtonLoading(document.getElementById('createBlankBtn'), false);
+        }
+
+        window.addEventListener('message', (event) => {
+          const message = event.data;
+          if (message?.type === 'configGenerationStarted') {
+            setGenerationLoading(true);
+          }
+          if (message?.type === 'configGenerationComplete') {
+            clearGenerationLoading();
+          }
+        });
+        
         document.getElementById('createBlankBtn')?.addEventListener('click', () => {
+          const btn = document.getElementById('createBlankBtn');
+          setGenerationLoading(true);
+          setButtonLoading(btn, true, 'Creating...');
           vscode.postMessage({ command: 'createBlankConfig' });
         });
 
-        function collectSources(optionsVisible) {
+        function collectSources() {
           const sources = {};
           
-          if (optionsVisible) {
-            // Basic sources
-            const npmCheck = document.getElementById('npmCheck');
-            const tasksCheck = document.getElementById('tasksCheck');
-            const launchCheck = document.getElementById('launchCheck');
-            
-            if (npmCheck) sources.npm = npmCheck.checked;
-            if (tasksCheck) sources.tasks = tasksCheck.checked;
-            if (launchCheck) sources.launch = launchCheck.checked;
+          // Basic sources
+          const npmCheck = document.getElementById('npmCheck');
+          const tasksCheck = document.getElementById('tasksCheck');
+          const launchCheck = document.getElementById('launchCheck');
+          
+          if (npmCheck) sources.npm = npmCheck.checked;
+          if (tasksCheck) sources.tasks = tasksCheck.checked;
+          if (launchCheck) sources.launch = launchCheck.checked;
 
-            // Enhanced sources
-            const dockerCheck = document.getElementById('dockerCheck');
-            if (dockerCheck) sources.docker = dockerCheck.checked;
-            
-            const dockerComposeCheck = document.getElementById('dockerComposeCheck');
-            if (dockerComposeCheck) sources.dockerCompose = dockerComposeCheck.checked;
-            
-            const pythonCheck = document.getElementById('pythonCheck');
-            if (pythonCheck) sources.python = pythonCheck.checked;
-            
-            const goCheck = document.getElementById('goCheck');
-            if (goCheck) sources.go = goCheck.checked;
-            
-            const rustCheck = document.getElementById('rustCheck');
-            if (rustCheck) sources.rust = rustCheck.checked;
-            
-            const makeCheck = document.getElementById('makeCheck');
-            if (makeCheck) sources.make = makeCheck.checked;
-            
-            const gradleCheck = document.getElementById('gradleCheck');
-            if (gradleCheck) sources.gradle = gradleCheck.checked;
-            
-            const mavenCheck = document.getElementById('mavenCheck');
-            if (mavenCheck) sources.maven = mavenCheck.checked;
-            
-            const cmakeCheck = document.getElementById('cmakeCheck');
-            if (cmakeCheck) sources.cmake = cmakeCheck.checked;
-            
-            const gitCheck = document.getElementById('gitCheck');
-            if (gitCheck) sources.git = gitCheck.checked;
-          } else {
-            // Default to all basic sources enabled if options hidden
-            sources.npm = true;
-            sources.tasks = true;
-            sources.launch = true;
-          }
+          // Enhanced sources
+          const dockerCheck = document.getElementById('dockerCheck');
+          if (dockerCheck) sources.docker = dockerCheck.checked;
+          
+          const dockerComposeCheck = document.getElementById('dockerComposeCheck');
+          if (dockerComposeCheck) sources.dockerCompose = dockerComposeCheck.checked;
+          
+          const pythonCheck = document.getElementById('pythonCheck');
+          if (pythonCheck) sources.python = pythonCheck.checked;
+          
+          const goCheck = document.getElementById('goCheck');
+          if (goCheck) sources.go = goCheck.checked;
+          
+          const rustCheck = document.getElementById('rustCheck');
+          if (rustCheck) sources.rust = rustCheck.checked;
+          
+          const makeCheck = document.getElementById('makeCheck');
+          if (makeCheck) sources.make = makeCheck.checked;
+          
+          const gradleCheck = document.getElementById('gradleCheck');
+          if (gradleCheck) sources.gradle = gradleCheck.checked;
+          
+          const mavenCheck = document.getElementById('mavenCheck');
+          if (mavenCheck) sources.maven = mavenCheck.checked;
+          
+          const cmakeCheck = document.getElementById('cmakeCheck');
+          if (cmakeCheck) sources.cmake = cmakeCheck.checked;
+          
+          const gitCheck = document.getElementById('gitCheck');
+          if (gitCheck) sources.git = gitCheck.checked;
           
           return sources;
         }
@@ -278,8 +372,11 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
         const generateBtn = document.getElementById('generateBtn');
         if (generateBtn) {
           generateBtn.addEventListener('click', () => {
+            setGenerationLoading(true);
+            setButtonLoading(generateBtn, true);
+            
             const optionsVisible = showOptionsCheck?.checked || false;
-            const sources = collectSources(optionsVisible);
+            const sources = collectSources();
             const enableGrouping = optionsVisible ? document.getElementById('groupCheck').checked : true;
             const enableColoring = optionsVisible ? document.getElementById('colorCheck').checked : false;
             
@@ -300,23 +397,11 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
         const createBtn = document.getElementById('createBtn');
         if (createBtn) {
           createBtn.addEventListener('click', () => {
-            // createBtn is "Generate" in non-welcome view (options always visible/available in DOM but hidden by default)
-            // But actually createBtn is used in the "Generate Configuration" view which is renderGenerateConfigView
-            // The logic above handles showOptionsCheck for visibility.
-            // Wait, the original code had two blocks. Let's see. 
-            // The original code had:
-            // generateBtn (welcome view) -> checks showOptionsCheck
-            // createBtn (normal view) -> assumes options are available to read?
+            setGenerationLoading(true);
+            setButtonLoading(createBtn, true);
             
-            // Actually in renderGenerateConfigView, both use the same HTML structure for options.
-            // The difference is just the button ID.
-            
-            const optionsVisible = showOptionsCheck?.checked || false; 
-            // In the "normal" view (not welcome), optionsContainer is hidden by default too.
-            // But we should probably respect the checkboxes regardless of visibility if the user hasn't toggled them?
-            // Or maybe just do the same logic.
-            
-            const sources = collectSources(optionsVisible);
+            const optionsVisible = showOptionsCheck?.checked || false;
+            const sources = collectSources();
             const enableGrouping = document.getElementById('groupCheck')?.checked ?? true;
             const enableColoring = document.getElementById('colorCheck')?.checked ?? false;
 

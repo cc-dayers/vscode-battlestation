@@ -8,7 +8,8 @@ export interface Action {
   group?: string;
   hidden?: boolean;
   workspace?: string; // Can be used as secondary grouping key
-  backgroundColor?: string;
+  backgroundColor?: string; // Background color for the action button
+  workspaceColor?: string; // Background color for the workspace label badge
 }
 
 export interface IconMapping {
@@ -22,6 +23,7 @@ export interface Group {
   color?: string;
   backgroundColor?: string;
   borderColor?: string;
+  hidden?: boolean;
 }
 
 export interface SecondaryGroup {
@@ -32,24 +34,44 @@ export interface SecondaryGroup {
 }
 
 export interface Todo {
-  id: string;
-  name: string;
-  detail: string;
-  priority: "high" | "medium" | "low";
-  completed: boolean;
-  createdAt: string;
+  title: string;
+  description?: string;
+  then?: string; // ID of an action to run after completion
+  completed?: boolean;
+  order?: number;
+}
+
+export interface TodoGroup {
+  [id: string]: Todo;
 }
 
 export interface TodosData {
-  todos: Todo[];
+  todos: TodoGroup;
+}
+
+export interface BattleConfig {
+  groups: Group[];
+  actions: Action[];
+  todos?: TodoGroup;
+}
+
+export interface TodoList {
+  id: string;
+  name: string;
+  todos: TodoGroup;
+  icon?: string;
+  color?: string;
 }
 
 export interface Config {
   actions: Action[];
   groups?: Group[];
   icons?: IconMapping[];
-  todos?: Todo[];
+  todos?: TodoGroup; // Legacy field, kept for migration
+  todoLists?: Record<string, TodoList>; // map id -> list
+  activeTodoList?: string; // ID of currently active list
   secondaryGroups?: Record<string, SecondaryGroup>;
+  customColors?: string[]; // User-defined color palette
   density?: string; // "compact" or "comfortable"
   [key: string]: any; // Allow arbitrary keys from config
 }

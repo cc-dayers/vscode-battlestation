@@ -59,6 +59,37 @@ export function activate(context: vscode.ExtensionContext) {
       provider.showSettingsForm();
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("battlestation.toggleSearch", () => {
+      provider.toggleSearch();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("battlestation.toggleHidden", () => {
+      provider.toggleShowHidden();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("battlestation.hideHidden", () => {
+      provider.toggleShowHidden();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("battlestation.collapseAllGroups", () => {
+      provider.collapseAllGroups();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("battlestation.expandAllGroups", () => {
+      provider.expandAllGroups();
+    })
+  );
 }
 
 export function deactivate() { }
+

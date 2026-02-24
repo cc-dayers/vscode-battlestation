@@ -9,6 +9,7 @@ node_modules/
 # Generated files
 media/codicon.css
 media/codicon.ttf
+media/output.css
 
 # Source maps
 **/*.map

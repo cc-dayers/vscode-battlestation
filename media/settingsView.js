@@ -580,7 +580,7 @@ var HIDE_ICON_OPTIONS = [
   { value: "close", label: "Close" },
   { value: "circle-slash", label: "Circle Slash" }
 ];
-var vscode = acquireVsCodeApi();
+var vscode = window.acquireVsCodeApi();
 var root = document.getElementById("root");
 var state = window.__SETTINGS__ || {
   showIcon: true,
@@ -590,9 +590,11 @@ var state = window.__SETTINGS__ || {
   hideIcon: "eye-closed",
   backupCount: 0,
   configExists: false,
-  usedIcons: []
+  usedIcons: [],
+  customConfigPath: null
 };
 var showDeleteConfirm = false;
+var showAdvanced = false;
 var setState = (partial) => {
   Object.assign(state, partial);
   renderView();
@@ -606,25 +608,29 @@ var hideDeleteConfirm = () => {
   renderView();
 };
 var onSave = () => {
-  vscode.postMessage({
-    command: "saveSettings",
-    settings: {
-      showIcon: state.showIcon,
-      showType: state.showType,
-      showCommand: state.showCommand,
-      showGroup: state.showGroup,
-      hideIcon: state.hideIcon
-    }
-  });
+  try {
+    console.log("[SettingsView] Saving settings...");
+    vscode.postMessage({
+      command: "saveSettings",
+      settings: {
+        showIcon: state.showIcon,
+        showType: state.showType,
+        showCommand: state.showCommand,
+        showGroup: state.showGroup,
+        hideIcon: state.hideIcon
+      }
+    });
+    console.log("[SettingsView] Save message sent");
+  } catch (e4) {
+    console.error("Failed to save settings:", e4);
+    alert(`Failed to save settings: ${e4}`);
+  }
 };
 var renderIconChips = () => state.usedIcons.map(
   (icon) => b2`
-      <span
-        style="display: inline-flex; align-items: center; gap: 4px; font-size: 10px; padding: 4px 6px; background: var(--vscode-input-background); border-radius: 3px;"
-        title=${icon}
-      >
+      <span class="lp-icon-chip" title=${icon}>
         <span class="codicon codicon-${icon}"></span>
-        <span style="opacity: 0.7;">${icon}</span>
+        <span class="lp-icon-chip-name">${icon}</span>
       </span>
     `
 );
@@ -634,8 +640,8 @@ var renderView = () => {
   if (!window.__SETTINGS__) {
     D(
       b2`
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 200px; opacity: 0.7;">
-          <div style="font-size: 24px; margin-bottom: 8px;">⚙️</div>
+        <div class="lp-settings-loading">
+          <div class="lp-settings-loading-icon">⚙️</div>
           <div>Loading settings...</div>
         </div>
       `,
@@ -643,81 +649,98 @@ var renderView = () => {
     );
     return;
   }
-  const configDisabled = !state.configExists;
   D(
     b2`
-      <div class="lp-settings-header">
-        <h3>⚙️ Settings</h3>
-        <div class="lp-top-actions">
-          <button
-            type="button"
-            class="lp-icon-btn"
-            title="Open Battlestation visual settings"
-            aria-label="Open Battlestation visual settings"
-            @click=${() => vscode.postMessage({ command: "openVisualSettings" })}
-          >
-            <span class="codicon codicon-settings"></span>
-          </button>
-        </div>
-      </div>
-
-      <div class="lp-setting-group ${configDisabled ? "lp-config-disabled" : ""}">
-        <div class="lp-config-header">
-          <div class="lp-setting-group-title">📄 battle.json</div>
-          <div class="lp-config-actions">
+      <div class="lp-settings-view">
+        <div class="lp-settings-header">
+          <h3><span class="codicon codicon-settings-gear"></span> Settings</h3>
+          <div class="lp-top-actions">
             <button
               type="button"
-              class="lp-config-btn lp-btn lp-btn-secondary"
-              ?disabled=${!state.configExists}
-              title=${state.configExists ? "Open config file" : "Generate config first"}
-              @click=${() => {
+              class="lp-icon-btn"
+              title="Open Battlestation visual settings"
+              aria-label="Open Battlestation visual settings"
+              @click=${() => vscode.postMessage({ command: "openVisualSettings" })}
+            >
+              <span class="codicon codicon-settings"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="lp-setting-group">
+          <div class="lp-config-header">
+            <div class="lp-config-toolbar">
+              <div class="lp-setting-group-title">📄 battle.json</div>
+              <div class="lp-config-actions">
+                <button
+                  type="button"
+                  class="lp-config-btn lp-btn lp-btn-secondary"
+                  ?disabled=${!state.configExists}
+                  title=${state.configExists ? "Open config file" : "Generate config first"}
+                  aria-label="Open config file"
+                  @click=${() => {
       hideDeleteConfirm();
       vscode.postMessage({ command: "openConfig" });
     }}
-            >
-              <span class="codicon codicon-file"></span><span class="lp-btn-text">Open</span>
-            </button>
-            <button
-              type="button"
-              class="lp-config-btn lp-btn lp-btn-secondary lp-config-cta"
-              title=${state.configExists ? "Regenerate config from scanned sources" : "Generate new config file"}
-              @click=${() => {
+                >
+                  <span class="codicon codicon-file"></span><span class="lp-btn-text">Open</span>
+                </button>
+                <button
+                  type="button"
+                  class="lp-config-btn lp-btn lp-btn-secondary"
+                  title="Open folder containing battle.json"
+                  aria-label="Open config location"
+                  @click=${() => {
+      hideDeleteConfirm();
+      vscode.postMessage({ command: "openConfigFolder" });
+    }}
+                >
+                  <span class="codicon codicon-folder-opened"></span><span class="lp-btn-text">Location</span>
+                </button>
+                <button
+                  type="button"
+                  class="lp-config-btn lp-btn lp-btn-secondary lp-config-cta"
+                  title=${state.configExists ? "Regenerate config from scanned sources" : "Generate new config file"}
+                  aria-label=${state.configExists ? "Regenerate config" : "Generate config"}
+                  @click=${() => {
       hideDeleteConfirm();
       vscode.postMessage({ command: "showGenerateConfig" });
     }}
-            >
-              <span class="codicon codicon-refresh"></span
-              ><span class="lp-btn-text">${state.configExists ? "Regenerate" : "Generate"}</span>
-            </button>
-            ${state.backupCount > 0 ? b2`
-                  <button
-                    type="button"
-                    class="lp-config-btn lp-btn lp-btn-secondary"
-                    ?disabled=${!state.configExists}
-                    title="Restore a previous config (${state.backupCount})"
-                    @click=${() => {
+                >
+                  <span class="codicon codicon-refresh"></span
+                  ><span class="lp-btn-text">${state.configExists ? "Regen" : "Generate"}</span>
+                </button>
+                ${state.backupCount > 0 ? b2`
+                      <button
+                        type="button"
+                        class="lp-config-btn lp-btn lp-btn-secondary"
+                        ?disabled=${!state.configExists}
+                        title="Restore a previous config (${state.backupCount})"
+                        aria-label="Restore previous config"
+                        @click=${() => {
       hideDeleteConfirm();
       vscode.postMessage({ command: "restoreConfig" });
     }}
-                  >
-                    <span class="codicon codicon-history"></span
-                    ><span class="lp-btn-text">Restore</span>
-                  </button>
-                ` : null}
-            ${state.configExists ? b2`
-                  <button
-                    type="button"
-                    class="lp-config-btn lp-btn lp-btn-secondary"
-                    title="Delete config file"
-                    style="color: var(--vscode-errorForeground);"
-                    @click=${() => toggleDeleteConfirm()}
-                  >
-                    <span class="codicon codicon-trash"></span
-                    ><span class="lp-btn-text">Delete</span>
-                  </button>
-                ` : null}
-          </div>
-          ${state.configExists && showDeleteConfirm ? b2`
+                      >
+                        <span class="codicon codicon-history"></span
+                        ><span class="lp-btn-text">Undo</span>
+                      </button>
+                    ` : null}
+                ${state.configExists ? b2`
+                      <button
+                        type="button"
+                        class="lp-config-btn lp-btn lp-btn-secondary lp-btn-danger"
+                        title="Delete config file"
+                        aria-label="Delete config file"
+                        @click=${() => toggleDeleteConfirm()}
+                      >
+                        <span class="codicon codicon-trash"></span
+                        ><span class="lp-btn-text">Delete</span>
+                      </button>
+                    ` : null}
+              </div>
+            </div>
+            ${state.configExists && showDeleteConfirm ? b2`
                 <div class="lp-config-confirm">
                   <div class="lp-config-confirm-text">
                     Delete battle.json? This cannot be undone.
@@ -725,8 +748,8 @@ var renderView = () => {
                   <div class="lp-config-confirm-actions">
                     <button
                       type="button"
-                      class="lp-config-btn lp-btn lp-btn-secondary"
-                      style="color: var(--vscode-errorForeground);"
+                      class="lp-config-btn lp-btn lp-btn-secondary lp-btn-danger"
+                      aria-label="Confirm delete config file"
                       @click=${() => {
       hideDeleteConfirm();
       vscode.postMessage({ command: "deleteConfig" });
@@ -738,6 +761,7 @@ var renderView = () => {
                     <button
                       type="button"
                       class="lp-config-btn lp-btn lp-btn-secondary"
+                      aria-label="Cancel delete config"
                       @click=${() => hideDeleteConfirm()}
                     >
                       <span class="codicon codicon-close"></span
@@ -746,12 +770,79 @@ var renderView = () => {
                   </div>
                 </div>
               ` : null}
+          </div>
         </div>
-      </div>
 
-      <div class="lp-setting-group">
-        <div class="lp-setting-group-title">🎨 Display</div>
-        <div class="lp-setting-row">
+        <!-- Advanced Section -->
+        <div class="lp-setting-group">
+        <button
+          type="button"
+          class="lp-generate-toggle"
+          @click=${() => {
+      showAdvanced = !showAdvanced;
+      renderView();
+    }}
+        >
+          <span class="codicon codicon-${showAdvanced ? "chevron-down" : "chevron-right"}"></span>
+          <span>Advanced</span>
+        </button>
+        ${showAdvanced ? b2`
+          <div class="lp-generate-content">
+            <div class="lp-setting-row">
+              <div class="lp-setting-label">
+                <div class="lp-setting-name">Config Location</div>
+                <div class="lp-setting-desc">
+                  ${state.customConfigPath ? b2`Custom: <code class="lp-inline-code">${state.customConfigPath}/battle.json</code>` : b2`Default: <code class="lp-inline-code">.vscode/battle.json</code>`}
+                </div>
+              </div>
+              <div class="lp-inline-actions">
+                <button
+                  type="button"
+                  class="lp-config-btn lp-btn lp-btn-secondary"
+                  title="Choose a custom folder to store battle.json"
+                  aria-label="Change config location"
+                  @click=${() => vscode.postMessage({ command: "changeConfigLocation" })}
+                >
+                  <span class="codicon codicon-folder-opened"></span>
+                  <span class="lp-btn-text">Change</span>
+                </button>
+                ${state.customConfigPath ? b2`
+                  <button
+                    type="button"
+                    class="lp-config-btn lp-btn lp-btn-secondary"
+                    title="Reset to default location (.vscode/battle.json)"
+                    aria-label="Reset config location"
+                    @click=${() => vscode.postMessage({ command: "resetConfigLocation" })}
+                  >
+                    <span class="codicon codicon-discard"></span>
+                    <span class="lp-btn-text">Reset</span>
+                  </button>
+                ` : null}
+              </div>
+            </div>
+            <div class="lp-setting-row">
+              <div class="lp-setting-label">
+                <div class="lp-setting-name">Import Config</div>
+                <div class="lp-setting-desc">Load an existing battle.json from disk. Your current config will be backed up first.</div>
+              </div>
+              <button
+                type="button"
+                class="lp-config-btn lp-btn lp-btn-secondary"
+                title="Browse for a JSON config file to import"
+                aria-label="Import config file"
+                @click=${() => vscode.postMessage({ command: "importConfig" })}
+              >
+                <span class="codicon codicon-desktop-download"></span>
+                <span class="lp-btn-text">Import</span>
+              </button>
+            </div>
+          </div>
+        ` : null}
+        </div>
+
+        <div class="lp-setting-group">
+          <div class="lp-setting-group-title">🎨 Display</div>
+          <div class="lp-setting-row">
           <div class="lp-setting-label">
             <div class="lp-setting-name">Show Icons</div>
             <div class="lp-setting-desc">Display codicons next to button names</div>
@@ -765,7 +856,7 @@ var renderView = () => {
             <span class="lp-toggle-slider"></span>
           </label>
         </div>
-        <div class="lp-setting-row">
+          <div class="lp-setting-row">
           <div class="lp-setting-label">
             <div class="lp-setting-name">Show Type</div>
             <div class="lp-setting-desc">Display command type (npm, shell, vscode, etc.)</div>
@@ -779,7 +870,7 @@ var renderView = () => {
             <span class="lp-toggle-slider"></span>
           </label>
         </div>
-        <div class="lp-setting-row">
+          <div class="lp-setting-row">
           <div class="lp-setting-label">
             <div class="lp-setting-name">Show Command</div>
             <div class="lp-setting-desc">Display the actual command text</div>
@@ -793,7 +884,7 @@ var renderView = () => {
             <span class="lp-toggle-slider"></span>
           </label>
         </div>
-        <div class="lp-setting-row">
+          <div class="lp-setting-row">
           <div class="lp-setting-label">
             <div class="lp-setting-name">Show Groups</div>
             <div class="lp-setting-desc">Display group headers and organization</div>
@@ -807,14 +898,14 @@ var renderView = () => {
             <span class="lp-toggle-slider"></span>
           </label>
         </div>
-        <div class="lp-setting-row">
+          <div class="lp-setting-row">
           <div class="lp-setting-label">
             <div class="lp-setting-name">Hide Icon</div>
             <div class="lp-setting-desc">Icon to use for hiding items</div>
           </div>
           <select
             id="hideIcon"
-            style="padding: 4px 8px; font-size: 12px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 2px;"
+            class="lp-hide-icon-select"
             .value=${state.hideIcon}
             @change=${(e4) => setState({ hideIcon: e4.target.value })}
           >
@@ -822,53 +913,49 @@ var renderView = () => {
       (opt) => b2`<option value=${opt.value}>${opt.label}</option>`
     )}
           </select>
+          </div>
         </div>
-      </div>
 
-      <div class="lp-setting-group">
-        <div class="lp-setting-group-title">🎭 Available Icons</div>
-        <div
-          class="lp-setting-row"
-          style="border: none; flex-direction: column; align-items: flex-start; gap: 8px;"
-        >
-          <div class="lp-setting-label" style="flex-direction: row; align-items: center; gap: 6px;">
-            <span class="codicon codicon-info" style="color: var(--vscode-textLink-foreground);"></span>
-            <div class="lp-setting-desc" style="margin: 0;">
+        <div class="lp-setting-group">
+          <div class="lp-setting-group-title">🎭 Available Icons</div>
+          <div class="lp-setting-row lp-icon-row">
+            <div class="lp-setting-label lp-icon-help-row">
+              <span class="codicon codicon-info"></span>
+              <div class="lp-setting-desc lp-icon-help-text">
               Only icons used in your config are loaded for performance. All
               <a
                 href="https://microsoft.github.io/vscode-codicons/dist/codicon.html"
-                style="color: var(--vscode-textLink-foreground);"
                 target="_blank"
                 >codicons</a
               are supported—just add them to your config and refresh.
+              </div>
             </div>
-          </div>
-          <div style="margin-top: 8px; width: 100%;">
-            <div style="font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 6px;">
-              Currently Loaded (${state.usedIcons.length} icons):
-            </div>
-            <div
-              style="display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; background: var(--vscode-editor-background); border-radius: 4px; max-height: 120px; overflow-y: auto;"
-            >
-              ${renderIconChips()}
+            <div class="lp-loaded-icons-wrap">
+              <div class="lp-loaded-icons-title">Currently Loaded (${state.usedIcons.length} icons):</div>
+              <div class="lp-loaded-icons-grid">${renderIconChips()}</div>
             </div>
           </div>
         </div>
-      </div>
-
-      <div class="lp-form-actions">
-        <button
-          type="button"
-          class="lp-btn lp-btn-secondary"
-          @click=${() => {
+      
+        <div class="lp-form-actions">
+          <button
+            type="button"
+            class="lp-btn lp-btn-secondary"
+            @click=${() => {
+      console.log("[SettingsView] Cancel clicked");
       hideDeleteConfirm();
       vscode.postMessage({ command: "cancelForm" });
     }}
-        >
-          Cancel
-        </button>
-        <button type="button" class="lp-btn lp-btn-primary" @click=${onSave}>Save Settings</button>
+          >
+            Cancel
+          </button>
+          <button type="button" class="lp-btn lp-btn-primary" @click=${() => {
+      console.log("[SettingsView] Save button clicked");
+      onSave();
+    }}>Save Settings</button>
+        </div>
       </div>
+
     `,
     root
   );

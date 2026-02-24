@@ -17,6 +17,13 @@ npm run check-types  # Type checking only (no build)
 npm run lint         # Lint TypeScript code
 ```
 
+### UI Testing Harness
+When working agentically to build or modify UI/Webview features, use the visual test harness:
+```bash
+npm run test:ui-server  # Starts localhost:3000 to test UI views independently 
+```
+Instead of writing manual tests or interacting with the host tests, run this server and visually observe changes or rely on browser subagents to click features and verify `postMessage` outputs via toasts.
+
 ### Debugging
 - Press **F5** in VS Code to launch Extension Development Host
 - The launch configuration automatically runs `npm run watch` as a pre-launch task

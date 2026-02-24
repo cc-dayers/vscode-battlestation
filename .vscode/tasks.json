@@ -24,6 +24,17 @@
           "endsPattern": "^\\[watch\\] build finished"
         }
       }
+    },
+    {
+      "type": "npm",
+      "script": "test:ui-server",
+      "label": "Serve UI (localhost:3000)",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
     }
   ]
 }

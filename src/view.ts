@@ -90,6 +90,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
             void this.handleShowGenerateConfig();
             return;
           }
+          // Only refresh if we're in main view or a form (not transitioning)
+          // This prevents race conditions when saving settings
           void this.refresh();
         }
       })
@@ -173,6 +175,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         void this.refresh();
         break;
       case "cancelForm":
+        console.log('[ViewProvider] Received cancelForm message');
         this.showingForm = false;
         void this.refresh();
         break;
@@ -214,6 +217,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       case "assignGroup":
         void this.assignActionToGroup(message.item, message.groupName);
         break;
+      case "hideGroup":
+        void this.toggleGroupHidden(message.group);
+        break;
       case "bulkHideActions":
         void this.bulkHideActions(message.items);
         break;
@@ -227,6 +233,18 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         void this.configService.openConfigFile();
         this.showingForm = false;
         void this.refresh();
+        break;
+      case "openConfigFolder":
+        void this.configService.openConfigFolder();
+        break;
+      case "changeConfigLocation":
+        void this.handleChangeConfigLocation();
+        break;
+      case "resetConfigLocation":
+        void this.handleResetConfigLocation();
+        break;
+      case "importConfig":
+        void this.handleImportConfig();
         break;
       case "showGenerateConfig":
         void this.handleShowGenerateConfig();
@@ -246,14 +264,40 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       case "openVisualSettings":
         void this.handleOpenVisualSettings();
         break;
+      case "saveCustomColor":
+        void this.saveCustomColor(message.color);
+        break;
+      case "reorderActions":
+        void this.handleReorderActions(message.actions);
+        break;
     }
   }
 
   public toggleSearch() {
     this.searchVisible = !this.searchVisible;
     if (this.view) {
-      this.view.webview.postMessage({ command: "toggleSearch", visible: this.searchVisible });
+      this.view.webview.postMessage({ type: "toggleSearch", visible: this.searchVisible });
     }
+  }
+
+  public collapseAllGroups() {
+    if (this.view) {
+      this.view.webview.postMessage({ type: "collapseAllGroups" });
+    }
+    vscode.commands.executeCommand("setContext", "battlestation.allGroupsCollapsed", true);
+  }
+
+  public expandAllGroups() {
+    if (this.view) {
+      this.view.webview.postMessage({ type: "expandAllGroups" });
+    }
+    vscode.commands.executeCommand("setContext", "battlestation.allGroupsCollapsed", false);
+  }
+
+  public toggleShowHidden() {
+    this.showHidden = !this.showHidden;
+    vscode.commands.executeCommand("setContext", "battlestation.showHidden", this.showHidden);
+    void this.refresh();
   }
 
   /* ─── public API for TodoPanelProvider ─── */
@@ -262,12 +306,12 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     return this.todosService.readTodos();
   }
 
-  public async createTodo(name: string, detail: string, priority: "high" | "medium" | "low") {
-    await this.todosService.addTodo(name, detail, priority);
+  public async createTodo(title: string, description: string) {
+    await this.todosService.addTodo(title, description);
     this.showToast("Todo added");
   }
 
-  public async modifyTodo(id: string, updates: Partial<Omit<Todo, "id" | "createdAt">>) {
+  public async modifyTodo(id: string, updates: Partial<Omit<Todo, "order">>): Promise<void> {
     await this.todosService.updateTodo(id, updates);
     this.showToast("Todo updated");
   }
@@ -331,6 +375,17 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
       const cspSource = this.view.webview.cspSource;
       const nonce = getNonce();
+
+      // Optimized refresh: if we are staying in the main view, just update data
+      const isMainView = this.showingForm === false;
+      const wasMainView = this._currentViewMode === "main"; // We need to track this
+
+      if (isMainView) {
+        this._currentViewMode = "main";
+      } else {
+        const activeForm = this.showingForm;
+        this._currentViewMode = typeof activeForm === "boolean" ? "addAction" : activeForm;
+      }
 
       if (this.showingForm === "settings") {
         this.view.webview.html = await this.renderSettings(cspSource, nonce);
@@ -403,13 +458,32 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
       // Main view
       const config = configStatus.config || (await this.configService.readConfig());
+
+      if (isMainView) {
+        // If we were already in main view and it's visible, try to update via specific message
+        // instead of replacing the whole HTML which causes a reload/flash.
+        if (wasMainView && this.view.visible) {
+          const enrichedConfig = this.getEnrichedConfig(config);
+          this.view.webview.postMessage({
+            type: "update",
+            data: {
+              ...enrichedConfig,
+              showHidden: this.showHidden
+            }
+          });
+          return;
+        }
+      }
+
       this.view.webview.html = this.renderMain(config, cspSource, nonce);
     }, 100);
   }
 
+  private _currentViewMode: string | boolean = false;
+
   /* ─── render helpers ─── */
 
-  private renderMain(config: Config, cspSource: string, nonce: string): string {
+  private getEnrichedConfig(config: Config): Config & Record<string, any> {
     const wsConfig = vscode.workspace.getConfiguration("battlestation");
     const customMappings = wsConfig.get<Record<string, string>>("customIconMappings", {});
 
@@ -421,27 +495,39 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    // Attach display settings as meta so the renderer can read them
-    const enrichedConfig: Config & Record<string, any> = {
+    return {
       ...config,
       icons: mergedIcons,
-      __showIcon: wsConfig.get<boolean>("display.showIcon", false),
-      __showType: wsConfig.get<boolean>("display.showType", true),
-      __showCommand: wsConfig.get<boolean>("display.showCommand", true),
-      __showGroup: wsConfig.get<boolean>("display.showGroup", true),
-      __hideIcon: wsConfig.get<string>("display.hideIcon", "eye-closed"),
-      __playButtonBackgroundColor: wsConfig.get<string>("display.playButtonBackgroundColor", "transparent"),
-      density: wsConfig.get<string>("display.density", "comfortable"),
+      display: {
+        showIcon: wsConfig.get<boolean>("display.showIcon", false),
+        showType: wsConfig.get<boolean>("display.showType", true),
+        showCommand: wsConfig.get<boolean>("display.showCommand", true),
+        showGroup: wsConfig.get<boolean>("display.showGroup", true),
+        hideIcon: wsConfig.get<string>("display.hideIcon", "eye-closed"),
+        playButtonBg: wsConfig.get<string>("display.playButtonBackgroundColor", "transparent"),
+        density: wsConfig.get<string>("display.density", "comfortable"),
+        useEmojiLoader: wsConfig.get<boolean>("display.useEmojiLoader", false),
+        loaderEmoji: wsConfig.get<string>("display.loaderEmoji", "🌯"),
+      },
       secondaryGroups: wsConfig.get<Record<string, Group>>("secondaryGroups", {}),
     };
+  }
+
+  private renderMain(config: Config, cspSource: string, nonce: string): string {
+    const enrichedConfig = this.getEnrichedConfig(config);
+    const scriptUri = this.view?.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, "media", "mainView.js")
+    ).toString();
 
     return renderMainView({
       cspSource,
       nonce,
       codiconStyles: this.getCodiconStyles(),
       config: enrichedConfig,
+      initialData: enrichedConfig,
       showHidden: this.showHidden,
       searchVisible: this.searchVisible,
+      scriptUri,
       cssUri: this.view?.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "output.css")).toString(),
     });
   }
@@ -470,7 +556,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       backupCount: backups.length,
       configExists,
       usedIcons,
+      customConfigPath: this.configService.getCustomConfigPath(),
       settingsScriptUri,
+      cssUri: this.view?.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "output.css")).toString(),
     });
   }
 
@@ -486,6 +574,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       nonce,
       codiconStyles: this.getCodiconStyles(),
       availableIcons: suggested.filter((i) => !existingIcons.includes(i)),
+      customColors: config.customColors || [],
     });
   }
 
@@ -516,6 +605,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       availableIcons: suggested.filter(
         (i) => !existingIcons.includes(i) || i === this.currentEditGroup!.icon
       ),
+      customColors: config.customColors || [],
     });
   }
 
@@ -528,6 +618,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       codiconStyles: this.getCodiconStyles(),
       item: this.currentEditAction!,
       iconMap,
+      customColors: config.customColors || [],
     });
   }
 
@@ -542,6 +633,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       nonce,
       codiconStyles: this.getCodiconStyles(),
       typeOptions,
+      customColors: config.customColors || [],
     });
   }
 
@@ -861,7 +953,11 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       vscode.window.showWarningMessage(`Group "${newGroup.name}" already exists.`);
       return;
     }
-    config.groups[idx] = newGroup;
+    config.groups[idx] = {
+      ...config.groups[idx],
+      ...newGroup,
+      hidden: newGroup.hidden ?? config.groups[idx].hidden,
+    };
     if (oldGroup.name !== newGroup.name) {
       config.actions.forEach((item) => {
         if (item.group === oldGroup.name) { item.group = newGroup.name; }
@@ -873,6 +969,24 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     void this.refresh();
   }
 
+  private async toggleGroupHidden(group: Group) {
+    const config = await this.configService.readConfig();
+    if (!config.groups) {
+      return;
+    }
+
+    const target = config.groups.find((g) => g.name === group.name);
+    if (!target) {
+      vscode.window.showErrorMessage(`Group "${group.name}" not found.`);
+      return;
+    }
+
+    target.hidden = !target.hidden;
+    await this.configService.writeConfig(config);
+    void this.refresh();
+    this.showToast(target.hidden ? `Group "${group.name}" hidden` : `Group "${group.name}" shown`);
+  }
+
   private async saveSettings(settings: {
     showIcon: boolean;
     showType: boolean;
@@ -882,6 +996,12 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     useEmojiLoader?: boolean;
     loaderEmoji?: string;
   }) {
+    console.log('[View Provider] saveSettings called, showingForm before:', this.showingForm);
+    // IMPORTANT: Set showingForm to false BEFORE updating config
+    // to prevent onDidChangeConfiguration from re-rendering settings view
+    this.showingForm = false;
+    console.log('[ViewProvider] showingForm set to false');
+
     const cfg = vscode.workspace.getConfiguration("battlestation");
     await cfg.update("display.showIcon", settings.showIcon, vscode.ConfigurationTarget.Workspace);
     await cfg.update("display.showType", settings.showType, vscode.ConfigurationTarget.Workspace);
@@ -905,12 +1025,175 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         vscode.ConfigurationTarget.Workspace
       );
     }
-    this.showingForm = false;
+    console.log('[ViewProvider] All settings updated, calling refresh');
     void this.refresh();
     this.showToast("\u2705 Settings saved");
   }
 
+  private async handleChangeConfigLocation(): Promise<void> {
+    const result = await vscode.window.showOpenDialog({
+      title: 'Choose Battle Config Location',
+      openLabel: 'Store battle.json Here',
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+    });
+    if (!result || result.length === 0) return;
+    const dirPath = result[0].fsPath;
+    // Capture the current config uri before changing the path
+    const currentUri = await this.configService.resolveConfigUri();
+    const currentExists = await this.configService.configExists();
+    await this.configService.setCustomConfigPath(dirPath);
+    if (currentExists && currentUri) {
+      const move = await vscode.window.showInformationMessage(
+        `Config location changed to: ${dirPath}\nMove existing config to the new location?`,
+        { modal: false },
+        'Move', 'Keep Both'
+      );
+      if (move === 'Move') {
+        const destUri = vscode.Uri.joinPath(vscode.Uri.file(dirPath), 'battle.json');
+        await vscode.workspace.fs.copy(currentUri, destUri, { overwrite: true });
+        try { await vscode.workspace.fs.delete(currentUri); } catch { /* best effort */ }
+        this.configService.invalidateCache();
+      }
+    } else {
+      vscode.window.showInformationMessage(`Config location set to: ${dirPath}`);
+    }
+    void this.refresh();
+  }
+
+  private async handleResetConfigLocation(): Promise<void> {
+    await this.configService.setCustomConfigPath(undefined);
+    vscode.window.showInformationMessage('Config location reset to default (.vscode/battle.json)');
+    void this.refresh();
+  }
+
+  private async handleImportConfig(): Promise<void> {
+    const result = await vscode.window.showOpenDialog({
+      title: 'Import Battle Config',
+      openLabel: 'Import',
+      canSelectFiles: true,
+      canSelectFolders: false,
+      canSelectMany: false,
+      filters: { 'JSON Config': ['json', 'config'] },
+    });
+    if (!result || result.length === 0) return;
+    try {
+      await this.configService.importConfig(result[0]);
+      this.showToast('\u2705 Config imported');
+      void this.refresh();
+    } catch (err) {
+      vscode.window.showErrorMessage(`Failed to import config: ${(err as Error).message}`);
+    }
+  }
+
+  private async saveCustomColor(color: string) {
+    if (!color) return;
+    const config = await this.configService.readConfig();
+    const current = config.customColors || [];
+    if (!current.includes(color)) {
+      current.push(color);
+      config.customColors = current;
+      await this.configService.writeConfig(config);
+      void this.refresh();
+      // No toast needed, implicit save
+    }
+  }
+
+  private async handleReorderActions(newActions: Action[]) {
+    if (!Array.isArray(newActions)) { return; }
+    const config = await this.configService.readConfig();
+    // Rebuild full actions array: newActions contains only the items visible at time of
+    // drag. Preserve any hidden items not in newActions in their existing relative order.
+    const reorderedSet = new Set(newActions.map((a) => JSON.stringify({ name: a.name, command: a.command })));
+    const notReordered = (config.actions || []).filter(
+      (a) => !reorderedSet.has(JSON.stringify({ name: a.name, command: a.command }))
+    );
+    config.actions = [...newActions, ...notReordered];
+    await this.configService.writeConfig(config);
+    // Update the webview in-place without a full HTML reload
+    if (this.view?.visible && this._currentViewMode === "main") {
+      const enrichedConfig = this.getEnrichedConfig(config);
+      this.view.webview.postMessage({
+        type: "update",
+        data: { ...enrichedConfig, showHidden: this.showHidden },
+      });
+    }
+  }
+
   /* ─── generate / delete config handlers ─── */
+
+  private async handleDeleteConfig() {
+    try {
+      if (this.view) {
+        this.view.webview.postMessage({ type: "setLoading", value: true });
+      }
+      const result = await this.configService.deleteConfig();
+      if (result.deleted) {
+        this.showingForm = false;
+        void this.refresh();
+        this.showToast(`Deleted ${result.location}`);
+        vscode.window.showInformationMessage(`Config file deleted: ${result.location}`);
+      } else {
+        vscode.window.showWarningMessage(
+          "Config file not found. It may have already been deleted."
+        );
+        // Reset loading if we didn't refresh
+        if (this.view) {
+          this.view.webview.postMessage({ type: "setLoading", value: false });
+        }
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Failed to delete config: ${(error as Error).message}`
+      );
+      if (this.view) {
+        this.view.webview.postMessage({ type: "setLoading", value: false });
+      }
+    }
+  }
+
+  private async handleRestoreConfig() {
+    if (this.view) {
+      this.view.webview.postMessage({ type: "setLoading", value: true });
+    }
+    const versions = await this.configService.listConfigVersions();
+    if (versions.length === 0) {
+      vscode.window.showInformationMessage("No history found to restore from.");
+      if (this.view) {
+        this.view.webview.postMessage({ type: "setLoading", value: false });
+      }
+      return;
+    }
+
+    const items = versions.map((v) => ({
+      label: v.label,
+      description: new Date(v.timestamp).toLocaleString(),
+      timestamp: v.timestamp
+    }));
+
+    const selected = await vscode.window.showQuickPick(items, {
+      placeHolder: "Select a version to restore",
+    });
+
+    if (selected) {
+      try {
+        await this.configService.restoreConfigVersion(selected.timestamp);
+        this.showingForm = false;
+        void this.refresh();
+        this.showToast("Config restored");
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to restore config: ${(error as Error).message}`);
+        if (this.view) {
+          this.view.webview.postMessage({ type: "setLoading", value: false });
+        }
+      }
+    } else {
+      if (this.view) {
+        this.view.webview.postMessage({ type: "setLoading", value: false });
+      }
+    }
+  }
 
   private async handleShowGenerateConfig() {
     await vscode.window.withProgress(
@@ -972,6 +1255,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       },
       async (progress) => {
         try {
+          this.view?.webview.postMessage({ type: "configGenerationStarted" });
           progress.report({ increment: 50, message: "Creating file..." });
           await this.configService.createMinimalConfig(BattlestationViewProvider.defaultIcons);
 
@@ -979,13 +1263,13 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           await this.configService.openConfigFile();
 
           progress.report({ increment: 10, message: "Done" });
-          this.showingForm = false;
-          void this.refresh();
           this.showToast("📝 Created blank battle.config");
         } catch (error) {
-          vscode.window.showErrorMessage(
-            `Failed to create config: ${(error as Error).message}`
-          );
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          vscode.window.showErrorMessage(`Failed to create config: ${errorMsg}`);
+        } finally {
+          this.view?.webview.postMessage({ type: "configGenerationComplete" });
+          await this.transitionToMainAfterGeneration();
         }
       }
     );
@@ -1000,6 +1284,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       },
       async (progress) => {
         try {
+          this.view?.webview.postMessage({ type: "configGenerationStarted" });
           progress.report({ increment: 50, message: "Creating example file..." });
           await this.configService.createExampleConfig(BattlestationViewProvider.defaultIcons);
 
@@ -1007,13 +1292,13 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           await this.configService.openConfigFile();
 
           progress.report({ increment: 10, message: "Done" });
-          this.showingForm = false;
-          void this.refresh();
           this.showToast("✨ Created example battle.config - customize it to your needs!");
         } catch (error) {
-          vscode.window.showErrorMessage(
-            `Failed to create config: ${(error as Error).message}`
-          );
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          vscode.window.showErrorMessage(`Failed to create config: ${errorMsg}`);
+        } finally {
+          this.view?.webview.postMessage({ type: "configGenerationComplete" });
+          await this.transitionToMainAfterGeneration();
         }
       }
     );
@@ -1029,29 +1314,35 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         cancellable: false,
       },
       async (progress) => {
-        progress.report({ increment: 20, message: `Using ${detectionMethod} detection...` });
-        const availability = await this.toolDetectionService.detectToolAvailability(detectionMethod);
+        try {
+          progress.report({ increment: 20, message: `Using ${detectionMethod} detection...` });
+          const availability = await this.toolDetectionService.detectToolAvailability(detectionMethod);
 
-        progress.report({ increment: 70, message: "Updating options..." });
-        const enhancedMode = {
-          hasDocker: availability.docker,
-          hasDockerCompose: availability.dockerCompose,
-          hasPython: availability.python,
-          hasGo: availability.go,
-          hasRust: availability.rust,
-          hasMakefile: availability.make,
-          hasGradle: availability.gradle,
-          hasMaven: availability.maven,
-          hasCMake: availability.cmake,
-          hasGit: availability.git,
-        };
+          progress.report({ increment: 70, message: "Updating options..." });
+          const enhancedMode = {
+            hasDocker: availability.docker,
+            hasDockerCompose: availability.dockerCompose,
+            hasPython: availability.python,
+            hasGo: availability.go,
+            hasRust: availability.rust,
+            hasMakefile: availability.make,
+            hasGradle: availability.gradle,
+            hasMaven: availability.maven,
+            hasCMake: availability.cmake,
+            hasGit: availability.git,
+          };
 
-        if (this.generateFormParams) {
-          this.generateFormParams.enhancedMode = enhancedMode;
+          if (this.generateFormParams) {
+            this.generateFormParams.enhancedMode = enhancedMode;
+          }
+
+          progress.report({ increment: 10, message: "Done" });
+          void this.refresh();
+        } catch (error) {
+          console.error("Failed to redetect tools:", error);
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          vscode.window.showErrorMessage(`Failed to redetect tools: ${errorMsg}`);
         }
-
-        progress.report({ increment: 10, message: "Done" });
-        void this.refresh();
       }
     );
   }
@@ -1071,6 +1362,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       },
       async (progress) => {
         try {
+          this.view?.webview.postMessage({ type: "configGenerationStarted" });
           // Get enhanced actions from the unified sources object
           // scanEnhanced only checks for specific keys (docker, git, etc) so we can pass the whole object
           let enhancedActions: Action[] = [];
@@ -1112,79 +1404,39 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           await this.configService.openConfigFile();
 
           progress.report({ increment: 10, message: "Done" });
+          const generatedConfig = await this.configService.readConfig();
+          this.showToast(`\u2705 Config generated (${generatedConfig.actions.length} actions)`);
+        } catch (error) {
+          console.error("Failed to create config:", error);
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          vscode.window.showErrorMessage(`Failed to generate config: ${errorMsg}`);
         } finally {
-          this.showingForm = false;
-          void this.refresh();
+          this.view?.webview.postMessage({ type: "configGenerationComplete" });
+          await this.transitionToMainAfterGeneration();
         }
       }
     );
   }
 
-  private async handleDeleteConfig() {
-    try {
-      const result = await this.configService.deleteConfig();
-      if (result.deleted) {
-        this.showingForm = false;
-        void this.refresh();
-        this.showToast(`\ud83d\uddd1\ufe0f Deleted ${result.location}`);
-        vscode.window.showInformationMessage(`Config file deleted: ${result.location}`);
-      } else {
-        vscode.window.showWarningMessage(
-          "Config file not found. It may have already been deleted."
-        );
-      }
-    } catch (error) {
-      vscode.window.showErrorMessage(
-        `Failed to delete config: ${(error as Error).message}`
-      );
-    }
-  }
+  private async transitionToMainAfterGeneration(): Promise<void> {
+    this.showingForm = false;
 
-  private async handleRestoreConfig() {
-    const versions = await this.configService.listConfigVersions();
-    if (versions.length === 0) {
-      vscode.window.showInformationMessage("No previous configs available to restore.");
+    if (!this.view) {
       return;
     }
 
-    const picks = versions.map((v) => ({
-      label: v.label,
-      description: new Date(v.timestamp).toLocaleString(),
-      timestamp: v.timestamp,
-    }));
+    const status = await this.configService.getConfigStatus();
+    if (status.valid && status.config) {
+      const cspSource = this.view.webview.cspSource;
+      const nonce = getNonce();
+      this._currentViewMode = "main";
+      this.view.webview.html = this.renderMain(status.config, cspSource, nonce);
+      return;
+    }
 
-    const selection = await vscode.window.showQuickPick(picks, {
-      title: "Restore battle.config",
-      placeHolder: "Select a previous config to restore",
-      matchOnDescription: true,
-    });
-
-    if (!selection) return;
-
-    await vscode.window.withProgress(
-      {
-        location: { viewId: "battlestation.view" },
-        title: "Restoring config...",
-        cancellable: false,
-      },
-      async (progress) => {
-        try {
-          progress.report({ increment: 50, message: `Loading ${selection.label}...` });
-          await this.configService.restoreConfigVersion(selection.timestamp);
-
-          progress.report({ increment: 50, message: "Done" });
-          this.showingForm = false;
-          void this.refresh();
-          this.showToast(`🔁 Restored ${selection.label}`);
-          vscode.window.showInformationMessage(`Config restored from ${selection.label}`);
-        } catch (error) {
-          vscode.window.showErrorMessage(
-            `Failed to restore config: ${(error as Error).message}`
-          );
-        }
-      }
-    );
+    void this.refresh();
   }
+
 
   private async handleOpenVisualSettings() {
     await vscode.commands.executeCommand(

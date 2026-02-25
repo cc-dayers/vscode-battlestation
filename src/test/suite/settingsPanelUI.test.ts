@@ -2,7 +2,14 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { ConfigService } from '../../services/configService';
 
-suite('Settings Panel UI Integration Test Suite', () => {
+/**
+ * Settings Panel Integration Tests
+ *
+ * Tests that VS Code Configuration API round-trips work and that
+ * commands don't throw. Actual settings panel UI (checkboxes, save/cancel)
+ * is verified via the UI test harness.
+ */
+suite('Settings Panel Integration Test Suite', () => {
     let configService: ConfigService;
     const mockContext = {
         globalState: { get: () => undefined, update: () => Promise.resolve() },
@@ -11,10 +18,12 @@ suite('Settings Panel UI Integration Test Suite', () => {
         extensionPath: __dirname
     } as any;
 
+    // Track original values for cleanup
+    let originalShowIcon: boolean | undefined;
+
     setup(async () => {
         configService = new ConfigService(mockContext);
 
-        // Ensure we have a config file
         const exists = await configService.configExists();
         if (!exists) {
             await configService.createMinimalConfig([
@@ -22,104 +31,66 @@ suite('Settings Panel UI Integration Test Suite', () => {
                 { type: "shell", icon: "terminal" }
             ]);
         }
+
+        originalShowIcon = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.showIcon');
     });
 
-    test('Should open settings panel without errors', async function () {
+    teardown(async () => {
+        // Restore original setting value
+        await vscode.workspace.getConfiguration('battlestation')
+            .update('display.showIcon', originalShowIcon, vscode.ConfigurationTarget.Workspace);
+    });
+
+    test('battlestation.open and battlestation.openSettings execute without error', async function () {
         this.timeout(10000);
 
-        // Step 1: Open the Battlestation panel (sidebar view)
-        // This should execute without throwing errors
+        // These commands must not throw
         await vscode.commands.executeCommand('battlestation.open');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Step 2: Open the settings panel
-        // This should also execute without throwing errors
         await vscode.commands.executeCommand('battlestation.openSettings');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Step 3: Verify that we have a config (context key should be set)
-        const hasConfig = await configService.configExists();
-        assert.ok(hasConfig, 'Config should exist after opening panel');
-
-        // Note: Battlestation is a sidebar VIEW, not a tab/panel
-        // We can't directly verify the webview content due to isolation,
-        // but successful command execution indicates the view is working
-
-        // The actual Cancel/Save button functionality is tested in manual tests
-        assert.ok(true, 'Commands executed successfully');
+        // Verify config is still intact (commands didn't corrupt it)
+        const status = await configService.getConfigStatus();
+        assert.strictEqual(status.exists, true, 'Config must survive opening settings');
+        assert.strictEqual(status.valid, true, 'Config must remain valid after opening settings');
     });
 
-    test('Should be able to open and interact with settings panel flow', async function () {
-        this.timeout(15000);
+    test('display.showIcon setting round-trips through Configuration API', async function () {
+        this.timeout(10000);
 
-        console.log('Test: Opening Battlestation panel...');
-        await vscode.commands.executeCommand('battlestation.open');
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        const config = vscode.workspace.getConfiguration('battlestation');
+        const initial = config.get<boolean>('display.showIcon');
 
-        console.log('Test: Opening settings panel...');
-        await vscode.commands.executeCommand('battlestation.openSettings');
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Toggle
+        await config.update('display.showIcon', !initial, vscode.ConfigurationTarget.Workspace);
+        await new Promise(resolve => setTimeout(resolve, 300));
 
-        // Get initial settings
-        const initialConfig = vscode.workspace.getConfiguration('battlestation');
-        const initialShowIcon = initialConfig.get<boolean>('display.showIcon');
+        const toggled = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.showIcon');
+        assert.strictEqual(toggled, !initial, 'Setting value should be toggled');
 
-        console.log('Test: Initial showIcon value:', initialShowIcon);
+        // Toggle back
+        await config.update('display.showIcon', initial, vscode.ConfigurationTarget.Workspace);
+        await new Promise(resolve => setTimeout(resolve, 300));
 
-        // Modify a setting through the config API (simulating what Save would do)
-        await initialConfig.update('display.showIcon', !initialShowIcon, vscode.ConfigurationTarget.Workspace);
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Verify the change
-        const updatedConfig = vscode.workspace.getConfiguration('battlestation');
-        const updatedShowIcon = updatedConfig.get<boolean>('display.showIcon');
-
-        console.log('Test: Updated showIcon value:', updatedShowIcon);
-        assert.strictEqual(updatedShowIcon, !initialShowIcon, 'Setting should be toggled');
-
-        // Restore original value
-        await updatedConfig.update('display.showIcon', initialShowIcon, vscode.ConfigurationTarget.Workspace);
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        console.log('Test: Settings interaction test complete');
+        const restored = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.showIcon');
+        assert.strictEqual(restored, initial, 'Setting value should be restored');
     });
 
-    test('Should be able to cancel out of the settings panel', async () => {
-        // Step 1: Open the Battlestation panel
-        await vscode.commands.executeCommand('battlestation.open');
-        await new Promise(resolve => setTimeout(resolve, 1000)); // wait for init
+    test('changing settings does not mutate battle.json config', async function () {
+        this.timeout(10000);
 
-        // Step 2: Open settings form
-        await vscode.commands.executeCommand('battlestation.openSettings');
-        await new Promise(resolve => setTimeout(resolve, 500));
+        const configBefore = await configService.readConfig();
+        const actionCountBefore = configBefore.actions.length;
 
-        // Let's get the active provider to simulate a message
-        // Since it's difficult to grab the instance directly from the extension context in this test setup
-        // without modifying the extension's export surface, we will verify the behavior via the command and 
-        // watching the configuration/UI state.
+        // Change a display setting
+        await vscode.workspace.getConfiguration('battlestation')
+            .update('display.showIcon', true, vscode.ConfigurationTarget.Workspace);
+        await new Promise(resolve => setTimeout(resolve, 300));
 
-        // Wait, the Extension context might not expose the provider directly.
-        // But we DO know that if we execute the custom save or refresh commands, or wait for the update,
-        // it reflects.
-
-        // Let's interact via the command that triggers a refresh or simulates saving settings
-        // To truly test the provider without the view object, we can execute the 'battlestation.openSettings'
-        // and check if a configuration update causes the expected main view transition.
-
-        // Let's execute the 'battlestation.open' command which theoretically behaves like cancel if we force a refresh
-        // Actually, let's use the Configuration API to trigger the `vscode.workspace.onDidChangeConfiguration` 
-        // which calls refresh().
-        const initialConfig = vscode.workspace.getConfiguration('battlestation');
-        const initialShowIcon = initialConfig.get<boolean>('display.showIcon');
-
-        await initialConfig.update('display.showIcon', !initialShowIcon, vscode.ConfigurationTarget.Workspace);
-        await new Promise(resolve => setTimeout(resolve, 500)); // wait for update
-
-        // The test above verifies that opening the settings panel works.
-        // We removed the manual prompt block. 
-        assert.ok(true, 'Settings interaction tests passed automatically.');
-
-        // Restore
-        await initialConfig.update('display.showIcon', initialShowIcon, vscode.ConfigurationTarget.Workspace);
+        const configAfter = await configService.readConfig();
+        assert.strictEqual(configAfter.actions.length, actionCountBefore,
+            'Changing display settings must not alter action count in battle.json');
     });
 });

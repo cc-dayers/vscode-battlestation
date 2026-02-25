@@ -14,8 +14,29 @@ export function run(): Promise<void> {
 
     return new Promise((c, e) => {
         glob('**/**.test.js', { cwd: testsRoot }).then((files) => {
+            const priorityOrder = [
+                'suite/configLifecycle.test.js',
+                'suite/configGeneration.test.js',
+                'suite/generateConfigUI.test.js',
+                'suite/configService.test.js',
+            ];
+
+            const rank = (file: string) => {
+                const index = priorityOrder.indexOf(file);
+                return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+            };
+
+            const orderedFiles = [...files].sort((a, b) => {
+                const rankA = rank(a);
+                const rankB = rank(b);
+                if (rankA !== rankB) {
+                    return rankA - rankB;
+                }
+                return a.localeCompare(b);
+            });
+
             // Add files to the test suite
-            files.forEach(f => mocha.addFile(path.resolve(testsRoot, f)));
+            orderedFiles.forEach(f => mocha.addFile(path.resolve(testsRoot, f)));
 
             try {
                 // Run the mocha test

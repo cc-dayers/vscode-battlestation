@@ -2,7 +2,17 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { ConfigService } from '../../services/configService';
 
-suite('Welcome View Test Suite', () => {
+/**
+ * Welcome View → Config Generation Flow Tests
+ *
+ * These tests exercise the REAL config lifecycle that a user hits:
+ *   no config → welcome state → generate config → config exists → valid status
+ *
+ * They test ConfigService directly (not the webview) because VS Code's test
+ * host cannot inspect iframe DOM.  The webview rendering side is covered by
+ * the generateConfigUI tests (HTML output) and the UI test harness (browser).
+ */
+suite('Welcome View / Config Generation Flow', () => {
     let configService: ConfigService;
     const mockContext = {
         globalState: { get: () => undefined, update: () => Promise.resolve() },
@@ -14,152 +24,187 @@ suite('Welcome View Test Suite', () => {
         configService = new ConfigService(mockContext);
     });
 
-    test('Should show welcome view when no config exists', async function () {
+    /* ──────────────────────────────────────────────
+     *  Welcome state (no config)
+     * ────────────────────────────────────────────── */
+
+    test('getConfigStatus reports exists:false when no config present', async function () {
         this.timeout(10000);
 
-        // Ensure no config exists
-        const exists = await configService.configExists();
-        if (exists) {
+        // Ensure clean slate
+        if (await configService.configExists()) {
             await configService.deleteConfig();
         }
 
-        // Verify config doesn't exist
-        const configStatus = await configService.getConfigStatus();
-        assert.strictEqual(configStatus.exists, false, 'Config should not exist');
-        assert.strictEqual(configStatus.valid, false, 'Config should not be valid');
+        const status = await configService.getConfigStatus();
 
-        // Open the panel
-        await vscode.commands.executeCommand('battlestation.open');
-        
-        // Wait for view to render
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Note: We can't directly inspect webview HTML in tests due to VS Code's webview isolation,
-        // but we can verify the config state which determines if welcome view is shown
-        // Welcome view is shown when config doesn't exist or is invalid
-        const finalStatus = await configService.getConfigStatus();
-        assert.strictEqual(finalStatus.exists, false, 'Welcome view should be shown (no config)');
+        assert.strictEqual(status.exists, false, 'Config should not exist');
+        assert.strictEqual(status.valid, false, 'Config should not be valid');
+        assert.strictEqual(status.config, undefined, 'Config object should be undefined');
     });
 
-    test('Should show main view after config is created', async function () {
+    test('configExists returns false when no config present', async function () {
         this.timeout(10000);
 
-        // Create a minimal config
-        await configService.createMinimalConfig([
-            { type: "npm", icon: "package" },
-            { type: "shell", icon: "terminal" }
-        ]);
-
-        // Verify config exists
-        const exists = await configService.configExists();
-        assert.strictEqual(exists, true, 'Config should exist');
-
-        // Open the panel
-        await vscode.commands.executeCommand('battlestation.open');
-        
-        // Wait for view to render
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Verify config status
-        const configStatus = await configService.getConfigStatus();
-        assert.strictEqual(configStatus.exists, true, 'Config should exist');
-        assert.strictEqual(configStatus.valid, true, 'Config should be valid');
-    });
-
-    test('Should handle config creation errors gracefully', async function () {
-        this.timeout(10000);
-
-        // Delete config if it exists
-        const exists = await configService.configExists();
-        if (exists) {
+        if (await configService.configExists()) {
             await configService.deleteConfig();
         }
 
-        // Verify config doesn't exist
-        const configStatus = await configService.getConfigStatus();
-        assert.strictEqual(configStatus.exists, false, 'Config should not exist');
-
-        // Open the panel (should show welcome view)
-        await vscode.commands.executeCommand('battlestation.open');
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Create a minimal config to simulate successful creation
-        await configService.createMinimalConfig([
-            { type: "npm", icon: "package" }
-        ]);
-
-        // Verify config was created
-        const existsAfterCreate = await configService.configExists();
-        assert.strictEqual(existsAfterCreate, true, 'Config should exist after creation');
-
-        // Note: Testing actual error handling would require mocking file system operations
-        // which is complex in VS Code's test environment. This test verifies the happy path.
-    });
-
-    test('Should preserve workspace when cycling between views', async function () {
-        this.timeout(10000);
-
-        // Start with a config
-        await configService.createMinimalConfig([
-            { type: "npm", icon: "package" }
-        ]);
-
-        // Open panel
-        await vscode.commands.executeCommand('battlestation.open');
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Delete config (simulating user action)
-        await configService.deleteConfig();
-
-        // Wait a bit for file watcher to detect deletion
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Verify config is gone
         const exists = await configService.configExists();
-        assert.strictEqual(exists, false, 'Config should not exist after deletion');
-
-        // Refresh the view (simulating what happens after deletion)
-        await vscode.commands.executeCommand('battlestation.refresh');
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // The view should now show the welcome screen
-        // (We can't test webview content directly, but we verified the config state)
-        const configStatus = await configService.getConfigStatus();
-        assert.strictEqual(configStatus.exists, false, 'Should show welcome view state');
+        assert.strictEqual(exists, false, 'configExists must return false after deletion');
     });
 
-    test('Should recover from welcome to main-ready state after generation and refresh', async function () {
+    /* ──────────────────────────────────────────────
+     *  Config generation (the critical flow!)
+     * ────────────────────────────────────────────── */
+
+    test('createAutoConfig produces a file on disk with valid JSON and actions', async function () {
         this.timeout(15000);
 
-        await configService.deleteConfig();
+        // Start from no-config state
+        if (await configService.configExists()) {
+            await configService.deleteConfig();
+        }
+        assert.strictEqual(await configService.configExists(), false, 'Precondition: no config');
 
-        // Start from welcome path (no config)
-        await vscode.commands.executeCommand('battlestation.open');
-        await new Promise(resolve => setTimeout(resolve, 700));
-
-        const before = await configService.getConfigStatus();
-        assert.strictEqual(before.exists, false, 'Precondition should be welcome state with no config');
-
-        // Simulate generate from welcome flow
+        // Generate config — same call that handleCreateConfig makes
         await configService.createAutoConfig(
             { npm: true, tasks: true, launch: true },
             true,
-            [
-                { type: 'npm', icon: 'package' },
-                { type: 'task', icon: 'check' },
-                { type: 'launch', icon: 'play' }
-            ],
+            ConfigService.defaultIcons,
             [],
             false
         );
 
-        // Force host refresh as done by normal command flow
-        await vscode.commands.executeCommand('battlestation.refresh');
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // 1. File must now exist
+        const exists = await configService.configExists();
+        assert.strictEqual(exists, true, 'Config file must exist after createAutoConfig');
 
-        const after = await configService.getConfigStatus();
-        assert.strictEqual(after.exists, true, 'Config should exist after generation');
-        assert.strictEqual(after.valid, true, 'Config should be valid after generation');
-        assert.ok((after.config?.actions?.length ?? 0) > 0, 'Generated config should include actions for main view');
+        // 2. getConfigStatus must report valid
+        const status = await configService.getConfigStatus();
+        assert.strictEqual(status.exists, true, 'Status should report exists');
+        assert.strictEqual(status.valid, true, 'Status should report valid');
+        assert.ok(status.config, 'Status should include parsed config');
+
+        // 3. Config must have actions (we're in a real workspace with package.json)
+        assert.ok(status.config!.actions.length > 0, 'Generated config must contain at least one action');
+
+        // 4. Every action must have required fields
+        for (const action of status.config!.actions) {
+            assert.ok(action.name, `Action missing name: ${JSON.stringify(action)}`);
+            assert.ok(action.command, `Action missing command: ${JSON.stringify(action)}`);
+            assert.ok(action.type, `Action missing type: ${JSON.stringify(action)}`);
+        }
+
+        // 5. Config should be valid JSON when read back via readConfig
+        const config = await configService.readConfig();
+        assert.ok(Array.isArray(config.actions), 'readConfig().actions must be an array');
+        assert.strictEqual(config.actions.length, status.config!.actions.length,
+            'readConfig and getConfigStatus should agree on action count');
+    });
+
+    test('createAutoConfig with grouping produces groups that match actions', async function () {
+        this.timeout(15000);
+
+        if (await configService.configExists()) {
+            await configService.deleteConfig();
+        }
+
+        await configService.createAutoConfig(
+            { npm: true, tasks: true, launch: true },
+            true, // groupByType enabled
+            ConfigService.defaultIcons,
+            [],
+            false
+        );
+
+        const config = await configService.readConfig();
+
+        // If there are groups, every grouped action must reference an existing group
+        if (config.groups && config.groups.length > 0) {
+            const groupNames = new Set(config.groups.map(g => g.name));
+            for (const action of config.actions) {
+                if (action.group) {
+                    assert.ok(groupNames.has(action.group),
+                        `Action "${action.name}" references group "${action.group}" which doesn't exist. Available: ${[...groupNames].join(', ')}`);
+                }
+            }
+        }
+
+        // Groups must have name and icon
+        for (const group of (config.groups ?? [])) {
+            assert.ok(group.name, 'Group missing name');
+            assert.ok(group.icon, `Group "${group.name}" missing icon`);
+        }
+    });
+
+    test('createMinimalConfig produces a file with valid structure', async function () {
+        this.timeout(10000);
+
+        if (await configService.configExists()) {
+            await configService.deleteConfig();
+        }
+
+        await configService.createMinimalConfig([
+            { type: 'npm', icon: 'package' },
+            { type: 'shell', icon: 'terminal' }
+        ]);
+
+        const status = await configService.getConfigStatus();
+        assert.strictEqual(status.exists, true, 'Minimal config must exist');
+        assert.strictEqual(status.valid, true, 'Minimal config must be valid');
+        assert.ok(status.config!.actions.length > 0, 'Minimal config must have actions');
+        assert.ok(Array.isArray(status.config!.icons), 'Minimal config must have icons array');
+    });
+
+    /* ──────────────────────────────────────────────
+     *  Post-generation state transitions
+     * ────────────────────────────────────────────── */
+
+    test('openConfigFile returns true after successful generation', async function () {
+        this.timeout(10000);
+
+        if (await configService.configExists()) {
+            await configService.deleteConfig();
+        }
+
+        await configService.createAutoConfig(
+            { npm: true, tasks: false, launch: false },
+            false,
+            ConfigService.defaultIcons,
+            [],
+            false
+        );
+
+        const opened = await configService.openConfigFile();
+        assert.strictEqual(opened, true, 'openConfigFile must return true when config exists');
+    });
+
+    test('delete → generate → status cycle works without errors', async function () {
+        this.timeout(15000);
+
+        // Start: ensure config exists
+        await configService.createMinimalConfig([{ type: 'npm', icon: 'package' }]);
+        assert.strictEqual(await configService.configExists(), true, 'Setup: config exists');
+
+        // Delete
+        await configService.deleteConfig();
+        const afterDelete = await configService.getConfigStatus();
+        assert.strictEqual(afterDelete.exists, false, 'After delete: config gone');
+
+        // Regenerate
+        await configService.createAutoConfig(
+            { npm: true, tasks: true, launch: true },
+            true,
+            ConfigService.defaultIcons,
+            [],
+            false
+        );
+
+        // Verify full round-trip
+        const afterRegen = await configService.getConfigStatus();
+        assert.strictEqual(afterRegen.exists, true, 'After regen: config exists');
+        assert.strictEqual(afterRegen.valid, true, 'After regen: config valid');
+        assert.ok(afterRegen.config!.actions.length > 0, 'After regen: has actions');
     });
 });

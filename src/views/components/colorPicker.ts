@@ -1,20 +1,6 @@
 
 import { esc } from "../helpers";
-
-export const THEME_COLORS = [
-  { name: "Blue", value: "var(--vscode-charts-blue)" },
-  { name: "Red", value: "var(--vscode-charts-red)" },
-  { name: "Green", value: "var(--vscode-charts-green)" },
-  { name: "Yellow", value: "var(--vscode-charts-yellow)" },
-  { name: "Orange", value: "var(--vscode-charts-orange)" },
-  { name: "Purple", value: "var(--vscode-charts-purple)" },
-  { name: "Pink", value: "var(--vscode-charts-pink)" },
-  { name: "Foreground", value: "var(--vscode-foreground)" },
-  { name: "Error", value: "var(--vscode-errorForeground)" },
-  { name: "Warning", value: "var(--vscode-editorWarning-foreground)" },
-  { name: "Info", value: "var(--vscode-editorInfo-foreground)" },
-  { name: "Success", value: "var(--vscode-testing-iconPassed)" },
-];
+import { THEME_COLOR_OPTIONS } from "../../utils/themeColors";
 
 export interface ColorPickerOptions {
   id: string; // Base ID for this picker instance
@@ -28,7 +14,7 @@ export interface ColorPickerOptions {
 export function renderColorPicker(opts: ColorPickerOptions): string {
   const { id, value, customColors = [], label, placeholder } = opts;
 
-  const themeOptions = THEME_COLORS.map(
+  const themeOptions = THEME_COLOR_OPTIONS.map(
     (color) =>
       `<div class="lp-color-option ${color.value === value ? "selected" : ""}" 
             data-color="${color.value}" 

@@ -273,4 +273,28 @@ suite('Config Lifecycle Test Suite', () => {
         assert.ok(config.groups?.find(g => g.name === 'VS Code Tasks'), 'VS Code Tasks group should exist');
         assert.ok(config.groups?.find(g => g.name === 'NPM Scripts'), 'NPM Scripts group should exist');
     });
+
+    test('Should allow opening config file immediately after generation', async function () {
+        this.timeout(10000);
+
+        await configService.deleteConfig();
+
+        await configService.createAutoConfig(
+            { npm: true, tasks: true, launch: true },
+            true,
+            [
+                { type: 'npm', icon: 'package' },
+                { type: 'task', icon: 'check' },
+                { type: 'launch', icon: 'play' }
+            ],
+            [],
+            false
+        );
+
+        const exists = await configService.configExists();
+        assert.strictEqual(exists, true, 'Generated config should exist');
+
+        const opened = await configService.openConfigFile();
+        assert.strictEqual(opened, true, 'Generated config should be openable immediately');
+    });
 });

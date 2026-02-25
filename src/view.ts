@@ -14,6 +14,7 @@ import {
   renderEditActionForm,
   renderAddActionForm,
 } from "./views";
+import { THEME_COLOR_OPTIONS } from "./utils/themeColors";
 // Import codicon CSS as a string at build time via esbuild plugin
 import codiconCssTemplate from "../media/codicon.css";
 
@@ -80,6 +81,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     // Refresh when config or todos change
     this.disposables.push(
       this.configService.onDidChange(() => this.refresh()),
+      // Auto-refresh when workspace folders change (e.g. user opens a folder)
+      vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh()),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration("battlestation")) {
           // If enhanced mode setting changed and we are preparing generation config
@@ -139,6 +142,12 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         void this.refresh();
       }
     });
+
+    // If no workspace folder is open, proactively open the folder picker
+    // so the user isn't stuck on a dead-end welcome screen
+    if (!vscode.workspace.workspaceFolders?.length) {
+      void vscode.commands.executeCommand('vscode.openFolder');
+    }
 
     // Refresh with actual content
     void this.refresh();
@@ -230,12 +239,23 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         void this.saveSettings(message.settings);
         break;
       case "openConfig":
-        void this.configService.openConfigFile();
-        this.showingForm = false;
-        void this.refresh();
+        void (async () => {
+          const exists = await this.configService.configExists();
+          if (!exists) {
+            this.showToast("No config yet. Opening generator...");
+            await this.handleShowGenerateConfig();
+            return;
+          }
+          await this.configService.openConfigFile();
+          this.showingForm = false;
+          void this.refresh();
+        })();
         break;
       case "openConfigFolder":
         void this.configService.openConfigFolder();
+        break;
+      case "openFolder":
+        void vscode.commands.executeCommand('vscode.openFolder');
         break;
       case "changeConfigLocation":
         void this.handleChangeConfigLocation();
@@ -412,6 +432,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       if (!exists || !valid) {
         this.showingForm = false;
         const codiconStyles = this.getCodiconStyles();
+        const hasWorkspace = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
 
         // Quick detection of basic tools for welcome view
         // This is fast (just file existence checks) so it won't slow down initial load
@@ -426,6 +447,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           hasNpm,
           hasTasks,
           hasLaunch,
+          hasWorkspace,
           showWelcome: true,
           enhancedMode: undefined,
         });
@@ -845,13 +867,10 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     const THEME_COLORS = [
       { label: "$(symbol-color) Remove Color", value: "" },
       { label: "$(color-mode) Custom Color...", value: "CUSTOM" },
-      { label: "$(circle-filled) Red", value: "var(--vscode-charts-red)" },
-      { label: "$(circle-filled) Orange", value: "var(--vscode-charts-orange)" },
-      { label: "$(circle-filled) Yellow", value: "var(--vscode-charts-yellow)" },
-      { label: "$(circle-filled) Green", value: "var(--vscode-charts-green)" },
-      { label: "$(circle-filled) Blue", value: "var(--vscode-charts-blue)" },
-      { label: "$(circle-filled) Purple", value: "var(--vscode-charts-purple)" },
-      { label: "$(circle-filled) Pink", value: "var(--vscode-button-secondaryHoverBackground)" }, // Pink-ish/Hover
+      ...THEME_COLOR_OPTIONS.map((color) => ({
+        label: `$(circle-filled) ${color.name}`,
+        value: color.value,
+      })),
     ];
 
     const selected = await vscode.window.showQuickPick(THEME_COLORS, {
@@ -1247,6 +1266,10 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleCreateBlankConfig() {
+    if (!vscode.workspace.workspaceFolders?.length) {
+      vscode.window.showErrorMessage('Please open a folder before creating a config.');
+      return;
+    }
     await vscode.window.withProgress(
       {
         location: { viewId: "battlestation.view" },
@@ -1258,6 +1281,11 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           this.view?.webview.postMessage({ type: "configGenerationStarted" });
           progress.report({ increment: 50, message: "Creating file..." });
           await this.configService.createMinimalConfig(BattlestationViewProvider.defaultIcons);
+
+          const created = await this.configService.configExists();
+          if (!created) {
+            throw new Error("Config generation completed but no config file was created.");
+          }
 
           progress.report({ increment: 40, message: "Opening file..." });
           await this.configService.openConfigFile();
@@ -1276,6 +1304,10 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleCreateExampleConfig() {
+    if (!vscode.workspace.workspaceFolders?.length) {
+      vscode.window.showErrorMessage('Please open a folder before creating a config.');
+      return;
+    }
     await vscode.window.withProgress(
       {
         location: { viewId: "battlestation.view" },
@@ -1287,6 +1319,11 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           this.view?.webview.postMessage({ type: "configGenerationStarted" });
           progress.report({ increment: 50, message: "Creating example file..." });
           await this.configService.createExampleConfig(BattlestationViewProvider.defaultIcons);
+
+          const created = await this.configService.configExists();
+          if (!created) {
+            throw new Error("Config generation completed but no config file was created.");
+          }
 
           progress.report({ increment: 40, message: "Opening file..." });
           await this.configService.openConfigFile();
@@ -1354,6 +1391,10 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     detectionMethod: "file" | "command" | "hybrid",
     enableColoring: boolean = false
   ) {
+    if (!vscode.workspace.workspaceFolders?.length) {
+      vscode.window.showErrorMessage('Please open a folder before generating a config.');
+      return;
+    }
     await vscode.window.withProgress(
       {
         location: { viewId: "battlestation.view" },
@@ -1363,8 +1404,10 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       async (progress) => {
         try {
           this.view?.webview.postMessage({ type: "configGenerationStarted" });
+
+          console.log('[Battlestation] handleCreateConfig called with sources:', JSON.stringify(sources));
+
           // Get enhanced actions from the unified sources object
-          // scanEnhanced only checks for specific keys (docker, git, etc) so we can pass the whole object
           let enhancedActions: Action[] = [];
 
           // Check if any enhanced source keys are present and true
@@ -1385,11 +1428,14 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           progress.report({ increment: 40, message: "Building configuration..." });
 
           // Extract basic sources from the unified object
+          // Ensure boolean values (webview may send undefined for unchecked)
           const basicSources = {
-            npm: sources.npm,
-            tasks: sources.tasks,
-            launch: sources.launch
+            npm: sources.npm === true,
+            tasks: sources.tasks === true,
+            launch: sources.launch === true
           };
+
+          console.log('[Battlestation] Creating auto config with basic sources:', JSON.stringify(basicSources));
 
           await this.configService.createAutoConfig(
             basicSources,
@@ -1399,6 +1445,12 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
             enableColoring
           );
 
+          const created = await this.configService.configExists();
+          console.log('[Battlestation] Config exists after creation:', created);
+          if (!created) {
+            throw new Error("Config generation completed but no config file was created.");
+          }
+
           progress.report({ increment: 30, message: "Opening config file..." });
           // Open the config file for review
           await this.configService.openConfigFile();
@@ -1407,7 +1459,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           const generatedConfig = await this.configService.readConfig();
           this.showToast(`\u2705 Config generated (${generatedConfig.actions.length} actions)`);
         } catch (error) {
-          console.error("Failed to create config:", error);
+          console.error("[Battlestation] Failed to create config:", error);
           const errorMsg = error instanceof Error ? error.message : String(error);
           vscode.window.showErrorMessage(`Failed to generate config: ${errorMsg}`);
         } finally {

@@ -581,24 +581,24 @@ const renderGroup = (group: Group, actions: Action[]) => {
 
     // Group styles
     const styles = [];
-    if (group.color) {
-        if (group.color.includes("--vscode-charts-")) {
-            styles.push(`--lp-group-accent: ${group.color}`);
+    // borderColor takes priority for the accent stripe, then color, then theme default
+    const accent = group.borderColor || group.color;
+    if (accent) {
+        if (accent.includes("--vscode-charts-")) {
+            styles.push(`--lp-group-accent: ${accent}`);
         } else {
+            styles.push(`--lp-group-accent: ${accent}`);
+        }
+    }
+    if (group.color) {
+        if (!group.color.includes("--vscode-charts-")) {
             styles.push(`color: ${group.color}`);
-            styles.push(`--lp-group-accent: ${group.color}`);
         }
     }
     if (group.backgroundColor) styles.push(`background-color: ${group.backgroundColor}`);
-    if (group.borderColor) styles.push(`border-color: ${group.borderColor}`);
 
     const itemsStyles = [];
     if (group.backgroundColor) itemsStyles.push(`background-color: ${group.backgroundColor}`);
-    if (group.borderColor) {
-        itemsStyles.push(`border: 1px solid ${group.borderColor}`);
-        itemsStyles.push(`border-radius: 4px`);
-        itemsStyles.push(`padding: 8px`);
-    }
 
     return html`
     <details class="lp-group" ?open=${isOpen} @toggle=${(e: Event) => {
@@ -655,30 +655,6 @@ const renderSearch = () => {
         <!-- Additional search buttons (Select Multiple, etc) could go here -->
     </div>
     `;
-};
-
-const renderMainToolbar = () => {
-    const hiddenActionCount = state.actions.filter(a => a.hidden).length;
-    const hiddenGroupCount = state.groups.filter(g => g.hidden).length;
-    const hiddenTotal = hiddenActionCount + hiddenGroupCount;
-    const showCounts = hiddenTotal > 0;
-
-    return html`
-    <div class="lp-main-toolbar">
-        <button
-            class="lp-toolbar-btn"
-            title=${state.showHidden ? "Hide hidden actions and groups" : "Show hidden actions and groups"}
-            aria-label=${state.showHidden ? "Hide hidden actions and groups" : "Show hidden actions and groups"}
-            @click=${() => {
-                state.showHidden = !state.showHidden;
-                vscode.postMessage({ command: 'toggleShowHidden' });
-            }}>
-            <span class="codicon codicon-${state.showHidden ? state.display.hideIcon : 'eye'}"></span>
-            <span>${state.showHidden ? 'Hide Hidden' : 'Show Hidden'}</span>
-            ${showCounts ? html`<span class="lp-hidden-count">${hiddenTotal}</span>` : null}
-        </button>
-    </div>
-  `;
 };
 
 const renderView = () => {
@@ -762,7 +738,6 @@ const renderView = () => {
     ${state.loading
             ? html`<div class="lp-loading-overlay"><span class="codicon codicon-loading codicon-modifier-spin"></span></div>`
             : null}
-    ${renderMainToolbar()}
     ${renderSearch()}
     <div class="lp-grid ${state.display.density}">
         ${content}

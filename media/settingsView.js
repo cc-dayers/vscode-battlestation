@@ -1,656 +1,27 @@
-// node_modules/@lit/reactive-element/css-tag.js
-var t = globalThis;
-var e = t.ShadowRoot && (void 0 === t.ShadyCSS || t.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype;
-var s = Symbol();
-var o = /* @__PURE__ */ new WeakMap();
-var n = class {
-  constructor(t3, e4, o5) {
-    if (this._$cssResult$ = true, o5 !== s)
-      throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");
-    this.cssText = t3, this.t = e4;
-  }
-  get styleSheet() {
-    let t3 = this.o;
-    const s4 = this.t;
-    if (e && void 0 === t3) {
-      const e4 = void 0 !== s4 && 1 === s4.length;
-      e4 && (t3 = o.get(s4)), void 0 === t3 && ((this.o = t3 = new CSSStyleSheet()).replaceSync(this.cssText), e4 && o.set(s4, t3));
-    }
-    return t3;
-  }
-  toString() {
-    return this.cssText;
-  }
-};
-var r = (t3) => new n("string" == typeof t3 ? t3 : t3 + "", void 0, s);
-var S = (s4, o5) => {
-  if (e)
-    s4.adoptedStyleSheets = o5.map((t3) => t3 instanceof CSSStyleSheet ? t3 : t3.styleSheet);
-  else
-    for (const e4 of o5) {
-      const o6 = document.createElement("style"), n4 = t.litNonce;
-      void 0 !== n4 && o6.setAttribute("nonce", n4), o6.textContent = e4.cssText, s4.appendChild(o6);
-    }
-};
-var c = e ? (t3) => t3 : (t3) => t3 instanceof CSSStyleSheet ? ((t4) => {
-  let e4 = "";
-  for (const s4 of t4.cssRules)
-    e4 += s4.cssText;
-  return r(e4);
-})(t3) : t3;
-
-// node_modules/@lit/reactive-element/reactive-element.js
-var { is: i2, defineProperty: e2, getOwnPropertyDescriptor: h, getOwnPropertyNames: r2, getOwnPropertySymbols: o2, getPrototypeOf: n2 } = Object;
-var a = globalThis;
-var c2 = a.trustedTypes;
-var l = c2 ? c2.emptyScript : "";
-var p = a.reactiveElementPolyfillSupport;
-var d = (t3, s4) => t3;
-var u = { toAttribute(t3, s4) {
-  switch (s4) {
-    case Boolean:
-      t3 = t3 ? l : null;
-      break;
-    case Object:
-    case Array:
-      t3 = null == t3 ? t3 : JSON.stringify(t3);
-  }
-  return t3;
-}, fromAttribute(t3, s4) {
-  let i5 = t3;
-  switch (s4) {
-    case Boolean:
-      i5 = null !== t3;
-      break;
-    case Number:
-      i5 = null === t3 ? null : Number(t3);
-      break;
-    case Object:
-    case Array:
-      try {
-        i5 = JSON.parse(t3);
-      } catch (t4) {
-        i5 = null;
-      }
-  }
-  return i5;
-} };
-var f = (t3, s4) => !i2(t3, s4);
-var b = { attribute: true, type: String, converter: u, reflect: false, useDefault: false, hasChanged: f };
-Symbol.metadata ??= Symbol("metadata"), a.litPropertyMetadata ??= /* @__PURE__ */ new WeakMap();
-var y = class extends HTMLElement {
-  static addInitializer(t3) {
-    this._$Ei(), (this.l ??= []).push(t3);
-  }
-  static get observedAttributes() {
-    return this.finalize(), this._$Eh && [...this._$Eh.keys()];
-  }
-  static createProperty(t3, s4 = b) {
-    if (s4.state && (s4.attribute = false), this._$Ei(), this.prototype.hasOwnProperty(t3) && ((s4 = Object.create(s4)).wrapped = true), this.elementProperties.set(t3, s4), !s4.noAccessor) {
-      const i5 = Symbol(), h3 = this.getPropertyDescriptor(t3, i5, s4);
-      void 0 !== h3 && e2(this.prototype, t3, h3);
-    }
-  }
-  static getPropertyDescriptor(t3, s4, i5) {
-    const { get: e4, set: r4 } = h(this.prototype, t3) ?? { get() {
-      return this[s4];
-    }, set(t4) {
-      this[s4] = t4;
-    } };
-    return { get: e4, set(s5) {
-      const h3 = e4?.call(this);
-      r4?.call(this, s5), this.requestUpdate(t3, h3, i5);
-    }, configurable: true, enumerable: true };
-  }
-  static getPropertyOptions(t3) {
-    return this.elementProperties.get(t3) ?? b;
-  }
-  static _$Ei() {
-    if (this.hasOwnProperty(d("elementProperties")))
-      return;
-    const t3 = n2(this);
-    t3.finalize(), void 0 !== t3.l && (this.l = [...t3.l]), this.elementProperties = new Map(t3.elementProperties);
-  }
-  static finalize() {
-    if (this.hasOwnProperty(d("finalized")))
-      return;
-    if (this.finalized = true, this._$Ei(), this.hasOwnProperty(d("properties"))) {
-      const t4 = this.properties, s4 = [...r2(t4), ...o2(t4)];
-      for (const i5 of s4)
-        this.createProperty(i5, t4[i5]);
-    }
-    const t3 = this[Symbol.metadata];
-    if (null !== t3) {
-      const s4 = litPropertyMetadata.get(t3);
-      if (void 0 !== s4)
-        for (const [t4, i5] of s4)
-          this.elementProperties.set(t4, i5);
-    }
-    this._$Eh = /* @__PURE__ */ new Map();
-    for (const [t4, s4] of this.elementProperties) {
-      const i5 = this._$Eu(t4, s4);
-      void 0 !== i5 && this._$Eh.set(i5, t4);
-    }
-    this.elementStyles = this.finalizeStyles(this.styles);
-  }
-  static finalizeStyles(s4) {
-    const i5 = [];
-    if (Array.isArray(s4)) {
-      const e4 = new Set(s4.flat(1 / 0).reverse());
-      for (const s5 of e4)
-        i5.unshift(c(s5));
-    } else
-      void 0 !== s4 && i5.push(c(s4));
-    return i5;
-  }
-  static _$Eu(t3, s4) {
-    const i5 = s4.attribute;
-    return false === i5 ? void 0 : "string" == typeof i5 ? i5 : "string" == typeof t3 ? t3.toLowerCase() : void 0;
-  }
-  constructor() {
-    super(), this._$Ep = void 0, this.isUpdatePending = false, this.hasUpdated = false, this._$Em = null, this._$Ev();
-  }
-  _$Ev() {
-    this._$ES = new Promise((t3) => this.enableUpdating = t3), this._$AL = /* @__PURE__ */ new Map(), this._$E_(), this.requestUpdate(), this.constructor.l?.forEach((t3) => t3(this));
-  }
-  addController(t3) {
-    (this._$EO ??= /* @__PURE__ */ new Set()).add(t3), void 0 !== this.renderRoot && this.isConnected && t3.hostConnected?.();
-  }
-  removeController(t3) {
-    this._$EO?.delete(t3);
-  }
-  _$E_() {
-    const t3 = /* @__PURE__ */ new Map(), s4 = this.constructor.elementProperties;
-    for (const i5 of s4.keys())
-      this.hasOwnProperty(i5) && (t3.set(i5, this[i5]), delete this[i5]);
-    t3.size > 0 && (this._$Ep = t3);
-  }
-  createRenderRoot() {
-    const t3 = this.shadowRoot ?? this.attachShadow(this.constructor.shadowRootOptions);
-    return S(t3, this.constructor.elementStyles), t3;
-  }
-  connectedCallback() {
-    this.renderRoot ??= this.createRenderRoot(), this.enableUpdating(true), this._$EO?.forEach((t3) => t3.hostConnected?.());
-  }
-  enableUpdating(t3) {
-  }
-  disconnectedCallback() {
-    this._$EO?.forEach((t3) => t3.hostDisconnected?.());
-  }
-  attributeChangedCallback(t3, s4, i5) {
-    this._$AK(t3, i5);
-  }
-  _$ET(t3, s4) {
-    const i5 = this.constructor.elementProperties.get(t3), e4 = this.constructor._$Eu(t3, i5);
-    if (void 0 !== e4 && true === i5.reflect) {
-      const h3 = (void 0 !== i5.converter?.toAttribute ? i5.converter : u).toAttribute(s4, i5.type);
-      this._$Em = t3, null == h3 ? this.removeAttribute(e4) : this.setAttribute(e4, h3), this._$Em = null;
-    }
-  }
-  _$AK(t3, s4) {
-    const i5 = this.constructor, e4 = i5._$Eh.get(t3);
-    if (void 0 !== e4 && this._$Em !== e4) {
-      const t4 = i5.getPropertyOptions(e4), h3 = "function" == typeof t4.converter ? { fromAttribute: t4.converter } : void 0 !== t4.converter?.fromAttribute ? t4.converter : u;
-      this._$Em = e4;
-      const r4 = h3.fromAttribute(s4, t4.type);
-      this[e4] = r4 ?? this._$Ej?.get(e4) ?? r4, this._$Em = null;
-    }
-  }
-  requestUpdate(t3, s4, i5, e4 = false, h3) {
-    if (void 0 !== t3) {
-      const r4 = this.constructor;
-      if (false === e4 && (h3 = this[t3]), i5 ??= r4.getPropertyOptions(t3), !((i5.hasChanged ?? f)(h3, s4) || i5.useDefault && i5.reflect && h3 === this._$Ej?.get(t3) && !this.hasAttribute(r4._$Eu(t3, i5))))
-        return;
-      this.C(t3, s4, i5);
-    }
-    false === this.isUpdatePending && (this._$ES = this._$EP());
-  }
-  C(t3, s4, { useDefault: i5, reflect: e4, wrapped: h3 }, r4) {
-    i5 && !(this._$Ej ??= /* @__PURE__ */ new Map()).has(t3) && (this._$Ej.set(t3, r4 ?? s4 ?? this[t3]), true !== h3 || void 0 !== r4) || (this._$AL.has(t3) || (this.hasUpdated || i5 || (s4 = void 0), this._$AL.set(t3, s4)), true === e4 && this._$Em !== t3 && (this._$Eq ??= /* @__PURE__ */ new Set()).add(t3));
-  }
-  async _$EP() {
-    this.isUpdatePending = true;
-    try {
-      await this._$ES;
-    } catch (t4) {
-      Promise.reject(t4);
-    }
-    const t3 = this.scheduleUpdate();
-    return null != t3 && await t3, !this.isUpdatePending;
-  }
-  scheduleUpdate() {
-    return this.performUpdate();
-  }
-  performUpdate() {
-    if (!this.isUpdatePending)
-      return;
-    if (!this.hasUpdated) {
-      if (this.renderRoot ??= this.createRenderRoot(), this._$Ep) {
-        for (const [t5, s5] of this._$Ep)
-          this[t5] = s5;
-        this._$Ep = void 0;
-      }
-      const t4 = this.constructor.elementProperties;
-      if (t4.size > 0)
-        for (const [s5, i5] of t4) {
-          const { wrapped: t5 } = i5, e4 = this[s5];
-          true !== t5 || this._$AL.has(s5) || void 0 === e4 || this.C(s5, void 0, i5, e4);
-        }
-    }
-    let t3 = false;
-    const s4 = this._$AL;
-    try {
-      t3 = this.shouldUpdate(s4), t3 ? (this.willUpdate(s4), this._$EO?.forEach((t4) => t4.hostUpdate?.()), this.update(s4)) : this._$EM();
-    } catch (s5) {
-      throw t3 = false, this._$EM(), s5;
-    }
-    t3 && this._$AE(s4);
-  }
-  willUpdate(t3) {
-  }
-  _$AE(t3) {
-    this._$EO?.forEach((t4) => t4.hostUpdated?.()), this.hasUpdated || (this.hasUpdated = true, this.firstUpdated(t3)), this.updated(t3);
-  }
-  _$EM() {
-    this._$AL = /* @__PURE__ */ new Map(), this.isUpdatePending = false;
-  }
-  get updateComplete() {
-    return this.getUpdateComplete();
-  }
-  getUpdateComplete() {
-    return this._$ES;
-  }
-  shouldUpdate(t3) {
-    return true;
-  }
-  update(t3) {
-    this._$Eq &&= this._$Eq.forEach((t4) => this._$ET(t4, this[t4])), this._$EM();
-  }
-  updated(t3) {
-  }
-  firstUpdated(t3) {
-  }
-};
-y.elementStyles = [], y.shadowRootOptions = { mode: "open" }, y[d("elementProperties")] = /* @__PURE__ */ new Map(), y[d("finalized")] = /* @__PURE__ */ new Map(), p?.({ ReactiveElement: y }), (a.reactiveElementVersions ??= []).push("2.1.2");
-
-// node_modules/lit-html/lit-html.js
-var t2 = globalThis;
-var i3 = (t3) => t3;
-var s2 = t2.trustedTypes;
-var e3 = s2 ? s2.createPolicy("lit-html", { createHTML: (t3) => t3 }) : void 0;
-var h2 = "$lit$";
-var o3 = `lit$${Math.random().toFixed(9).slice(2)}$`;
-var n3 = "?" + o3;
-var r3 = `<${n3}>`;
-var l2 = document;
-var c3 = () => l2.createComment("");
-var a2 = (t3) => null === t3 || "object" != typeof t3 && "function" != typeof t3;
-var u2 = Array.isArray;
-var d2 = (t3) => u2(t3) || "function" == typeof t3?.[Symbol.iterator];
-var f2 = "[ 	\n\f\r]";
-var v = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g;
-var _ = /-->/g;
-var m = />/g;
-var p2 = RegExp(`>|${f2}(?:([^\\s"'>=/]+)(${f2}*=${f2}*(?:[^ 	
-\f\r"'\`<>=]|("|')|))|$)`, "g");
-var g = /'/g;
-var $ = /"/g;
-var y2 = /^(?:script|style|textarea|title)$/i;
-var x = (t3) => (i5, ...s4) => ({ _$litType$: t3, strings: i5, values: s4 });
-var b2 = x(1);
-var w = x(2);
-var T = x(3);
-var E = Symbol.for("lit-noChange");
-var A = Symbol.for("lit-nothing");
-var C = /* @__PURE__ */ new WeakMap();
-var P = l2.createTreeWalker(l2, 129);
-function V(t3, i5) {
-  if (!u2(t3) || !t3.hasOwnProperty("raw"))
-    throw Error("invalid template strings array");
-  return void 0 !== e3 ? e3.createHTML(i5) : i5;
-}
-var N = (t3, i5) => {
-  const s4 = t3.length - 1, e4 = [];
-  let n4, l3 = 2 === i5 ? "<svg>" : 3 === i5 ? "<math>" : "", c4 = v;
-  for (let i6 = 0; i6 < s4; i6++) {
-    const s5 = t3[i6];
-    let a3, u3, d3 = -1, f3 = 0;
-    for (; f3 < s5.length && (c4.lastIndex = f3, u3 = c4.exec(s5), null !== u3); )
-      f3 = c4.lastIndex, c4 === v ? "!--" === u3[1] ? c4 = _ : void 0 !== u3[1] ? c4 = m : void 0 !== u3[2] ? (y2.test(u3[2]) && (n4 = RegExp("</" + u3[2], "g")), c4 = p2) : void 0 !== u3[3] && (c4 = p2) : c4 === p2 ? ">" === u3[0] ? (c4 = n4 ?? v, d3 = -1) : void 0 === u3[1] ? d3 = -2 : (d3 = c4.lastIndex - u3[2].length, a3 = u3[1], c4 = void 0 === u3[3] ? p2 : '"' === u3[3] ? $ : g) : c4 === $ || c4 === g ? c4 = p2 : c4 === _ || c4 === m ? c4 = v : (c4 = p2, n4 = void 0);
-    const x2 = c4 === p2 && t3[i6 + 1].startsWith("/>") ? " " : "";
-    l3 += c4 === v ? s5 + r3 : d3 >= 0 ? (e4.push(a3), s5.slice(0, d3) + h2 + s5.slice(d3) + o3 + x2) : s5 + o3 + (-2 === d3 ? i6 : x2);
-  }
-  return [V(t3, l3 + (t3[s4] || "<?>") + (2 === i5 ? "</svg>" : 3 === i5 ? "</math>" : "")), e4];
-};
-var S2 = class _S {
-  constructor({ strings: t3, _$litType$: i5 }, e4) {
-    let r4;
-    this.parts = [];
-    let l3 = 0, a3 = 0;
-    const u3 = t3.length - 1, d3 = this.parts, [f3, v2] = N(t3, i5);
-    if (this.el = _S.createElement(f3, e4), P.currentNode = this.el.content, 2 === i5 || 3 === i5) {
-      const t4 = this.el.content.firstChild;
-      t4.replaceWith(...t4.childNodes);
-    }
-    for (; null !== (r4 = P.nextNode()) && d3.length < u3; ) {
-      if (1 === r4.nodeType) {
-        if (r4.hasAttributes())
-          for (const t4 of r4.getAttributeNames())
-            if (t4.endsWith(h2)) {
-              const i6 = v2[a3++], s4 = r4.getAttribute(t4).split(o3), e5 = /([.?@])?(.*)/.exec(i6);
-              d3.push({ type: 1, index: l3, name: e5[2], strings: s4, ctor: "." === e5[1] ? I : "?" === e5[1] ? L : "@" === e5[1] ? z : H }), r4.removeAttribute(t4);
-            } else
-              t4.startsWith(o3) && (d3.push({ type: 6, index: l3 }), r4.removeAttribute(t4));
-        if (y2.test(r4.tagName)) {
-          const t4 = r4.textContent.split(o3), i6 = t4.length - 1;
-          if (i6 > 0) {
-            r4.textContent = s2 ? s2.emptyScript : "";
-            for (let s4 = 0; s4 < i6; s4++)
-              r4.append(t4[s4], c3()), P.nextNode(), d3.push({ type: 2, index: ++l3 });
-            r4.append(t4[i6], c3());
-          }
-        }
-      } else if (8 === r4.nodeType)
-        if (r4.data === n3)
-          d3.push({ type: 2, index: l3 });
-        else {
-          let t4 = -1;
-          for (; -1 !== (t4 = r4.data.indexOf(o3, t4 + 1)); )
-            d3.push({ type: 7, index: l3 }), t4 += o3.length - 1;
-        }
-      l3++;
-    }
-  }
-  static createElement(t3, i5) {
-    const s4 = l2.createElement("template");
-    return s4.innerHTML = t3, s4;
-  }
-};
-function M(t3, i5, s4 = t3, e4) {
-  if (i5 === E)
-    return i5;
-  let h3 = void 0 !== e4 ? s4._$Co?.[e4] : s4._$Cl;
-  const o5 = a2(i5) ? void 0 : i5._$litDirective$;
-  return h3?.constructor !== o5 && (h3?._$AO?.(false), void 0 === o5 ? h3 = void 0 : (h3 = new o5(t3), h3._$AT(t3, s4, e4)), void 0 !== e4 ? (s4._$Co ??= [])[e4] = h3 : s4._$Cl = h3), void 0 !== h3 && (i5 = M(t3, h3._$AS(t3, i5.values), h3, e4)), i5;
-}
-var R = class {
-  constructor(t3, i5) {
-    this._$AV = [], this._$AN = void 0, this._$AD = t3, this._$AM = i5;
-  }
-  get parentNode() {
-    return this._$AM.parentNode;
-  }
-  get _$AU() {
-    return this._$AM._$AU;
-  }
-  u(t3) {
-    const { el: { content: i5 }, parts: s4 } = this._$AD, e4 = (t3?.creationScope ?? l2).importNode(i5, true);
-    P.currentNode = e4;
-    let h3 = P.nextNode(), o5 = 0, n4 = 0, r4 = s4[0];
-    for (; void 0 !== r4; ) {
-      if (o5 === r4.index) {
-        let i6;
-        2 === r4.type ? i6 = new k(h3, h3.nextSibling, this, t3) : 1 === r4.type ? i6 = new r4.ctor(h3, r4.name, r4.strings, this, t3) : 6 === r4.type && (i6 = new Z(h3, this, t3)), this._$AV.push(i6), r4 = s4[++n4];
-      }
-      o5 !== r4?.index && (h3 = P.nextNode(), o5++);
-    }
-    return P.currentNode = l2, e4;
-  }
-  p(t3) {
-    let i5 = 0;
-    for (const s4 of this._$AV)
-      void 0 !== s4 && (void 0 !== s4.strings ? (s4._$AI(t3, s4, i5), i5 += s4.strings.length - 2) : s4._$AI(t3[i5])), i5++;
-  }
-};
-var k = class _k {
-  get _$AU() {
-    return this._$AM?._$AU ?? this._$Cv;
-  }
-  constructor(t3, i5, s4, e4) {
-    this.type = 2, this._$AH = A, this._$AN = void 0, this._$AA = t3, this._$AB = i5, this._$AM = s4, this.options = e4, this._$Cv = e4?.isConnected ?? true;
-  }
-  get parentNode() {
-    let t3 = this._$AA.parentNode;
-    const i5 = this._$AM;
-    return void 0 !== i5 && 11 === t3?.nodeType && (t3 = i5.parentNode), t3;
-  }
-  get startNode() {
-    return this._$AA;
-  }
-  get endNode() {
-    return this._$AB;
-  }
-  _$AI(t3, i5 = this) {
-    t3 = M(this, t3, i5), a2(t3) ? t3 === A || null == t3 || "" === t3 ? (this._$AH !== A && this._$AR(), this._$AH = A) : t3 !== this._$AH && t3 !== E && this._(t3) : void 0 !== t3._$litType$ ? this.$(t3) : void 0 !== t3.nodeType ? this.T(t3) : d2(t3) ? this.k(t3) : this._(t3);
-  }
-  O(t3) {
-    return this._$AA.parentNode.insertBefore(t3, this._$AB);
-  }
-  T(t3) {
-    this._$AH !== t3 && (this._$AR(), this._$AH = this.O(t3));
-  }
-  _(t3) {
-    this._$AH !== A && a2(this._$AH) ? this._$AA.nextSibling.data = t3 : this.T(l2.createTextNode(t3)), this._$AH = t3;
-  }
-  $(t3) {
-    const { values: i5, _$litType$: s4 } = t3, e4 = "number" == typeof s4 ? this._$AC(t3) : (void 0 === s4.el && (s4.el = S2.createElement(V(s4.h, s4.h[0]), this.options)), s4);
-    if (this._$AH?._$AD === e4)
-      this._$AH.p(i5);
-    else {
-      const t4 = new R(e4, this), s5 = t4.u(this.options);
-      t4.p(i5), this.T(s5), this._$AH = t4;
-    }
-  }
-  _$AC(t3) {
-    let i5 = C.get(t3.strings);
-    return void 0 === i5 && C.set(t3.strings, i5 = new S2(t3)), i5;
-  }
-  k(t3) {
-    u2(this._$AH) || (this._$AH = [], this._$AR());
-    const i5 = this._$AH;
-    let s4, e4 = 0;
-    for (const h3 of t3)
-      e4 === i5.length ? i5.push(s4 = new _k(this.O(c3()), this.O(c3()), this, this.options)) : s4 = i5[e4], s4._$AI(h3), e4++;
-    e4 < i5.length && (this._$AR(s4 && s4._$AB.nextSibling, e4), i5.length = e4);
-  }
-  _$AR(t3 = this._$AA.nextSibling, s4) {
-    for (this._$AP?.(false, true, s4); t3 !== this._$AB; ) {
-      const s5 = i3(t3).nextSibling;
-      i3(t3).remove(), t3 = s5;
-    }
-  }
-  setConnected(t3) {
-    void 0 === this._$AM && (this._$Cv = t3, this._$AP?.(t3));
-  }
-};
-var H = class {
-  get tagName() {
-    return this.element.tagName;
-  }
-  get _$AU() {
-    return this._$AM._$AU;
-  }
-  constructor(t3, i5, s4, e4, h3) {
-    this.type = 1, this._$AH = A, this._$AN = void 0, this.element = t3, this.name = i5, this._$AM = e4, this.options = h3, s4.length > 2 || "" !== s4[0] || "" !== s4[1] ? (this._$AH = Array(s4.length - 1).fill(new String()), this.strings = s4) : this._$AH = A;
-  }
-  _$AI(t3, i5 = this, s4, e4) {
-    const h3 = this.strings;
-    let o5 = false;
-    if (void 0 === h3)
-      t3 = M(this, t3, i5, 0), o5 = !a2(t3) || t3 !== this._$AH && t3 !== E, o5 && (this._$AH = t3);
-    else {
-      const e5 = t3;
-      let n4, r4;
-      for (t3 = h3[0], n4 = 0; n4 < h3.length - 1; n4++)
-        r4 = M(this, e5[s4 + n4], i5, n4), r4 === E && (r4 = this._$AH[n4]), o5 ||= !a2(r4) || r4 !== this._$AH[n4], r4 === A ? t3 = A : t3 !== A && (t3 += (r4 ?? "") + h3[n4 + 1]), this._$AH[n4] = r4;
-    }
-    o5 && !e4 && this.j(t3);
-  }
-  j(t3) {
-    t3 === A ? this.element.removeAttribute(this.name) : this.element.setAttribute(this.name, t3 ?? "");
-  }
-};
-var I = class extends H {
-  constructor() {
-    super(...arguments), this.type = 3;
-  }
-  j(t3) {
-    this.element[this.name] = t3 === A ? void 0 : t3;
-  }
-};
-var L = class extends H {
-  constructor() {
-    super(...arguments), this.type = 4;
-  }
-  j(t3) {
-    this.element.toggleAttribute(this.name, !!t3 && t3 !== A);
-  }
-};
-var z = class extends H {
-  constructor(t3, i5, s4, e4, h3) {
-    super(t3, i5, s4, e4, h3), this.type = 5;
-  }
-  _$AI(t3, i5 = this) {
-    if ((t3 = M(this, t3, i5, 0) ?? A) === E)
-      return;
-    const s4 = this._$AH, e4 = t3 === A && s4 !== A || t3.capture !== s4.capture || t3.once !== s4.once || t3.passive !== s4.passive, h3 = t3 !== A && (s4 === A || e4);
-    e4 && this.element.removeEventListener(this.name, this, s4), h3 && this.element.addEventListener(this.name, this, t3), this._$AH = t3;
-  }
-  handleEvent(t3) {
-    "function" == typeof this._$AH ? this._$AH.call(this.options?.host ?? this.element, t3) : this._$AH.handleEvent(t3);
-  }
-};
-var Z = class {
-  constructor(t3, i5, s4) {
-    this.element = t3, this.type = 6, this._$AN = void 0, this._$AM = i5, this.options = s4;
-  }
-  get _$AU() {
-    return this._$AM._$AU;
-  }
-  _$AI(t3) {
-    M(this, t3);
-  }
-};
-var B = t2.litHtmlPolyfillSupport;
-B?.(S2, k), (t2.litHtmlVersions ??= []).push("3.3.2");
-var D = (t3, i5, s4) => {
-  const e4 = s4?.renderBefore ?? i5;
-  let h3 = e4._$litPart$;
-  if (void 0 === h3) {
-    const t4 = s4?.renderBefore ?? null;
-    e4._$litPart$ = h3 = new k(i5.insertBefore(c3(), t4), t4, void 0, s4 ?? {});
-  }
-  return h3._$AI(t3), h3;
-};
-
-// node_modules/lit-element/lit-element.js
-var s3 = globalThis;
-var i4 = class extends y {
-  constructor() {
-    super(...arguments), this.renderOptions = { host: this }, this._$Do = void 0;
-  }
-  createRenderRoot() {
-    const t3 = super.createRenderRoot();
-    return this.renderOptions.renderBefore ??= t3.firstChild, t3;
-  }
-  update(t3) {
-    const r4 = this.render();
-    this.hasUpdated || (this.renderOptions.isConnected = this.isConnected), super.update(t3), this._$Do = D(r4, this.renderRoot, this.renderOptions);
-  }
-  connectedCallback() {
-    super.connectedCallback(), this._$Do?.setConnected(true);
-  }
-  disconnectedCallback() {
-    super.disconnectedCallback(), this._$Do?.setConnected(false);
-  }
-  render() {
-    return E;
-  }
-};
-i4._$litElement$ = true, i4["finalized"] = true, s3.litElementHydrateSupport?.({ LitElement: i4 });
-var o4 = s3.litElementPolyfillSupport;
-o4?.({ LitElement: i4 });
-(s3.litElementVersions ??= []).push("4.2.2");
-
-// src/webview/settingsView.ts
-var HIDE_ICON_OPTIONS = [
-  { value: "eye-closed", label: "Eye Closed" },
-  { value: "x", label: "X Mark" },
-  { value: "trash", label: "Trash" },
-  { value: "close", label: "Close" },
-  { value: "circle-slash", label: "Circle Slash" }
-];
-var vscode = window.acquireVsCodeApi();
-var root = document.getElementById("root");
-var state = window.__SETTINGS__ || {
-  showIcon: true,
-  showType: true,
-  showCommand: true,
-  showGroup: true,
-  hideIcon: "eye-closed",
-  backupCount: 0,
-  configExists: false,
-  usedIcons: [],
-  customConfigPath: null
-};
-var showDeleteConfirm = false;
-var showAdvanced = false;
-var setState = (partial) => {
-  Object.assign(state, partial);
-  renderView();
-};
-var toggleDeleteConfirm = () => {
-  showDeleteConfirm = !showDeleteConfirm;
-  renderView();
-};
-var hideDeleteConfirm = () => {
-  showDeleteConfirm = false;
-  renderView();
-};
-var onSave = () => {
-  try {
-    console.log("[SettingsView] Saving settings...");
-    vscode.postMessage({
-      command: "saveSettings",
-      settings: {
-        showIcon: state.showIcon,
-        showType: state.showType,
-        showCommand: state.showCommand,
-        showGroup: state.showGroup,
-        hideIcon: state.hideIcon
-      }
-    });
-    console.log("[SettingsView] Save message sent");
-  } catch (e4) {
-    console.error("Failed to save settings:", e4);
-    alert(`Failed to save settings: ${e4}`);
-  }
-};
-var renderIconChips = () => state.usedIcons.map(
-  (icon) => b2`
-      <span class="lp-icon-chip" title=${icon}>
-        <span class="codicon codicon-${icon}"></span>
-        <span class="lp-icon-chip-name">${icon}</span>
+var N=globalThis,j=N.ShadowRoot&&(N.ShadyCSS===void 0||N.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,rt=Symbol(),at=new WeakMap,D=class{constructor(t,s,e){if(this._$cssResult$=!0,e!==rt)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=s}get styleSheet(){let t=this.o,s=this.t;if(j&&t===void 0){let e=s!==void 0&&s.length===1;e&&(t=at.get(s)),t===void 0&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),e&&at.set(s,t))}return t}toString(){return this.cssText}},lt=i=>new D(typeof i=="string"?i:i+"",void 0,rt);var ct=(i,t)=>{if(j)i.adoptedStyleSheets=t.map(s=>s instanceof CSSStyleSheet?s:s.styleSheet);else for(let s of t){let e=document.createElement("style"),n=N.litNonce;n!==void 0&&e.setAttribute("nonce",n),e.textContent=s.cssText,i.appendChild(e)}},W=j?i=>i:i=>i instanceof CSSStyleSheet?(t=>{let s="";for(let e of t.cssRules)s+=e.cssText;return lt(s)})(i):i;var{is:xt,defineProperty:Tt,getOwnPropertyDescriptor:Pt,getOwnPropertyNames:kt,getOwnPropertySymbols:Ot,getPrototypeOf:Mt}=Object,B=globalThis,dt=B.trustedTypes,It=dt?dt.emptyScript:"",Lt=B.reactiveElementPolyfillSupport,T=(i,t)=>i,F={toAttribute(i,t){switch(t){case Boolean:i=i?It:null;break;case Object:case Array:i=i==null?i:JSON.stringify(i)}return i},fromAttribute(i,t){let s=i;switch(t){case Boolean:s=i!==null;break;case Number:s=i===null?null:Number(i);break;case Object:case Array:try{s=JSON.parse(i)}catch{s=null}}return s}},pt=(i,t)=>!xt(i,t),ht={attribute:!0,type:String,converter:F,reflect:!1,useDefault:!1,hasChanged:pt};Symbol.metadata??=Symbol("metadata"),B.litPropertyMetadata??=new WeakMap;var $=class extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??=[]).push(t)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,s=ht){if(s.state&&(s.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(t)&&((s=Object.create(s)).wrapped=!0),this.elementProperties.set(t,s),!s.noAccessor){let e=Symbol(),n=this.getPropertyDescriptor(t,e,s);n!==void 0&&Tt(this.prototype,t,n)}}static getPropertyDescriptor(t,s,e){let{get:n,set:o}=Pt(this.prototype,t)??{get(){return this[s]},set(a){this[s]=a}};return{get:n,set(a){let d=n?.call(this);o?.call(this,a),this.requestUpdate(t,d,e)},configurable:!0,enumerable:!0}}static getPropertyOptions(t){return this.elementProperties.get(t)??ht}static _$Ei(){if(this.hasOwnProperty(T("elementProperties")))return;let t=Mt(this);t.finalize(),t.l!==void 0&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties)}static finalize(){if(this.hasOwnProperty(T("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(T("properties"))){let s=this.properties,e=[...kt(s),...Ot(s)];for(let n of e)this.createProperty(n,s[n])}let t=this[Symbol.metadata];if(t!==null){let s=litPropertyMetadata.get(t);if(s!==void 0)for(let[e,n]of s)this.elementProperties.set(e,n)}this._$Eh=new Map;for(let[s,e]of this.elementProperties){let n=this._$Eu(s,e);n!==void 0&&this._$Eh.set(n,s)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(t){let s=[];if(Array.isArray(t)){let e=new Set(t.flat(1/0).reverse());for(let n of e)s.unshift(W(n))}else t!==void 0&&s.push(W(t));return s}static _$Eu(t,s){let e=s.attribute;return e===!1?void 0:typeof e=="string"?e:typeof t=="string"?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this))}addController(t){(this._$EO??=new Set).add(t),this.renderRoot!==void 0&&this.isConnected&&t.hostConnected?.()}removeController(t){this._$EO?.delete(t)}_$E_(){let t=new Map,s=this.constructor.elementProperties;for(let e of s.keys())this.hasOwnProperty(e)&&(t.set(e,this[e]),delete this[e]);t.size>0&&(this._$Ep=t)}createRenderRoot(){let t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return ct(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(t=>t.hostConnected?.())}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.())}attributeChangedCallback(t,s,e){this._$AK(t,e)}_$ET(t,s){let e=this.constructor.elementProperties.get(t),n=this.constructor._$Eu(t,e);if(n!==void 0&&e.reflect===!0){let o=(e.converter?.toAttribute!==void 0?e.converter:F).toAttribute(s,e.type);this._$Em=t,o==null?this.removeAttribute(n):this.setAttribute(n,o),this._$Em=null}}_$AK(t,s){let e=this.constructor,n=e._$Eh.get(t);if(n!==void 0&&this._$Em!==n){let o=e.getPropertyOptions(n),a=typeof o.converter=="function"?{fromAttribute:o.converter}:o.converter?.fromAttribute!==void 0?o.converter:F;this._$Em=n;let d=a.fromAttribute(s,o.type);this[n]=d??this._$Ej?.get(n)??d,this._$Em=null}}requestUpdate(t,s,e,n=!1,o){if(t!==void 0){let a=this.constructor;if(n===!1&&(o=this[t]),e??=a.getPropertyOptions(t),!((e.hasChanged??pt)(o,s)||e.useDefault&&e.reflect&&o===this._$Ej?.get(t)&&!this.hasAttribute(a._$Eu(t,e))))return;this.C(t,s,e)}this.isUpdatePending===!1&&(this._$ES=this._$EP())}C(t,s,{useDefault:e,reflect:n,wrapped:o},a){e&&!(this._$Ej??=new Map).has(t)&&(this._$Ej.set(t,a??s??this[t]),o!==!0||a!==void 0)||(this._$AL.has(t)||(this.hasUpdated||e||(s=void 0),this._$AL.set(t,s)),n===!0&&this._$Em!==t&&(this._$Eq??=new Set).add(t))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(s){Promise.reject(s)}let t=this.scheduleUpdate();return t!=null&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(let[n,o]of this._$Ep)this[n]=o;this._$Ep=void 0}let e=this.constructor.elementProperties;if(e.size>0)for(let[n,o]of e){let{wrapped:a}=o,d=this[n];a!==!0||this._$AL.has(n)||d===void 0||this.C(n,void 0,o,d)}}let t=!1,s=this._$AL;try{t=this.shouldUpdate(s),t?(this.willUpdate(s),this._$EO?.forEach(e=>e.hostUpdate?.()),this.update(s)):this._$EM()}catch(e){throw t=!1,this._$EM(),e}t&&this._$AE(s)}willUpdate(t){}_$AE(t){this._$EO?.forEach(s=>s.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(t)),this.updated(t)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return!0}update(t){this._$Eq&&=this._$Eq.forEach(s=>this._$ET(s,this[s])),this._$EM()}updated(t){}firstUpdated(t){}};$.elementStyles=[],$.shadowRootOptions={mode:"open"},$[T("elementProperties")]=new Map,$[T("finalized")]=new Map,Lt?.({ReactiveElement:$}),(B.reactiveElementVersions??=[]).push("2.1.2");var tt=globalThis,ut=i=>i,V=tt.trustedTypes,gt=V?V.createPolicy("lit-html",{createHTML:i=>i}):void 0,bt="$lit$",b=`lit$${Math.random().toFixed(9).slice(2)}$`,yt="?"+b,Ut=`<${yt}>`,S=document,k=()=>S.createComment(""),O=i=>i===null||typeof i!="object"&&typeof i!="function",et=Array.isArray,Rt=i=>et(i)||typeof i?.[Symbol.iterator]=="function",K=`[ 	
+\f\r]`,P=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,ft=/-->/g,vt=/>/g,y=RegExp(`>|${K}(?:([^\\s"'>=/]+)(${K}*=${K}*(?:[^ 	
+\f\r"'\`<>=]|("|')|))|$)`,"g"),$t=/'/g,mt=/"/g,At=/^(?:script|style|textarea|title)$/i,st=i=>(t,...s)=>({_$litType$:i,strings:t,values:s}),g=st(1),Jt=st(2),Yt=st(3),m=Symbol.for("lit-noChange"),p=Symbol.for("lit-nothing"),_t=new WeakMap,A=S.createTreeWalker(S,129);function St(i,t){if(!et(i)||!i.hasOwnProperty("raw"))throw Error("invalid template strings array");return gt!==void 0?gt.createHTML(t):t}var Ht=(i,t)=>{let s=i.length-1,e=[],n,o=t===2?"<svg>":t===3?"<math>":"",a=P;for(let d=0;d<s;d++){let r=i[d],h,u,c=-1,v=0;for(;v<r.length&&(a.lastIndex=v,u=a.exec(r),u!==null);)v=a.lastIndex,a===P?u[1]==="!--"?a=ft:u[1]!==void 0?a=vt:u[2]!==void 0?(At.test(u[2])&&(n=RegExp("</"+u[2],"g")),a=y):u[3]!==void 0&&(a=y):a===y?u[0]===">"?(a=n??P,c=-1):u[1]===void 0?c=-2:(c=a.lastIndex-u[2].length,h=u[1],a=u[3]===void 0?y:u[3]==='"'?mt:$t):a===mt||a===$t?a=y:a===ft||a===vt?a=P:(a=y,n=void 0);let _=a===y&&i[d+1].startsWith("/>")?" ":"";o+=a===P?r+Ut:c>=0?(e.push(h),r.slice(0,c)+bt+r.slice(c)+b+_):r+b+(c===-2?d:_)}return[St(i,o+(i[s]||"<?>")+(t===2?"</svg>":t===3?"</math>":"")),e]},M=class i{constructor({strings:t,_$litType$:s},e){let n;this.parts=[];let o=0,a=0,d=t.length-1,r=this.parts,[h,u]=Ht(t,s);if(this.el=i.createElement(h,e),A.currentNode=this.el.content,s===2||s===3){let c=this.el.content.firstChild;c.replaceWith(...c.childNodes)}for(;(n=A.nextNode())!==null&&r.length<d;){if(n.nodeType===1){if(n.hasAttributes())for(let c of n.getAttributeNames())if(c.endsWith(bt)){let v=u[a++],_=n.getAttribute(c).split(b),H=/([.?@])?(.*)/.exec(v);r.push({type:1,index:o,name:H[2],strings:_,ctor:H[1]==="."?Y:H[1]==="?"?X:H[1]==="@"?Z:w}),n.removeAttribute(c)}else c.startsWith(b)&&(r.push({type:6,index:o}),n.removeAttribute(c));if(At.test(n.tagName)){let c=n.textContent.split(b),v=c.length-1;if(v>0){n.textContent=V?V.emptyScript:"";for(let _=0;_<v;_++)n.append(c[_],k()),A.nextNode(),r.push({type:2,index:++o});n.append(c[v],k())}}}else if(n.nodeType===8)if(n.data===yt)r.push({type:2,index:o});else{let c=-1;for(;(c=n.data.indexOf(b,c+1))!==-1;)r.push({type:7,index:o}),c+=b.length-1}o++}}static createElement(t,s){let e=S.createElement("template");return e.innerHTML=t,e}};function C(i,t,s=i,e){if(t===m)return t;let n=e!==void 0?s._$Co?.[e]:s._$Cl,o=O(t)?void 0:t._$litDirective$;return n?.constructor!==o&&(n?._$AO?.(!1),o===void 0?n=void 0:(n=new o(i),n._$AT(i,s,e)),e!==void 0?(s._$Co??=[])[e]=n:s._$Cl=n),n!==void 0&&(t=C(i,n._$AS(i,t.values),n,e)),t}var J=class{constructor(t,s){this._$AV=[],this._$AN=void 0,this._$AD=t,this._$AM=s}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(t){let{el:{content:s},parts:e}=this._$AD,n=(t?.creationScope??S).importNode(s,!0);A.currentNode=n;let o=A.nextNode(),a=0,d=0,r=e[0];for(;r!==void 0;){if(a===r.index){let h;r.type===2?h=new I(o,o.nextSibling,this,t):r.type===1?h=new r.ctor(o,r.name,r.strings,this,t):r.type===6&&(h=new Q(o,this,t)),this._$AV.push(h),r=e[++d]}a!==r?.index&&(o=A.nextNode(),a++)}return A.currentNode=S,n}p(t){let s=0;for(let e of this._$AV)e!==void 0&&(e.strings!==void 0?(e._$AI(t,e,s),s+=e.strings.length-2):e._$AI(t[s])),s++}},I=class i{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,s,e,n){this.type=2,this._$AH=p,this._$AN=void 0,this._$AA=t,this._$AB=s,this._$AM=e,this.options=n,this._$Cv=n?.isConnected??!0}get parentNode(){let t=this._$AA.parentNode,s=this._$AM;return s!==void 0&&t?.nodeType===11&&(t=s.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,s=this){t=C(this,t,s),O(t)?t===p||t==null||t===""?(this._$AH!==p&&this._$AR(),this._$AH=p):t!==this._$AH&&t!==m&&this._(t):t._$litType$!==void 0?this.$(t):t.nodeType!==void 0?this.T(t):Rt(t)?this.k(t):this._(t)}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t))}_(t){this._$AH!==p&&O(this._$AH)?this._$AA.nextSibling.data=t:this.T(S.createTextNode(t)),this._$AH=t}$(t){let{values:s,_$litType$:e}=t,n=typeof e=="number"?this._$AC(t):(e.el===void 0&&(e.el=M.createElement(St(e.h,e.h[0]),this.options)),e);if(this._$AH?._$AD===n)this._$AH.p(s);else{let o=new J(n,this),a=o.u(this.options);o.p(s),this.T(a),this._$AH=o}}_$AC(t){let s=_t.get(t.strings);return s===void 0&&_t.set(t.strings,s=new M(t)),s}k(t){et(this._$AH)||(this._$AH=[],this._$AR());let s=this._$AH,e,n=0;for(let o of t)n===s.length?s.push(e=new i(this.O(k()),this.O(k()),this,this.options)):e=s[n],e._$AI(o),n++;n<s.length&&(this._$AR(e&&e._$AB.nextSibling,n),s.length=n)}_$AR(t=this._$AA.nextSibling,s){for(this._$AP?.(!1,!0,s);t!==this._$AB;){let e=ut(t).nextSibling;ut(t).remove(),t=e}}setConnected(t){this._$AM===void 0&&(this._$Cv=t,this._$AP?.(t))}},w=class{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(t,s,e,n,o){this.type=1,this._$AH=p,this._$AN=void 0,this.element=t,this.name=s,this._$AM=n,this.options=o,e.length>2||e[0]!==""||e[1]!==""?(this._$AH=Array(e.length-1).fill(new String),this.strings=e):this._$AH=p}_$AI(t,s=this,e,n){let o=this.strings,a=!1;if(o===void 0)t=C(this,t,s,0),a=!O(t)||t!==this._$AH&&t!==m,a&&(this._$AH=t);else{let d=t,r,h;for(t=o[0],r=0;r<o.length-1;r++)h=C(this,d[e+r],s,r),h===m&&(h=this._$AH[r]),a||=!O(h)||h!==this._$AH[r],h===p?t=p:t!==p&&(t+=(h??"")+o[r+1]),this._$AH[r]=h}a&&!n&&this.j(t)}j(t){t===p?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,t??"")}},Y=class extends w{constructor(){super(...arguments),this.type=3}j(t){this.element[this.name]=t===p?void 0:t}},X=class extends w{constructor(){super(...arguments),this.type=4}j(t){this.element.toggleAttribute(this.name,!!t&&t!==p)}},Z=class extends w{constructor(t,s,e,n,o){super(t,s,e,n,o),this.type=5}_$AI(t,s=this){if((t=C(this,t,s,0)??p)===m)return;let e=this._$AH,n=t===p&&e!==p||t.capture!==e.capture||t.once!==e.once||t.passive!==e.passive,o=t!==p&&(e===p||n);n&&this.element.removeEventListener(this.name,this,e),o&&this.element.addEventListener(this.name,this,t),this._$AH=t}handleEvent(t){typeof this._$AH=="function"?this._$AH.call(this.options?.host??this.element,t):this._$AH.handleEvent(t)}},Q=class{constructor(t,s,e){this.element=t,this.type=6,this._$AN=void 0,this._$AM=s,this.options=e}get _$AU(){return this._$AM._$AU}_$AI(t){C(this,t)}};var Nt=tt.litHtmlPolyfillSupport;Nt?.(M,I),(tt.litHtmlVersions??=[]).push("3.3.2");var L=(i,t,s)=>{let e=s?.renderBefore??t,n=e._$litPart$;if(n===void 0){let o=s?.renderBefore??null;e._$litPart$=n=new I(t.insertBefore(k(),o),o,void 0,s??{})}return n._$AI(i),n};var it=globalThis,x=class extends ${constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){let t=super.createRenderRoot();return this.renderOptions.renderBefore??=t.firstChild,t}update(t){let s=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=L(s,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return m}};x._$litElement$=!0,x.finalized=!0,it.litElementHydrateSupport?.({LitElement:x});var Dt=it.litElementPolyfillSupport;Dt?.({LitElement:x});(it.litElementVersions??=[]).push("4.2.2");var Et={ATTRIBUTE:1,CHILD:2,PROPERTY:3,BOOLEAN_ATTRIBUTE:4,EVENT:5,ELEMENT:6},Ct=i=>(...t)=>({_$litDirective$:i,values:t}),G=class{constructor(t){}get _$AU(){return this._$AM._$AU}_$AT(t,s,e){this._$Ct=t,this._$AM=s,this._$Ci=e}_$AS(t,s){return this.update(t,s)}update(t,s){return this.render(...s)}};var wt=Ct(class extends G{constructor(i){if(super(i),i.type!==Et.ATTRIBUTE||i.name!=="class"||i.strings?.length>2)throw Error("`classMap()` can only be used in the `class` attribute and must be the only part in the attribute.")}render(i){return" "+Object.keys(i).filter(t=>i[t]).join(" ")+" "}update(i,[t]){if(this.st===void 0){this.st=new Set,i.strings!==void 0&&(this.nt=new Set(i.strings.join(" ").split(/\s/).filter(e=>e!=="")));for(let e in t)t[e]&&!this.nt?.has(e)&&this.st.add(e);return this.render(t)}let s=i.element.classList;for(let e of this.st)e in t||(s.remove(e),this.st.delete(e));for(let e in t){let n=!!t[e];n===this.st.has(e)||this.nt?.has(e)||(n?(s.add(e),this.st.add(e)):(s.remove(e),this.st.delete(e)))}return m}});var jt=[{value:"eye-closed",label:"Eye Closed"},{value:"x",label:"X Mark"},{value:"trash",label:"Trash"},{value:"close",label:"Close"},{value:"circle-slash",label:"Circle Slash"}],E=window.acquireVsCodeApi(),nt=document.getElementById("root"),l=window.__SETTINGS__||{showIcon:!0,showType:!0,showCommand:!0,showGroup:!0,hideIcon:"eye-closed",backupCount:0,configExists:!1,usedIcons:[],customConfigPath:null},q=!1,z=!1,U=i=>{Object.assign(l,i),R()},Bt=()=>{q=!q,R()},ot=()=>{q=!1,R()},Vt=()=>{try{console.log("[SettingsView] Saving settings..."),E.postMessage({command:"saveSettings",settings:{showIcon:l.showIcon,showType:l.showType,showCommand:l.showCommand,showGroup:l.showGroup,hideIcon:l.hideIcon}}),console.log("[SettingsView] Save message sent")}catch(i){console.error("Failed to save settings:",i),alert(`Failed to save settings: ${i}`)}},Gt=()=>l.usedIcons.map(i=>g`
+      <span class="lp-icon-chip" title=${i}>
+        <span class="codicon codicon-${i}"></span>
+        <span class="lp-icon-chip-name">${i}</span>
       </span>
-    `
-);
-var renderView = () => {
-  if (!root)
-    return;
-  if (!window.__SETTINGS__) {
-    D(
-      b2`
+    `),f=(i,t,s,e)=>g`
+  <button
+    type="button"
+    class=${wt({"lp-config-btn":!0,"lp-btn":!0,"lp-btn-secondary":!0,"lp-btn-danger":!!e?.danger,"lp-config-cta":!!e?.cta})}
+    ?disabled=${e?.disabled??!1}
+    title=${e?.title??t}
+    aria-label=${e?.ariaLabel??t}
+    @click=${()=>{e?.onClick?e.onClick():(ot(),E.postMessage({command:s}))}}
+  >
+    <span class="codicon codicon-${i}"></span><span class="lp-btn-text">${t}</span>
+  </button>
+`,R=()=>{if(nt){if(!window.__SETTINGS__){L(g`
         <div class="lp-settings-loading">
           <div class="lp-settings-loading-icon">⚙️</div>
           <div>Loading settings...</div>
         </div>
-      `,
-      root
-    );
-    return;
-  }
-  D(
-    b2`
+      `,nt);return}L(g`
       <div class="lp-settings-view">
         <div class="lp-settings-header">
           <h3><span class="codicon codicon-settings-gear"></span> Settings</h3>
@@ -660,7 +31,7 @@ var renderView = () => {
               class="lp-icon-btn"
               title="Open Battlestation visual settings"
               aria-label="Open Battlestation visual settings"
-              @click=${() => vscode.postMessage({ command: "openVisualSettings" })}
+              @click=${()=>E.postMessage({command:"openVisualSettings"})}
             >
               <span class="codicon codicon-settings"></span>
             </button>
@@ -672,104 +43,24 @@ var renderView = () => {
             <div class="lp-config-toolbar">
               <div class="lp-setting-group-title">📄 battle.json</div>
               <div class="lp-config-actions">
-                <button
-                  type="button"
-                  class="lp-config-btn lp-btn lp-btn-secondary"
-                  ?disabled=${!state.configExists}
-                  title=${state.configExists ? "Open config file" : "Generate config first"}
-                  aria-label="Open config file"
-                  @click=${() => {
-      hideDeleteConfirm();
-      vscode.postMessage({ command: "openConfig" });
-    }}
-                >
-                  <span class="codicon codicon-file"></span><span class="lp-btn-text">Open</span>
-                </button>
-                <button
-                  type="button"
-                  class="lp-config-btn lp-btn lp-btn-secondary"
-                  title="Open folder containing battle.json"
-                  aria-label="Open config location"
-                  @click=${() => {
-      hideDeleteConfirm();
-      vscode.postMessage({ command: "openConfigFolder" });
-    }}
-                >
-                  <span class="codicon codicon-folder-opened"></span><span class="lp-btn-text">Location</span>
-                </button>
-                <button
-                  type="button"
-                  class="lp-config-btn lp-btn lp-btn-secondary lp-config-cta"
-                  title=${state.configExists ? "Regenerate config from scanned sources" : "Generate new config file"}
-                  aria-label=${state.configExists ? "Regenerate config" : "Generate config"}
-                  @click=${() => {
-      hideDeleteConfirm();
-      vscode.postMessage({ command: "showGenerateConfig" });
-    }}
-                >
-                  <span class="codicon codicon-refresh"></span
-                  ><span class="lp-btn-text">${state.configExists ? "Regen" : "Generate"}</span>
-                </button>
-                ${state.backupCount > 0 ? b2`
-                      <button
-                        type="button"
-                        class="lp-config-btn lp-btn lp-btn-secondary"
-                        ?disabled=${!state.configExists}
-                        title="Restore a previous config (${state.backupCount})"
-                        aria-label="Restore previous config"
-                        @click=${() => {
-      hideDeleteConfirm();
-      vscode.postMessage({ command: "restoreConfig" });
-    }}
-                      >
-                        <span class="codicon codicon-history"></span
-                        ><span class="lp-btn-text">Undo</span>
-                      </button>
-                    ` : null}
-                ${state.configExists ? b2`
-                      <button
-                        type="button"
-                        class="lp-config-btn lp-btn lp-btn-secondary lp-btn-danger"
-                        title="Delete config file"
-                        aria-label="Delete config file"
-                        @click=${() => toggleDeleteConfirm()}
-                      >
-                        <span class="codicon codicon-trash"></span
-                        ><span class="lp-btn-text">Delete</span>
-                      </button>
-                    ` : null}
+                ${f("file","Open","openConfig",{disabled:!l.configExists,title:l.configExists?"Open config file":"Generate config first",ariaLabel:"Open config file"})}
+                ${f("folder-opened","Location","openConfigFolder",{title:"Open folder containing battle.json",ariaLabel:"Open config location"})}
+                ${f("refresh",l.configExists?"Regen":"Generate","showGenerateConfig",{cta:!0,title:l.configExists?"Regenerate config from scanned sources":"Generate new config file",ariaLabel:l.configExists?"Regenerate config":"Generate config"})}
+                ${l.backupCount>0?f("history","Undo","restoreConfig",{disabled:!l.configExists,title:`Restore a previous config (${l.backupCount})`,ariaLabel:"Restore previous config"}):null}
+                ${l.configExists?f("trash","Delete","deleteConfig",{danger:!0,title:"Delete config file",ariaLabel:"Delete config file",onClick:()=>Bt()}):null}
               </div>
             </div>
-            ${state.configExists && showDeleteConfirm ? b2`
-                <div class="lp-config-confirm">
-                  <div class="lp-config-confirm-text">
-                    Delete battle.json? This cannot be undone.
-                  </div>
-                  <div class="lp-config-confirm-actions">
-                    <button
-                      type="button"
-                      class="lp-config-btn lp-btn lp-btn-secondary lp-btn-danger"
-                      aria-label="Confirm delete config file"
-                      @click=${() => {
-      hideDeleteConfirm();
-      vscode.postMessage({ command: "deleteConfig" });
-    }}
-                    >
-                      <span class="codicon codicon-trash"></span
-                      ><span class="lp-btn-text">Delete</span>
-                    </button>
-                    <button
-                      type="button"
-                      class="lp-config-btn lp-btn lp-btn-secondary"
-                      aria-label="Cancel delete config"
-                      @click=${() => hideDeleteConfirm()}
-                    >
-                      <span class="codicon codicon-close"></span
-                      ><span class="lp-btn-text">Cancel</span>
-                    </button>
-                  </div>
+            ${l.configExists&&q?g`
+              <div class="lp-config-confirm">
+                <div class="lp-config-confirm-text">
+                  <span>Delete battle.json?</span><br> You can recover any you have generated previously on this machine later.
                 </div>
-              ` : null}
+                <div class="lp-config-confirm-actions">
+                  ${f("trash","Delete","deleteConfig",{danger:!0,ariaLabel:"Confirm delete config file"})}
+                  ${f("close","Cancel","",{onClick:()=>ot(),ariaLabel:"Cancel delete config"})}
+                </div>
+              </div>
+            `:null}
           </div>
         </div>
 
@@ -778,46 +69,23 @@ var renderView = () => {
         <button
           type="button"
           class="lp-generate-toggle"
-          @click=${() => {
-      showAdvanced = !showAdvanced;
-      renderView();
-    }}
+          @click=${()=>{z=!z,R()}}
         >
-          <span class="codicon codicon-${showAdvanced ? "chevron-down" : "chevron-right"}"></span>
+          <span class="codicon codicon-${z?"chevron-down":"chevron-right"}"></span>
           <span>Advanced</span>
         </button>
-        ${showAdvanced ? b2`
+        ${z?g`
           <div class="lp-generate-content">
             <div class="lp-setting-row">
               <div class="lp-setting-label">
                 <div class="lp-setting-name">Config Location</div>
                 <div class="lp-setting-desc">
-                  ${state.customConfigPath ? b2`Custom: <code class="lp-inline-code">${state.customConfigPath}/battle.json</code>` : b2`Default: <code class="lp-inline-code">.vscode/battle.json</code>`}
+                  ${l.customConfigPath?g`Custom: <code class="lp-inline-code">${l.customConfigPath}/battle.json</code>`:g`Default: <code class="lp-inline-code">.vscode/battle.json</code>`}
                 </div>
               </div>
               <div class="lp-inline-actions">
-                <button
-                  type="button"
-                  class="lp-config-btn lp-btn lp-btn-secondary"
-                  title="Choose a custom folder to store battle.json"
-                  aria-label="Change config location"
-                  @click=${() => vscode.postMessage({ command: "changeConfigLocation" })}
-                >
-                  <span class="codicon codicon-folder-opened"></span>
-                  <span class="lp-btn-text">Change</span>
-                </button>
-                ${state.customConfigPath ? b2`
-                  <button
-                    type="button"
-                    class="lp-config-btn lp-btn lp-btn-secondary"
-                    title="Reset to default location (.vscode/battle.json)"
-                    aria-label="Reset config location"
-                    @click=${() => vscode.postMessage({ command: "resetConfigLocation" })}
-                  >
-                    <span class="codicon codicon-discard"></span>
-                    <span class="lp-btn-text">Reset</span>
-                  </button>
-                ` : null}
+                ${f("folder-opened","Change","changeConfigLocation",{title:"Choose a custom folder to store battle.json",ariaLabel:"Change config location",onClick:()=>E.postMessage({command:"changeConfigLocation"})})}
+                ${l.customConfigPath?f("discard","Reset","resetConfigLocation",{title:"Reset to default location (.vscode/battle.json)",ariaLabel:"Reset config location",onClick:()=>E.postMessage({command:"resetConfigLocation"})}):null}
               </div>
             </div>
             <div class="lp-setting-row">
@@ -825,19 +93,10 @@ var renderView = () => {
                 <div class="lp-setting-name">Import Config</div>
                 <div class="lp-setting-desc">Load an existing battle.json from disk. Your current config will be backed up first.</div>
               </div>
-              <button
-                type="button"
-                class="lp-config-btn lp-btn lp-btn-secondary"
-                title="Browse for a JSON config file to import"
-                aria-label="Import config file"
-                @click=${() => vscode.postMessage({ command: "importConfig" })}
-              >
-                <span class="codicon codicon-desktop-download"></span>
-                <span class="lp-btn-text">Import</span>
-              </button>
+              ${f("desktop-download","Import","importConfig",{title:"Browse for a JSON config file to import",ariaLabel:"Import config file",onClick:()=>E.postMessage({command:"importConfig"})})}
             </div>
           </div>
-        ` : null}
+        `:null}
         </div>
 
         <div class="lp-setting-group">
@@ -850,8 +109,8 @@ var renderView = () => {
           <label class="lp-setting-toggle">
             <input
               type="checkbox"
-              .checked=${state.showIcon}
-              @change=${(e4) => setState({ showIcon: e4.target.checked })}
+              .checked=${l.showIcon}
+              @change=${i=>U({showIcon:i.target.checked})}
             />
             <span class="lp-toggle-slider"></span>
           </label>
@@ -864,8 +123,8 @@ var renderView = () => {
           <label class="lp-setting-toggle">
             <input
               type="checkbox"
-              .checked=${state.showType}
-              @change=${(e4) => setState({ showType: e4.target.checked })}
+              .checked=${l.showType}
+              @change=${i=>U({showType:i.target.checked})}
             />
             <span class="lp-toggle-slider"></span>
           </label>
@@ -878,8 +137,8 @@ var renderView = () => {
           <label class="lp-setting-toggle">
             <input
               type="checkbox"
-              .checked=${state.showCommand}
-              @change=${(e4) => setState({ showCommand: e4.target.checked })}
+              .checked=${l.showCommand}
+              @change=${i=>U({showCommand:i.target.checked})}
             />
             <span class="lp-toggle-slider"></span>
           </label>
@@ -892,8 +151,8 @@ var renderView = () => {
           <label class="lp-setting-toggle">
             <input
               type="checkbox"
-              .checked=${state.showGroup}
-              @change=${(e4) => setState({ showGroup: e4.target.checked })}
+              .checked=${l.showGroup}
+              @change=${i=>U({showGroup:i.target.checked})}
             />
             <span class="lp-toggle-slider"></span>
           </label>
@@ -906,12 +165,10 @@ var renderView = () => {
           <select
             id="hideIcon"
             class="lp-hide-icon-select"
-            .value=${state.hideIcon}
-            @change=${(e4) => setState({ hideIcon: e4.target.value })}
+            .value=${l.hideIcon}
+            @change=${i=>U({hideIcon:i.target.value})}
           >
-            ${HIDE_ICON_OPTIONS.map(
-      (opt) => b2`<option value=${opt.value}>${opt.label}</option>`
-    )}
+            ${jt.map(i=>g`<option value=${i.value}>${i.label}</option>`)}
           </select>
           </div>
         </div>
@@ -931,8 +188,8 @@ var renderView = () => {
               </div>
             </div>
             <div class="lp-loaded-icons-wrap">
-              <div class="lp-loaded-icons-title">Currently Loaded (${state.usedIcons.length} icons):</div>
-              <div class="lp-loaded-icons-grid">${renderIconChips()}</div>
+              <div class="lp-loaded-icons-title">Currently Loaded (${l.usedIcons.length} icons):</div>
+              <div class="lp-loaded-icons-grid">${Gt()}</div>
             </div>
           </div>
         </div>
@@ -941,26 +198,21 @@ var renderView = () => {
           <button
             type="button"
             class="lp-btn lp-btn-secondary"
-            @click=${() => {
-      console.log("[SettingsView] Cancel clicked");
-      hideDeleteConfirm();
-      vscode.postMessage({ command: "cancelForm" });
-    }}
+            @click=${()=>{console.log("[SettingsView] Cancel clicked"),ot(),E.postMessage({command:"cancelForm"})}}
           >
             Cancel
           </button>
-          <button type="button" class="lp-btn lp-btn-primary" @click=${() => {
-      console.log("[SettingsView] Save button clicked");
-      onSave();
-    }}>Save Settings</button>
+          <button
+            type="button"
+            class="lp-btn lp-btn-primary"
+            @click=${()=>{console.log("[SettingsView] Save button clicked"),Vt()}}
+          >
+            Save Settings
+          </button>
         </div>
       </div>
 
-    `,
-    root
-  );
-};
-renderView();
+    `,nt)}};R();
 /*! Bundled license information:
 
 @lit/reactive-element/css-tag.js:
@@ -971,20 +223,9 @@ renderView();
    *)
 
 @lit/reactive-element/reactive-element.js:
-  (**
-   * @license
-   * Copyright 2017 Google LLC
-   * SPDX-License-Identifier: BSD-3-Clause
-   *)
-
 lit-html/lit-html.js:
-  (**
-   * @license
-   * Copyright 2017 Google LLC
-   * SPDX-License-Identifier: BSD-3-Clause
-   *)
-
 lit-element/lit-element.js:
+lit-html/directive.js:
   (**
    * @license
    * Copyright 2017 Google LLC
@@ -997,5 +238,11 @@ lit-html/is-server.js:
    * Copyright 2022 Google LLC
    * SPDX-License-Identifier: BSD-3-Clause
    *)
+
+lit-html/directives/class-map.js:
+  (**
+   * @license
+   * Copyright 2018 Google LLC
+   * SPDX-License-Identifier: BSD-3-Clause
+   *)
 */
-//# sourceMappingURL=settingsView.js.map

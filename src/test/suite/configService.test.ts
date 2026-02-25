@@ -65,19 +65,41 @@ suite('ConfigService Test Suite', () => {
 
     // launch.json might not exist or be populated in strictly test environ depending on how we launch
     // But let's try
-    test('scanLaunchConfigs should detect configurations', async () => {
+    test('scanLaunchConfigs should return valid launch actions without throwing', async () => {
         const mockContext = {
             globalState: { get: () => { }, update: () => { } },
             extensionUri: vscode.Uri.file(__dirname),
             subscriptions: []
         } as any;
         const configService = new ConfigService(mockContext);
-        try {
-            const configs = await configService.scanLaunchConfigs();
-            // It's okay if 0, but it shouldn't throw
-            assert.ok(Array.isArray(configs), 'Should return array');
-        } catch (e) {
-            assert.fail('scanLaunchConfigs threw error: ' + e);
+        const configs = await configService.scanLaunchConfigs();
+
+        assert.ok(Array.isArray(configs), 'Should return an array');
+
+        // If any configs are found, validate their structure
+        for (const config of configs) {
+            assert.ok(config.name, `Launch config missing name`);
+            assert.strictEqual(config.type, 'launch',
+                `Launch config "${config.name}" should have type "launch"`);
+            assert.ok(config.command, `Launch config "${config.name}" missing command`);
         }
+
+        // This workspace defines "Run Extension" in .vscode/launch.json
+        const runExtension = configs.find(c => c.name === 'Launch: Run Extension');
+        assert.ok(runExtension, 'Should detect "Run Extension" from launch.json');
+    });
+
+    test('openConfigFile should return false when config is missing', async () => {
+        const mockContext = {
+            globalState: { get: () => { }, update: () => { } },
+            extensionUri: vscode.Uri.file(__dirname),
+            subscriptions: []
+        } as any;
+        const configService = new ConfigService(mockContext);
+
+        // Ensure no config exists before trying to open
+        await configService.deleteConfig();
+        const opened = await configService.openConfigFile();
+        assert.strictEqual(opened, false, 'Should return false when no config file exists');
     });
 });

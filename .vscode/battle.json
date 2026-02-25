@@ -1,0 +1,33 @@
+{
+  "actions": [
+    {
+      "name": "Test Action 1",
+      "command": "echo \"test1\"",
+      "type": "shell"
+    },
+    {
+      "name": "Test Action 2",
+      "command": "echo \"test2\"",
+      "type": "shell"
+    },
+    {
+      "name": "Hidden Action",
+      "command": "echo \"hidden\"",
+      "type": "shell",
+      "hidden": true
+    }
+  ],
+  "groups": [
+    {
+      "name": "Test Group",
+      "icon": "folder",
+      "color": "#ff0000"
+    }
+  ],
+  "icons": [
+    {
+      "type": "shell",
+      "icon": "terminal"
+    }
+  ]
+}

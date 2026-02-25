@@ -2,6 +2,33 @@ import * as assert from 'assert';
 import { renderGenerateConfigView, GenerateConfigContext, EnhancedModeContext } from '../../views/generateConfigView';
 
 suite('Generate Config UI Test Suite', () => {
+    test('Should render core generation checkboxes checked by default', () => {
+        const ctx: GenerateConfigContext = {
+            cspSource: 'default-src "none"',
+            nonce: 'test-nonce',
+            codiconStyles: '',
+            hasNpm: false,
+            hasTasks: true,
+            hasLaunch: false,
+            showWelcome: false
+        };
+
+        const html = renderGenerateConfigView(ctx);
+
+        assert.ok(
+            /id="npmCheck"[^>]*checked/.test(html),
+            'npm source checkbox should be checked by default even when npm is not detected'
+        );
+        assert.ok(
+            /id="tasksCheck"[^>]*checked/.test(html),
+            'tasks source checkbox should be checked by default'
+        );
+        assert.ok(
+            /id="launchCheck"[^>]*checked/.test(html),
+            'launch source checkbox should be checked by default even when launch is not detected'
+        );
+    });
+
     test('Should not ignore enhanced sources when generating', () => {
         const enhancedMode: EnhancedModeContext = {
             hasDocker: true,
@@ -38,8 +65,12 @@ suite('Generate Config UI Test Suite', () => {
         assert.ok(!html.includes('function collectSources(optionsVisible)'), 'collectSources should not take optionsVisible to avoid ignoring detected tools');
         assert.ok(html.includes('function collectSources()'), 'collectSources should take no arguments');
 
-        // Ensure "optionsVisible" is not used to override or ignore checkboxes
-        assert.ok(!html.includes('} else {\n            // Default to all basic sources enabled if options hidden\n            sources.npm = true;'), 'Should not contain the fallback logic that ignores enhanced tools');
+        // When options are collapsed, core sources should still default to enabled
+        assert.ok(
+            html.includes('const effectiveSources = optionsVisible') &&
+            html.includes('npm: true, tasks: true, launch: true'),
+            'Collapsed mode should default npm/tasks/launch to enabled'
+        );
 
         // Ensure that dockerCheck is being read in the script
         assert.ok(html.includes('if (dockerCheck) sources.docker = dockerCheck.checked;'), 'Script should read docker checkbox value');

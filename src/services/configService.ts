@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { Config, Action, Group, IconMapping, SecondaryGroup } from "../types";
+import { getPreferredThemeColorForName, pickDistinctThemeColor } from "../utils/themeColors";
 
 interface HistoryEntry {
   timestamp: number;
@@ -486,10 +487,15 @@ export class ConfigService {
 
   async writeConfig(config: Config): Promise<void> {
     const uri = await this.resolveConfigUri();
-    if (!uri) return;
+    if (!uri) {
+      console.error('[ConfigService] writeConfig: resolveConfigUri returned undefined — no workspace open?');
+      throw new Error('Cannot write config: no valid config path resolved. Is a workspace open?');
+    }
 
-    const vsCodeFolder = this.getVSCodeFolderUri();
-    if (vsCodeFolder) await this.ensureDir(vsCodeFolder);
+    // Ensure the parent directory of the resolved config URI exists.
+    // This correctly handles both the default (.vscode/) and custom paths.
+    const parentUri = vscode.Uri.joinPath(uri, '..');
+    await this.ensureDir(parentUri);
 
     // Save to history before overwriting
     if (await this.fileExists(uri)) {
@@ -501,8 +507,15 @@ export class ConfigService {
       }
     }
 
-    await this.writeText(uri, JSON.stringify(config, null, 2));
+    const json = JSON.stringify(config, null, 2);
+    await this.writeText(uri, json);
     this.invalidateCache();
+
+    // Verify the write succeeded
+    if (!(await this.fileExists(uri))) {
+      console.error('[ConfigService] writeConfig: file does not exist after write at', uri.fsPath);
+      throw new Error(`Config file was not created at ${uri.fsPath}`);
+    }
   }
 
   async deleteConfig(): Promise<{ deleted: boolean; location?: string }> {
@@ -549,14 +562,14 @@ export class ConfigService {
     return { deleted: false };
   }
 
-  async openConfigFile(): Promise<void> {
+  async openConfigFile(): Promise<boolean> {
     const uri = await this.resolveConfigUri();
     if (!uri || !(await this.fileExists(uri))) {
-      vscode.window.showWarningMessage("Config file doesn't exist. Generate it first.");
-      return;
+      return false;
     }
     const doc = await vscode.workspace.openTextDocument(uri);
     await vscode.window.showTextDocument(doc);
+    return true;
   }
 
   async openConfigFolder(): Promise<void> {
@@ -735,7 +748,7 @@ export class ConfigService {
 
       for (const [name, type] of entries) {
         // Skip common directories
-        if (name === "node_modules" || name === ".git" || name === "dist" || name === "build" || name === "out") {
+        if (name === "node_modules" || name === ".git" || name === ".vscode-test" || name === "dist" || name === "build" || name === "out") {
           continue;
         }
 
@@ -848,7 +861,13 @@ export class ConfigService {
         const tasks = tasksJson.tasks || [];
         tasks
           .forEach((t: any) => {
-            const label = t.label || t.script || t.command;
+            if (t?.hide === true) return;
+
+            const label =
+              (typeof t?.label === "string" && t.label.trim()) ||
+              (typeof t?.script === "string" && t.script.trim()) ||
+              (typeof t?.command === "string" && t.command.trim()) ||
+              undefined;
             if (!label) return;
 
             // Extract group from task if present - this becomes SECONDARY grouping
@@ -857,7 +876,7 @@ export class ConfigService {
               // group can be a string or { kind: "build", isDefault: true }
               if (typeof t.group === 'string') {
                 secondaryGroup = t.group.charAt(0).toUpperCase() + t.group.slice(1);
-              } else if (t.group.kind) {
+              } else if (typeof t.group === 'object' && typeof t.group.kind === 'string') {
                 secondaryGroup = t.group.kind.charAt(0).toUpperCase() + t.group.kind.slice(1);
               }
             }
@@ -904,13 +923,36 @@ export class ConfigService {
       try {
         const raw = await this.readText(uri);
         const launchJson = JSON.parse(this.stripJsonComments(raw));
-        const configs = launchJson.configurations || [];
+        const configs = Array.isArray(launchJson.configurations) ? launchJson.configurations : [];
+        const compounds = Array.isArray(launchJson.compounds) ? launchJson.compounds : [];
+
         configs
-          .filter((c: any) => c.name)
+          .filter((c: any) =>
+            typeof c?.name === "string" &&
+            c.name.trim().length > 0 &&
+            c?.presentation?.hidden !== true
+          )
           .forEach((c: any) => {
             const action: Action = {
-              name: `Launch: ${c.name}`,
-              command: `workbench.action.debug.start|${c.name}`,
+              name: `Launch: ${c.name.trim()}`,
+              command: `workbench.action.debug.start|${c.name.trim()}`,
+              type: "launch",
+              workspace: isRootWorkspace ? undefined : folder.name,
+            };
+            this.applyColorRules(action);
+            allActions.push(action);
+          });
+
+        compounds
+          .filter((c: any) =>
+            typeof c?.name === "string" &&
+            c.name.trim().length > 0 &&
+            c?.presentation?.hidden !== true
+          )
+          .forEach((c: any) => {
+            const action: Action = {
+              name: `Launch: ${c.name.trim()}`,
+              command: `workbench.action.debug.start|${c.name.trim()}`,
               type: "launch",
               workspace: isRootWorkspace ? undefined : folder.name,
             };
@@ -1028,6 +1070,22 @@ export class ConfigService {
   ): Promise<void> {
     const actions: Action[] = [];
     const groups: Group[] = [];
+    const usedPrimaryGroupColors = new Set<string>();
+    const usedSecondaryGroupColors = new Set<string>();
+
+    const assignDistinctPrimaryColor = (groupName: string): string | undefined => {
+      if (!enableColoring) return undefined;
+      const color = pickDistinctThemeColor(groupName, usedPrimaryGroupColors);
+      usedPrimaryGroupColors.add(color);
+      return color;
+    };
+
+    const assignDistinctSecondaryColor = (groupName: string): string | undefined => {
+      if (!enableColoring) return undefined;
+      const color = pickDistinctThemeColor(groupName, usedSecondaryGroupColors);
+      usedSecondaryGroupColors.add(color);
+      return color;
+    };
 
     // 1. Gather actions from enabled sources
     if (sources.npm) {
@@ -1108,7 +1166,7 @@ export class ConfigService {
         groups.push({
           name: groupName,
           icon: typeGroupIcons[type] || "\ud83d\udce6",
-          color: enableColoring ? this.getDefaultColorForGroup(groupName) : undefined
+          color: assignDistinctPrimaryColor(groupName)
         });
         actionsInType.forEach((action) => (action.group = groupName));
       });
@@ -1132,7 +1190,7 @@ export class ConfigService {
             group = {
               name: groupName,
               icon: "\ud83d\udce6", // Simple default, can refine
-              color: enableColoring ? this.getDefaultColorForGroup(groupName) : undefined
+              color: assignDistinctPrimaryColor(groupName)
             };
             groups.push(group);
           }
@@ -1146,7 +1204,7 @@ export class ConfigService {
     // AND coloring is enabled
     groups.forEach(g => {
       if (!g.color && enableColoring) {
-        g.color = this.getDefaultColorForGroup(g.name);
+        g.color = assignDistinctPrimaryColor(g.name);
       }
     });
 
@@ -1215,8 +1273,7 @@ export class ConfigService {
             // Use workspace color if available (from npm workspace detection)
             backgroundColor = action.workspaceColor;
           } else {
-            // Use default color based on name
-            color = this.getDefaultColorForGroup(action.workspace);
+            color = assignDistinctSecondaryColor(action.workspace);
           }
         }
 
@@ -1240,18 +1297,7 @@ export class ConfigService {
   /* ─── Private ─── */
 
   private getDefaultColorForGroup(name: string): string | undefined {
-    const lower = name.toLowerCase();
-    if (lower.includes('npm') || lower.includes('node')) return "var(--vscode-charts-purple)";
-    if (lower.includes('task')) return "var(--vscode-charts-green)";
-    if (lower.includes('launch') || lower.includes('debug')) return "var(--vscode-charts-orange)";
-    if (lower.includes('docker') || lower.includes('container')) return "var(--vscode-charts-blue)";
-    if (lower.includes('python')) return "var(--vscode-charts-yellow)";
-    if (lower.includes('go')) return "var(--vscode-charts-blue)"; // Go gopher is blue-ish
-    if (lower.includes('rust')) return "var(--vscode-charts-red)"; // Rust is red/orange
-    if (lower.includes('test')) return "var(--vscode-charts-yellow)";
-    if (lower.includes('build')) return "var(--vscode-charts-red)"; // Build gets red to differentiate from NPM purple
-    if (lower.includes('git')) return "var(--vscode-charts-green)";
-    return undefined;
+    return getPreferredThemeColorForName(name);
   }
 
   private getDefaultIconForGroup(name: string): string {

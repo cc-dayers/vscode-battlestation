@@ -79,6 +79,7 @@ async function main() {
     platform: "browser",
     outdir: "media",
     logLevel: "silent",
+    conditions: production ? [] : ["development"],
   });
 
   // Copy media assets

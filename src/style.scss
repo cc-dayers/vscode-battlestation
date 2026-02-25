@@ -30,6 +30,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -61,8 +62,7 @@ body {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
-  border-left: 2px solid var(--lp-group-accent, transparent);
+  border-bottom: 1px solid var(--lp-group-accent, var(--vscode-panelTitle-activeBorder, var(--vscode-focusBorder)));
   position: sticky;
   top: 0;
   z-index: 5;
@@ -97,7 +97,11 @@ body {
   flex-shrink: 0;
 }
 
-.lp-flyout-trigger {
+.lp-flyout-trigger,
+.lp-group-menu-trigger,
+.lp-menu-trigger--group,
+.lp-action-menu-trigger,
+.lp-menu-trigger--action {
   border: none;
   cursor: pointer;
   display: flex;
@@ -108,7 +112,6 @@ body {
 
 .lp-group-menu-trigger,
 .lp-menu-trigger--group {
-  @extend .lp-flyout-trigger;
   opacity: 0;
   padding: 2px 6px;
   background: transparent;
@@ -139,7 +142,11 @@ body {
   outline-offset: 1px;
 }
 
-.lp-flyout-panel {
+.lp-flyout-panel,
+.lp-group-action-flyout,
+.lp-menu-panel--group,
+.lp-action-flyout,
+.lp-menu-panel--action {
   position: absolute;
   right: 0;
   display: flex;
@@ -155,12 +162,15 @@ body {
 
 .lp-group-action-flyout,
 .lp-menu-panel--group {
-  @extend .lp-flyout-panel;
   top: calc(100% + 4px);
   min-width: 170px;
 }
 
-.lp-flyout-item {
+.lp-flyout-item,
+.lp-group-flyout-item,
+.lp-menu-item--group,
+.lp-action-flyout-item,
+.lp-menu-item--action {
   width: 100%;
   padding: 6px 10px;
   border: none;
@@ -173,11 +183,6 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.lp-group-flyout-item,
-.lp-menu-item--group {
-  @extend .lp-flyout-item;
 }
 
 .lp-flyout-item:hover,
@@ -245,6 +250,7 @@ body {
   position: relative;
   display: flex;
   align-items: stretch;
+  --lp-action-border: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
   opacity: 1;
   animation: none !important;
   animation-delay: 0ms !important;
@@ -258,23 +264,28 @@ body {
 /* ─── Drag-and-drop reorder ─── */
 
 .lp-drag-handle {
-  width: 18px;
-  flex: 0 0 18px;
+  width: 20px;
+  flex: 0 0 20px;
   align-self: stretch;
   padding: 0;
-  border: 1px solid var(--vscode-button-border, var(--vscode-contrastBorder, transparent));
+  border: 1px solid var(--lp-action-border);
   border-right: none;
-  border-radius: 4px 0 0 4px;
-  background: var(--vscode-button-secondaryBackground);
+  // border-radius: 4px 0 0 4px;
+  background: transparent;
   color: var(--vscode-foreground);
-  opacity: 0;
+  opacity: 1;
   cursor: grab;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 11px;
   flex-shrink: 0;
-  transition: opacity 0.15s;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.lp-drag-handle .codicon {
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
 .lp-drag-handle:active {
@@ -282,12 +293,19 @@ body {
 }
 
 .lp-btn-wrapper:hover .lp-drag-handle {
-  opacity: 0.45;
+  background: var(--vscode-button-secondaryBackground);
+}
+
+.lp-btn-wrapper:hover .lp-drag-handle .codicon {
+  opacity: 0.7;
 }
 
 .lp-drag-handle:hover {
-  opacity: 0.9 !important;
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--vscode-button-hoverBackground);
+}
+
+.lp-drag-handle:hover .codicon {
+  opacity: 1;
 }
 
 .lp-btn-wrapper.lp-dragging {
@@ -324,19 +342,18 @@ body {
   z-index: 1;
 }
 
-.lp-btn.has-checkbox {
+.lp-btn-wrapper>.lp-btn.has-checkbox {
   padding-left: 32px;
 }
 
-.lp-btn {
+.lp-btn-wrapper>.lp-btn {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  padding: 10px 14px;
-  padding-right: 52px;
-  border: 1px solid var(--vscode-button-border, var(--vscode-contrastBorder, transparent));
+  padding: 10px 5px;
+  border: 1px solid var(--lp-action-border);
   border-left: none;
   border-radius: 0 4px 4px 0;
   background: var(--vscode-button-secondaryBackground);
@@ -347,7 +364,7 @@ body {
   box-sizing: border-box;
 }
 
-.lp-btn:hover {
+.lp-btn-wrapper>.lp-btn:hover {
   background: var(--vscode-button-secondaryHoverBackground);
 }
 
@@ -391,7 +408,7 @@ body {
   flex: 0 0 36px;
   align-self: stretch;
   padding: 0;
-  border: 1px solid var(--vscode-button-border, var(--vscode-contrastBorder, "transparent"));
+  border: 1px solid var(--lp-action-border);
   border-right: none;
   border-radius: 4px 0 0 4px;
   background: var(--lp-play-btn-bg, transparent);
@@ -424,7 +441,6 @@ body {
 
 .lp-action-menu-trigger,
 .lp-menu-trigger--action {
-  @extend .lp-flyout-trigger;
   width: 24px;
   height: 24px;
   padding: 0;
@@ -455,15 +471,11 @@ body {
 
 .lp-action-flyout,
 .lp-menu-panel--action {
-  @extend .lp-flyout-panel;
   top: calc(100% + 6px);
   min-width: 190px;
 }
 
-.lp-action-flyout-item,
-.lp-menu-item--action {
-  @extend .lp-flyout-item;
-}
+
 
 .lp-action-flyout-item .codicon,
 .lp-menu-item .codicon {
@@ -547,6 +559,33 @@ body {
 .lp-btn-secondary {
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
+}
+
+.lp-settings-view .lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 6px 10px;
+  border: 1px solid var(--vscode-button-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.45)));
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.lp-settings-view .lp-btn-secondary:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.lp-settings-view .lp-btn-primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.lp-settings-view .lp-btn-primary:hover {
+  background: var(--vscode-button-hoverBackground);
 }
 
 .lp-empty-state {
@@ -728,30 +767,6 @@ body {
   }
 }
 
-@media (max-width: 560px) {
-  .lp-settings-view .lp-config-actions {
-    gap: 4px;
-  }
-
-  .lp-settings-view .lp-config-btn {
-    padding: 4px 8px;
-    min-width: 0;
-    justify-content: center;
-  }
-}
-
-@media (max-width: 430px) {
-  .lp-settings-view .lp-config-btn .lp-btn-text {
-    display: none;
-  }
-
-  .lp-settings-view .lp-config-btn {
-    width: 36px;
-    min-width: 36px;
-    padding: 4px;
-    gap: 0;
-  }
-}
 
 .lp-form-actions {
   display: flex;
@@ -1532,12 +1547,12 @@ form {
   transition: 0.2s;
 }
 
-.lp-settings-view input:checked + .lp-toggle-slider {
+.lp-settings-view input:checked+.lp-toggle-slider {
   background: var(--vscode-button-background);
   border-color: var(--vscode-button-background);
 }
 
-.lp-settings-view input:checked + .lp-toggle-slider:before {
+.lp-settings-view input:checked+.lp-toggle-slider:before {
   transform: translateX(20px);
   background: var(--vscode-button-foreground);
 }

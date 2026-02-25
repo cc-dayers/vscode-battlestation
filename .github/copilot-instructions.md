@@ -1,5 +1,16 @@
 # General AI Assistant & Copilot Guidelines
 
+## Quality Gate (Required)
+For any code change in this repository, completion requires both of the following to succeed before handing off:
+1. Run the full test suite and ensure all tests pass.
+2. Run a production build and ensure it succeeds.
+
+Recommended commands:
+```bash
+npm test
+npm run build
+```
+
 ## AI UI Testing Paradigm
 This extension utilizes a **Visual UI Test Harness** to verify webviews. Because VS Code's extension test host blocks programmatic iframe DOM manipulation, you **MUST NOT** try to click via `vscode-test` or create manual prompt tests that simply `console.log` instructions.
 

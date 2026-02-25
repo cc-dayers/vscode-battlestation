@@ -1,4 +1,5 @@
 import { html, render } from "lit";
+import { classMap } from "lit/directives/class-map.js";
 
 type SettingsState = {
   showIcon: boolean;
@@ -99,6 +100,44 @@ const renderIconChips = () =>
     `
   );
 
+const configBtn = (
+  icon: string,
+  label: string,
+  command: string,
+  opts?: {
+    disabled?: boolean;
+    danger?: boolean;
+    cta?: boolean;
+    title?: string;
+    ariaLabel?: string;
+    onClick?: () => void;
+  }
+) => html`
+  <button
+    type="button"
+    class=${classMap({
+  "lp-config-btn": true,
+  "lp-btn": true,
+  "lp-btn-secondary": true,
+  "lp-btn-danger": !!opts?.danger,
+  "lp-config-cta": !!opts?.cta
+})}
+    ?disabled=${opts?.disabled ?? false}
+    title=${opts?.title ?? label}
+    aria-label=${opts?.ariaLabel ?? label}
+    @click=${() => {
+    if (opts?.onClick) {
+      opts.onClick();
+    } else {
+      hideDeleteConfirm();
+      vscode.postMessage({ command });
+    }
+  }}
+  >
+    <span class="codicon codicon-${icon}"></span><span class="lp-btn-text">${label}</span>
+  </button>
+`;
+
 const renderView = () => {
   if (!root) return;
 
@@ -139,112 +178,50 @@ const renderView = () => {
             <div class="lp-config-toolbar">
               <div class="lp-setting-group-title">📄 battle.json</div>
               <div class="lp-config-actions">
-                <button
-                  type="button"
-                  class="lp-config-btn lp-btn lp-btn-secondary"
-                  ?disabled=${!state.configExists}
-                  title=${state.configExists ? "Open config file" : "Generate config first"}
-                  aria-label="Open config file"
-                  @click=${() => {
-                    hideDeleteConfirm();
-                    vscode.postMessage({ command: "openConfig" });
-                  }}
-                >
-                  <span class="codicon codicon-file"></span><span class="lp-btn-text">Open</span>
-                </button>
-                <button
-                  type="button"
-                  class="lp-config-btn lp-btn lp-btn-secondary"
-                  title="Open folder containing battle.json"
-                  aria-label="Open config location"
-                  @click=${() => {
-                    hideDeleteConfirm();
-                    vscode.postMessage({ command: "openConfigFolder" });
-                  }}
-                >
-                  <span class="codicon codicon-folder-opened"></span><span class="lp-btn-text">Location</span>
-                </button>
-                <button
-                  type="button"
-                  class="lp-config-btn lp-btn lp-btn-secondary lp-config-cta"
-                  title=${state.configExists
-                    ? "Regenerate config from scanned sources"
-                    : "Generate new config file"}
-                  aria-label=${state.configExists ? "Regenerate config" : "Generate config"}
-                  @click=${() => {
-                    hideDeleteConfirm();
-                    vscode.postMessage({ command: "showGenerateConfig" });
-                  }}
-                >
-                  <span class="codicon codicon-refresh"></span
-                  ><span class="lp-btn-text">${state.configExists ? "Regen" : "Generate"}</span>
-                </button>
-                ${state.backupCount > 0
-                  ? html`
-                      <button
-                        type="button"
-                        class="lp-config-btn lp-btn lp-btn-secondary"
-                        ?disabled=${!state.configExists}
-                        title="Restore a previous config (${state.backupCount})"
-                        aria-label="Restore previous config"
-                        @click=${() => {
-                          hideDeleteConfirm();
-                          vscode.postMessage({ command: "restoreConfig" });
-                        }}
-                      >
-                        <span class="codicon codicon-history"></span
-                        ><span class="lp-btn-text">Undo</span>
-                      </button>
-                    `
-                  : null}
-                ${state.configExists
-                  ? html`
-                      <button
-                        type="button"
-                        class="lp-config-btn lp-btn lp-btn-secondary lp-btn-danger"
-                        title="Delete config file"
-                        aria-label="Delete config file"
-                        @click=${() => toggleDeleteConfirm()}
-                      >
-                        <span class="codicon codicon-trash"></span
-                        ><span class="lp-btn-text">Delete</span>
-                      </button>
-                    `
-                  : null}
+                ${configBtn("file", "Open", "openConfig", {
+      disabled: !state.configExists,
+      title: state.configExists ? "Open config file" : "Generate config first",
+      ariaLabel: "Open config file",
+    })}
+                ${configBtn("folder-opened", "Location", "openConfigFolder", {
+      title: "Open folder containing battle.json",
+      ariaLabel: "Open config location",
+    })}
+                ${configBtn("refresh", state.configExists ? "Regen" : "Generate", "showGenerateConfig", {
+      cta: true,
+      title: state.configExists ? "Regenerate config from scanned sources" : "Generate new config file",
+      ariaLabel: state.configExists ? "Regenerate config" : "Generate config",
+    })}
+                ${state.backupCount > 0 ? configBtn("history", "Undo", "restoreConfig", {
+      disabled: !state.configExists,
+      title: `Restore a previous config (${state.backupCount})`,
+      ariaLabel: "Restore previous config",
+    }) : null}
+                ${state.configExists ? configBtn("trash", "Delete", "deleteConfig", {
+      danger: true,
+      title: "Delete config file",
+      ariaLabel: "Delete config file",
+      onClick: () => toggleDeleteConfirm(),
+    }) : null}
               </div>
             </div>
-            ${state.configExists && showDeleteConfirm
-        ? html`
-                <div class="lp-config-confirm">
-                  <div class="lp-config-confirm-text">
-                    Delete battle.json? This cannot be undone.
-                  </div>
-                  <div class="lp-config-confirm-actions">
-                    <button
-                      type="button"
-                      class="lp-config-btn lp-btn lp-btn-secondary lp-btn-danger"
-                      aria-label="Confirm delete config file"
-                      @click=${() => {
-            hideDeleteConfirm();
-            vscode.postMessage({ command: "deleteConfig" });
-          }}
-                    >
-                      <span class="codicon codicon-trash"></span
-                      ><span class="lp-btn-text">Delete</span>
-                    </button>
-                    <button
-                      type="button"
-                      class="lp-config-btn lp-btn lp-btn-secondary"
-                      aria-label="Cancel delete config"
-                      @click=${() => hideDeleteConfirm()}
-                    >
-                      <span class="codicon codicon-close"></span
-                      ><span class="lp-btn-text">Cancel</span>
-                    </button>
-                  </div>
+            ${state.configExists && showDeleteConfirm ? html`
+              <div class="lp-config-confirm">
+                <div class="lp-config-confirm-text">
+                  <span>Delete battle.json?</span><br> You can recover any you have generated previously on this machine later.
                 </div>
-              `
-        : null}
+                <div class="lp-config-confirm-actions">
+                  ${configBtn("trash", "Delete", "deleteConfig", {
+      danger: true,
+      ariaLabel: "Confirm delete config file"
+    })}
+                  ${configBtn("close", "Cancel", "", {
+      onClick: () => hideDeleteConfirm(),
+      ariaLabel: "Cancel delete config"
+    })}
+                </div>
+              </div>
+            ` : null}
           </div>
         </div>
 
@@ -265,34 +242,22 @@ const renderView = () => {
                 <div class="lp-setting-name">Config Location</div>
                 <div class="lp-setting-desc">
                   ${state.customConfigPath
-                    ? html`Custom: <code class="lp-inline-code">${state.customConfigPath}/battle.json</code>`
-                    : html`Default: <code class="lp-inline-code">.vscode/battle.json</code>`
-                  }
+          ? html`Custom: <code class="lp-inline-code">${state.customConfigPath}/battle.json</code>`
+          : html`Default: <code class="lp-inline-code">.vscode/battle.json</code>`
+        }
                 </div>
               </div>
               <div class="lp-inline-actions">
-                <button
-                  type="button"
-                  class="lp-config-btn lp-btn lp-btn-secondary"
-                  title="Choose a custom folder to store battle.json"
-                  aria-label="Change config location"
-                  @click=${() => vscode.postMessage({ command: 'changeConfigLocation' })}
-                >
-                  <span class="codicon codicon-folder-opened"></span>
-                  <span class="lp-btn-text">Change</span>
-                </button>
-                ${state.customConfigPath ? html`
-                  <button
-                    type="button"
-                    class="lp-config-btn lp-btn lp-btn-secondary"
-                    title="Reset to default location (.vscode/battle.json)"
-                    aria-label="Reset config location"
-                    @click=${() => vscode.postMessage({ command: 'resetConfigLocation' })}
-                  >
-                    <span class="codicon codicon-discard"></span>
-                    <span class="lp-btn-text">Reset</span>
-                  </button>
-                ` : null}
+                ${configBtn("folder-opened", "Change", "changeConfigLocation", {
+          title: "Choose a custom folder to store battle.json",
+          ariaLabel: "Change config location",
+          onClick: () => vscode.postMessage({ command: "changeConfigLocation" })
+        })}
+                ${state.customConfigPath ? configBtn("discard", "Reset", "resetConfigLocation", {
+          title: "Reset to default location (.vscode/battle.json)",
+          ariaLabel: "Reset config location",
+          onClick: () => vscode.postMessage({ command: "resetConfigLocation" })
+        }) : null}
               </div>
             </div>
             <div class="lp-setting-row">
@@ -300,16 +265,11 @@ const renderView = () => {
                 <div class="lp-setting-name">Import Config</div>
                 <div class="lp-setting-desc">Load an existing battle.json from disk. Your current config will be backed up first.</div>
               </div>
-              <button
-                type="button"
-                class="lp-config-btn lp-btn lp-btn-secondary"
-                title="Browse for a JSON config file to import"
-                aria-label="Import config file"
-                @click=${() => vscode.postMessage({ command: 'importConfig' })}
-              >
-                <span class="codicon codicon-desktop-download"></span>
-                <span class="lp-btn-text">Import</span>
-              </button>
+              ${configBtn("desktop-download", "Import", "importConfig", {
+          title: "Browse for a JSON config file to import",
+          ariaLabel: "Import config file",
+          onClick: () => vscode.postMessage({ command: "importConfig" })
+        })}
             </div>
           </div>
         ` : null}
@@ -421,17 +381,23 @@ const renderView = () => {
             type="button"
             class="lp-btn lp-btn-secondary"
             @click=${() => {
-          console.log('[SettingsView] Cancel clicked');
-          hideDeleteConfirm();
-          vscode.postMessage({ command: "cancelForm" });
-        }}
+        console.log("[SettingsView] Cancel clicked");
+        hideDeleteConfirm();
+        vscode.postMessage({ command: "cancelForm" });
+      }}
           >
             Cancel
           </button>
-          <button type="button" class="lp-btn lp-btn-primary" @click=${() => {
-        console.log('[SettingsView] Save button clicked');
+          <button
+            type="button"
+            class="lp-btn lp-btn-primary"
+            @click=${() => {
+        console.log("[SettingsView] Save button clicked");
         onSave();
-      }}>Save Settings</button>
+      }}
+          >
+            Save Settings
+          </button>
         </div>
       </div>
 

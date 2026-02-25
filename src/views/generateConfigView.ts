@@ -24,14 +24,44 @@ export interface GenerateConfigContext {
   hasLaunch: boolean;
   showWelcome: boolean;
   enhancedMode?: EnhancedModeContext;
+  hasWorkspace?: boolean;
 }
 
 export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
+  // No-workspace guard: show a helpful message with Open Folder button
+  if (ctx.showWelcome && ctx.hasWorkspace === false) {
+    return htmlShell({
+      title: 'Battlestation',
+      cspSource: ctx.cspSource,
+      nonce: ctx.nonce,
+      codiconStyles: ctx.codiconStyles,
+      body: `
+        <div class="lp-setup">
+          <h2>Welcome to Battlestation</h2>
+          <p>No workspace folder is open.</p>
+          <p class="lp-setup-desc">Open a folder to create a <code>battle.json</code> and get started.</p>
+          <div class="lp-form-actions lp-form-actions--welcome" style="margin-top: 16px;">
+            <button type="button" class="lp-btn lp-btn-primary" id="openFolderBtn">Open Folder</button>
+          </div>
+        </div>
+      `,
+      styles: buttonStyles,
+      script: `
+        (function() {
+          const vscode = acquireVsCodeApi();
+          document.getElementById('openFolderBtn')?.addEventListener('click', () => {
+            vscode.postMessage({ command: 'openFolder' });
+          });
+        })();
+      `,
+    });
+  }
+
   const heading = ctx.showWelcome
     ? `<div class="lp-setup">
         <h2>Welcome to Battlestation</h2>
         <p>No <code>battle.json</code> found.</p>
-        <p class="lp-setup-desc">Create one automatically or manually to get started.</p>
+        <p class="lp-setup-desc">Create one to get started.</p>
       </div>`
     : '<h2>🚀 Generate Configuration</h2><p>Auto-detect commands from your workspace.</p>';
 
@@ -230,9 +260,9 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
       <div id="optionsContainer" class="lp-options-hidden">
         <div class="lp-sources">
           <div class="lp-sources-title">Auto-detect from:</div>
-          ${renderCheckbox("npmCheck", "npm scripts (package.json)", ctx.hasNpm)}
-          ${renderCheckbox("tasksCheck", "VS Code tasks (tasks.json)", ctx.hasTasks)}
-          ${renderCheckbox("launchCheck", "Launch configs (launch.json)", ctx.hasLaunch)}
+          ${renderCheckbox("npmCheck", "npm scripts (package.json)", true)}
+          ${renderCheckbox("tasksCheck", "VS Code tasks (tasks.json)", true)}
+          ${renderCheckbox("launchCheck", "Launch configs (launch.json)", true)}
         </div>
         ${enhancedSection}
         <div class="lp-sources">
@@ -377,6 +407,9 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
             
             const optionsVisible = showOptionsCheck?.checked || false;
             const sources = collectSources();
+            const effectiveSources = optionsVisible
+              ? sources
+              : { ...sources, npm: true, tasks: true, launch: true };
             const enableGrouping = optionsVisible ? document.getElementById('groupCheck').checked : true;
             const enableColoring = optionsVisible ? document.getElementById('colorCheck').checked : false;
             
@@ -386,7 +419,7 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
             
             vscode.postMessage({
               command: 'createConfig',
-              sources,
+              sources: effectiveSources,
               detectionMethod,
               enableGrouping,
               enableColoring
@@ -402,15 +435,22 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
             
             const optionsVisible = showOptionsCheck?.checked || false;
             const sources = collectSources();
-            const enableGrouping = document.getElementById('groupCheck')?.checked ?? true;
-            const enableColoring = document.getElementById('colorCheck')?.checked ?? false;
+            const effectiveSources = optionsVisible
+              ? sources
+              : { ...sources, npm: true, tasks: true, launch: true };
+            const enableGrouping = optionsVisible
+              ? (document.getElementById('groupCheck')?.checked ?? true)
+              : true;
+            const enableColoring = optionsVisible
+              ? (document.getElementById('colorCheck')?.checked ?? false)
+              : false;
 
             const detectionMethodRadio = document.querySelector('input[name="detectionMethod"]:checked');
             const detectionMethod = detectionMethodRadio ? detectionMethodRadio.value : 'hybrid';
 
             vscode.postMessage({
               command: 'createConfig',
-              sources,
+              sources: effectiveSources,
               detectionMethod,
               enableGrouping,
               enableColoring

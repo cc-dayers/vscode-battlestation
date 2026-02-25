@@ -1,8 +1,0 @@
-# TODO
-
-- We removed the cirle loader while we are generating? We should have a loader whe we are doing this (we need to have a loader state built into this that is an overlay over the whole extension with a super performant circle loader)
-- The color loader functionality is a bit half baked. really need to take a step a step back here, take inspiration from some popular vs code extensions and how they do things, maybe even install a nicer color picker. We need to basically make sure the user has a color pallet that will be broken down into 2 sections:
- 1. The current theme colors from vsCode theme. This needs to switch as the user switches their theme and any colors set to these variables should switch when they do.
- 2. Any additional colors the user has added manually. We really should have a separate view for adding a new color. Where the user has the option to either enter a hex / rgb, use the color picker, or provide a theme / pallet to import (not sure to do this just yet, looking for your guidance and the docs best practices around patterns for this, search community guidance etc). Then the user clicks add and this new color is added the their custom palette. The user should be able to hover over the colors in their custom palett and on hover get a little context menu that pops up with icons/buttons to delete or swap out with another color (this would launch the color wizard again, smae flow)
-3. Allow users to add to their color theme by simply uploading / pasting in a screenshot. We use an npm package to detect the colors and add it to their pallet. We could include this in the afformentioned "add color wizard"
-

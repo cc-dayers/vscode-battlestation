@@ -1,6 +1,6 @@
 # Battlestation
 
-A powerful VS Code extension that provides a configurable command launcher panel and integrated todo management system. Execute commands, npm scripts, VS Code tasks, and launch configurations with a single click, while managing your project tasks in a dedicated todos panel.
+A powerful VS Code extension that provides a configurable command launcher panel. Execute commands, npm scripts, VS Code tasks, and launch configurations with a single click.
 
 ## Features
 
@@ -13,15 +13,6 @@ A powerful VS Code extension that provides a configurable command launcher panel
 - **Flexible Display**: Toggle visibility of icons, command types, and command metadata
 - **Hide Actions**: Temporarily hide actions without deleting them
 - **Progressive Disclosure**: UI adapts based on your configuration
-
-### ✅ Todo Management (⚠️ Experimental)
-- **Integrated Todos Panel**: Manage project tasks directly in the sidebar
-- **Priority Levels**: High, medium, and low priority tasks
-- **Detailed Notes**: Add detailed descriptions to each todo
-- **Completion Tracking**: Check off completed tasks
-- **Reorderable**: Drag and drop todos to reorganize
-- **CRUD Operations**: Create, edit, and delete todos easily
-- **Enable in Settings**: Set `battlestation.experimental.enableTodos` to `true`
 
 ### 🎨 Customization
 - **Custom Icon Mappings**: Define your own icon mappings for command types
@@ -43,15 +34,9 @@ A powerful VS Code extension that provides a configurable command launcher panel
    - **Option A**: Click "Generate Config" to automatically detect npm scripts, tasks, and launch configs
    - **Option B**: Manually create a `battle.config` file in your workspace root
 
-### Enabling Experimental Todos (\u26a0\ufe0f Optional)
+## Experimental Features
 
-The Todos feature is currently experimental and disabled by default. To enable it:
-
-1. Open VS Code Settings (`Ctrl+,` or `Cmd+,`)
-2. Search for "Battlestation Experimental"
-3. Enable **"Battlestation: Experimental: Enable Todos"**
-4. Reload VS Code
-5. The Todos view will now appear in the Battlestation sidebar
+Battlestation includes experimental features that are disabled by default. You can enable these via VS Code settings by searching for `battlestation.experimental`.
 
 ## Configuration
 
@@ -141,14 +126,12 @@ Customize Battlestation through VS Code settings (`File > Preferences > Settings
   - Options: `eye-closed`, `x`, `trash`, `close`, `circle-slash`
 - **`battlestation.customIconMappings`** (default: `{}`): Custom icon mappings for command types
   - Example: `{"mytype": "rocket", "deploy": "cloud-upload"}`
-- **`battlestation.experimental.enableTodos`** (default: `false`): ⚠️ **EXPERIMENTAL** - Enable the integrated Todos panel
 
 ## Available Commands
 
 Access these via Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P`):
 
 - **Battlestation: Open Panel** - Open the main Battlestation panel
-- **Battlestation: Open Todos** - Open the Todos panel
 - **Battlestation: Refresh** - Refresh the current view
 - **Battlestation: Settings** - Open settings configuration
 - **Battlestation: Add Action** - Add a new action
@@ -167,12 +150,6 @@ Access these via Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P`):
 - Create groups to organize related actions
 - Use colors and icons to make groups visually distinct
 - Groups are collapsible for better organization
-
-### Managing Todos
-- Click the "Todos" view in the Battlestation sidebar
-- Use priority levels to organize tasks by importance
-- Add detailed descriptions for complex tasks
-- Drag and drop to reorder todos
 
 ### Hiding vs. Deleting
 - Use the hide feature to temporarily remove actions from view
@@ -240,16 +217,10 @@ After packaging, you can install the extension locally:
 
 - **extension.ts**: Extension activation and command registration
 - **view.ts**: Main Battlestation panel (command launcher)
-- **todosView.ts**: Todos panel implementation
-- **services/**: Business logic for config and todos management
+- **services/**: Business logic for config management
   - `configService.ts`: Handles battle.config file operations
-  - `todosService.ts`: Handles .battle.todos.json operations
 - **views/**: UI rendering functions for different views
 - **templates/**: Reusable HTML/CSS templates
-
-## Todo Storage
-
-Todos are stored in `.battle.todos.json` in your workspace root. This file is automatically created when you add your first todo.
 
 ## License
 

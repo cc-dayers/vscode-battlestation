@@ -16,11 +16,7 @@ interface MainViewState {
         showGroup: boolean;
         hideIcon: string;
         playButtonBg: string;
-        density: string;
-        useEmojiLoader: boolean;
-        loaderEmoji: string;
     };
-    secondaryGroups: Record<string, any>;
     iconMap: Record<string, string>;
     collapsedGroups: string[];
     // Transients
@@ -83,11 +79,7 @@ const startState: MainViewState = {
         showGroup: true,
         hideIcon: "eye-closed",
         playButtonBg: "transparent",
-        density: "comfortable",
-        useEmojiLoader: false,
-        loaderEmoji: "🌯",
     },
-    secondaryGroups: {},
     iconMap: {},
     collapsedGroups: [],
     showSearch: false,
@@ -460,17 +452,15 @@ const renderFlyoutMenu = (config: FlyoutRenderConfig) => {
 
 const renderButton = (item: Action) => {
     const isHidden = item.hidden;
-    const { display, iconMap, secondaryGroups } = state;
+    const { display, iconMap } = state;
 
     const icon = display.showIcon ? (iconMap[item.type] || "") : "";
 
     // Determine meta parts (can be strings or HTML templates)
     const metaParts = [];
-    
+
     if (item.workspace) {
-        // Use workspaceColor if available for the workspace label badge
-        const workspaceStyle = item.workspaceColor ? `background-color: ${item.workspaceColor};` : '';
-        metaParts.push(html`<span class="lp-workspace-label" style="${workspaceStyle}">${item.workspace}</span>`);
+        metaParts.push(html`<span class="lp-workspace-label">${item.workspace}</span>`);
     }
 
     const prettyCommand = formatCommandMeta(item);
@@ -486,8 +476,6 @@ const renderButton = (item: Action) => {
     const showGroupActions = hasGroups || isInGroup;
     const isMenuOpen = state.openActionMenuFor === item;
     const actionMenuId = getActionMenuId(item);
-
-    const actionStyle = item.backgroundColor ? `background-color: ${item.backgroundColor} !important;` : "";
     const isDragging = dragSrcAction === item;
     const isDragOver = dragOverAction === item;
     const wrapperClass = [
@@ -523,7 +511,7 @@ const renderButton = (item: Action) => {
             <span class="codicon codicon-gripper"></span>
         </button>` : null}
         
-        <div class="lp-btn ${state.selectionMode ? 'has-checkbox' : ''}" style="${actionStyle}">
+        <div class="lp-btn ${state.selectionMode ? 'has-checkbox' : ''}">
              <span class="lp-btn-name">
                 ${icon ? html`<span class="codicon codicon-${icon} lp-icon"></span>` : null}
                 ${item.name}
@@ -712,7 +700,7 @@ const renderView = () => {
           `);
         }
     } else {
-                content.push(visibleActions.map((a) => renderButton(a)));
+        content.push(visibleActions.map((a) => renderButton(a)));
     }
 
     if (visibleActions.length === 0) {
@@ -739,7 +727,7 @@ const renderView = () => {
             ? html`<div class="lp-loading-overlay"><span class="codicon codicon-loading codicon-modifier-spin"></span></div>`
             : null}
     ${renderSearch()}
-    <div class="lp-grid ${state.display.density}">
+    <div class="lp-grid">
         ${content}
     </div>
   `, root);

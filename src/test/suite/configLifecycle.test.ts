@@ -67,7 +67,7 @@ suite('Config Lifecycle Test Suite', () => {
         const hasName = config.actions.every(a => typeof a.name === 'string');
         const hasCommand = config.actions.every(a => typeof a.command === 'string');
         const hasType = config.actions.every(a => typeof a.type === 'string');
-        
+
         assert.strictEqual(hasName, true, 'All actions should have a name');
         assert.strictEqual(hasCommand, true, 'All actions should have a command');
         assert.strictEqual(hasType, true, 'All actions should have a type');
@@ -220,20 +220,16 @@ suite('Config Lifecycle Test Suite', () => {
         // Find watch task
         const watchTask = config.actions.find(a => a.name === 'Task: watch');
         assert.ok(watchTask, 'Should find watch task');
-        
+
         // Primary group should be "VS Code Tasks"
         assert.strictEqual(watchTask.group, 'VS Code Tasks', 'Task should have VS Code Tasks as primary group');
-        
+
         // Secondary group (Build) should be in workspace field
         assert.strictEqual(watchTask.workspace, 'Build', 'Task group from tasks.json should be in workspace field (secondary grouping)');
 
         // Verify that VS Code Tasks group exists in groups array
         const tasksGroup = config.groups?.find(g => g.name === 'VS Code Tasks');
         assert.ok(tasksGroup, 'VS Code Tasks group should be created');
-        
-        // Verify that Build secondary group exists
-        assert.ok(config.secondaryGroups, 'Config should have secondaryGroups');
-        assert.ok(config.secondaryGroups['Build'], 'Build should be in secondaryGroups');
     });
 
     test('Should not overwrite existing task groups when groupByType is enabled', async function () {
@@ -268,7 +264,7 @@ suite('Config Lifecycle Test Suite', () => {
         if (npmAction) {
             assert.strictEqual(npmAction.group, 'NPM Scripts', 'NPM action should have NPM Scripts as primary group');
         }
-        
+
         // Verify both primary groups exist
         assert.ok(config.groups?.find(g => g.name === 'VS Code Tasks'), 'VS Code Tasks group should exist');
         assert.ok(config.groups?.find(g => g.name === 'NPM Scripts'), 'NPM Scripts group should exist');

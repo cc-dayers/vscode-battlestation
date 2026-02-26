@@ -2,7 +2,6 @@ import { htmlShell } from "../templates/layout";
 import { buttonStyles, formStyles, iconGridStyles } from "../templates/styles";
 import { esc } from "./helpers";
 import type { Action } from "../types";
-import { renderColorPicker, colorPickerScript } from "./components/colorPicker";
 
 const COMMON_CODICONS = [
   "terminal", "package", "rocket", "play", "debug-alt", "beaker", "tools",
@@ -112,15 +111,7 @@ export function renderEditActionForm(ctx: EditActionContext): string {
           </div>
         </div>
         
-        <div class="lp-form-group">
-          ${renderColorPicker({
-      id: "customBgColor",
-      value: item.backgroundColor,
-      customColors,
-      label: "Button Background Color",
-      placeholder: "e.g. #ff0000 or var(--color)"
-    })}
-        </div>
+
         
         <div class="lp-form-group">
           <label for="command">Command *</label>
@@ -134,7 +125,6 @@ export function renderEditActionForm(ctx: EditActionContext): string {
       </form>
     `,
     script: `
-      ${colorPickerScript}
       (function () {
         const vscode = acquireVsCodeApi();
         const oldItem = ${itemJson};
@@ -145,9 +135,6 @@ export function renderEditActionForm(ctx: EditActionContext): string {
         const customIconInput = document.getElementById('customIconInput');
         let selectedIcon = '${currentIcon}';
 
-        // Initialize color picker
-        window.initColorPicker('customBgColor');
-
         iconGrid.addEventListener('click', (e) => {
           const option = e.target.closest('.lp-icon-option');
           if (!option) return;
@@ -155,14 +142,6 @@ export function renderEditActionForm(ctx: EditActionContext): string {
           option.classList.add('selected');
           selectedIcon = option.dataset.icon;
           customIconInput.value = selectedIcon;
-        });
-
-        // Watch for custom color inputs to save them
-        document.getElementById('customBgColor').addEventListener('change', (e) => {
-           const val = e.target.value;
-           if (val && !val.startsWith('var(')) {
-               vscode.postMessage({ command: 'saveCustomColor', color: val });
-           }
         });
 
         customIconInput.addEventListener('input', () => {
@@ -191,10 +170,9 @@ export function renderEditActionForm(ctx: EditActionContext): string {
           const name = document.getElementById('name').value.trim();
           const type = typeSelect.value === 'custom' ? customTypeInput.value.trim() : typeSelect.value;
           const command = document.getElementById('command').value.trim();
-          const backgroundColor = document.getElementById('customBgColor').value.trim() || undefined;
 
           if (!name || !type || !command) return;
-          const item = { name, type, command, backgroundColor };
+          const item = { name, type, command };
           if (typeSelect.value === 'custom' && selectedIcon) {
             vscode.postMessage({ command: 'submitEditAction', oldItem, newItem: item, customIcon: selectedIcon });
           } else {

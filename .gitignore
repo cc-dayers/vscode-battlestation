@@ -1,10 +1,12 @@
 # Build outputs
 dist/
 out/
+build/
 *.vsix
 
 # Dependencies
 node_modules/
+jspm_packages/
 
 # Generated files
 media/codicon.css
@@ -16,6 +18,8 @@ media/output.css
 
 # Testing
 .vscode-test/
+coverage/
+.nyc_output/
 
 # OS files
 .DS_Store
@@ -26,12 +30,31 @@ Thumbs.db
 *.swp
 *.swo
 *~
+.vscode/*.log
 
-# Logs
+# Logs and runtime data
+logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Environment variables
+.env
+.env.test
+.env.production
+.env.local
+
+# Caches
+*.tsbuildinfo
+.eslintcache
+.npm
 
 # Claude Code files (contains sensitive tokens)
 .claude/

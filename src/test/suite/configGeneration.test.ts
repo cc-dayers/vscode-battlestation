@@ -288,39 +288,7 @@ suite('Config Generation Integration (Critical Path)', () => {
         );
     });
 
-    test('Generated secondary groups assign distinct fallback colors', async function () {
-        this.timeout(15000);
 
-        if (await configService.configExists()) {
-            await configService.deleteConfig();
-        }
-
-        await configService.createAutoConfig(
-            { npm: false, tasks: false, launch: false },
-            false,
-            ConfigService.defaultIcons,
-            [
-                { name: 'API Service', command: 'echo api', type: 'shell', workspace: 'services/api' },
-                { name: 'Web App', command: 'echo web', type: 'shell', workspace: 'apps/web' },
-                { name: 'Worker', command: 'echo worker', type: 'shell', workspace: 'workers/queue' }
-            ],
-            true
-        );
-
-        const config = await configService.readConfig();
-        assert.ok(config.secondaryGroups, 'Expected secondaryGroups to be generated');
-
-        const secondaryColors = Object.values(config.secondaryGroups ?? {})
-            .map((group) => group.color)
-            .filter((color): color is string => Boolean(color));
-
-        assert.ok(secondaryColors.length >= 3, 'Expected fallback color assignment for all test secondary groups');
-        assert.strictEqual(
-            new Set(secondaryColors).size,
-            secondaryColors.length,
-            'Auto-assigned secondary group colors should be distinct'
-        );
-    });
 
     test('Overwriting config does not corrupt the file', async function () {
         this.timeout(15000);

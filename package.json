@@ -24,11 +24,6 @@
         "icon": "$(rocket)"
       },
       {
-        "command": "battlestation.openTodos",
-        "title": "Battlestation: Open Todos",
-        "icon": "$(sync)"
-      },
-      {
         "command": "battlestation.refresh",
         "title": "Battlestation: Refresh",
         "icon": "$(refresh)"
@@ -92,13 +87,6 @@
           "name": "Actions",
           "icon": "media/icon.svg",
           "contextualTitle": "Battlestation"
-        },
-        {
-          "type": "webview",
-          "id": "battlestation.todosView",
-          "name": "Todos",
-          "icon": "$(sync)",
-          "when": "config.battlestation.experimental.enableTodos"
         }
       ]
     },
@@ -179,15 +167,6 @@
           "default": "eye-closed",
           "description": "Icon to use for the 'Hide Action' button"
         },
-        "battlestation.workspaceColors": {
-          "type": "object",
-          "default": {},
-          "additionalProperties": {
-            "type": "string"
-          },
-          "markdownDescription": "Custom background colors for specific workspaces (e.g. `{\"client\": \"#ff0000\"}`). Used when auto-generating config.",
-          "description": "Custom background colors for specific workspaces"
-        },
         "battlestation.customIconMappings": {
           "type": "object",
           "default": {},
@@ -209,84 +188,10 @@
           "markdownDescription": "Map command types to specific shells. Example: `{\"npm\": \"bash\", \"task\": \"pwsh\"}`. If not specified, uses default terminal.",
           "description": "Shell configuration per command type"
         },
-        "battlestation.secondaryGroups": {
-          "type": "object",
-          "default": {},
-          "markdownDescription": "Configuration for secondary groups (workspaces). Key is the group name, value is an object with `color`, `icon`, etc.",
-          "additionalProperties": {
-            "type": "object",
-            "properties": {
-              "color": {
-                "type": "string"
-              },
-              "backgroundColor": {
-                "type": "string"
-              },
-              "icon": {
-                "type": "string"
-              }
-            }
-          }
-        },
-        "battlestation.display.enableAutoActionColors": {
-          "type": "boolean",
-          "default": false,
-          "description": "Automatically direct assign colors to actions based on their workspace folder"
-        },
-        "battlestation.colorRules": {
-          "type": "array",
-          "default": [],
-          "description": "Rules for automatically coloring actions based on patterns",
-          "items": {
-            "type": "object",
-            "properties": {
-              "namePattern": {
-                "type": "string",
-                "description": "Glob pattern to match against action name (e.g. '*test*')"
-              },
-              "commandPattern": {
-                "type": "string",
-                "description": "Glob pattern to match against command string"
-              },
-              "type": {
-                "type": "string",
-                "description": "Action type to match (npm, task, launch, etc.)"
-              },
-              "color": {
-                "type": "string",
-                "description": "CSS color to apply (hex, rgb, or var(...))"
-              }
-            },
-            "required": [
-              "color"
-            ]
-          }
-        },
-        "battlestation.experimental.enableTodos": {
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "**⚠️ EXPERIMENTAL**: Enable the integrated Todos panel. This feature is in early development and may change in future releases.",
-          "description": "Enable the experimental Todos panel feature"
-        },
-        "battlestation.experimental.enableEnhancedMode": {
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "**⚠️ EXPERIMENTAL**: Enable Enhanced Mode in the config generator. Hidden by default and may change without notice.",
-          "description": "Enable the experimental Enhanced Mode section in the config generator"
-        },
         "battlestation.display.playButtonBackgroundColor": {
           "type": "string",
           "default": "transparent",
           "description": "Background color of the play button (default: transparent)"
-        },
-        "battlestation.display.density": {
-          "type": "string",
-          "enum": [
-            "compact",
-            "comfortable"
-          ],
-          "default": "comfortable",
-          "description": "Control the density of the layout (padding and spacing)"
         }
       }
     }

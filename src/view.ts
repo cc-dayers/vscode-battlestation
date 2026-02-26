@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
-import type { Action, IconMapping, Group, Config, Todo } from "./types";
+import type { Action, IconMapping, Group, Config } from "./types";
 import { ConfigService } from "./services/configService";
-import { TodosService } from "./services/todosService";
 import { ToolDetectionService } from "./services/toolDetectionService";
 import { getNonce } from "./templates/nonce";
 import {
@@ -38,18 +37,6 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     hasNpm: boolean;
     hasTasks: boolean;
     hasLaunch: boolean;
-    enhancedMode?: {
-      hasDocker: boolean;
-      hasDockerCompose: boolean;
-      hasPython: boolean;
-      hasGo: boolean;
-      hasRust: boolean;
-      hasMakefile: boolean;
-      hasGradle: boolean;
-      hasMaven: boolean;
-      hasCMake: boolean;
-      hasGit: boolean;
-    };
   };
 
   private readonly disposables: vscode.Disposable[] = [];
@@ -74,25 +61,16 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly configService: ConfigService,
-    private readonly todosService: TodosService
+    private readonly configService: ConfigService
   ) {
     this.toolDetectionService = new ToolDetectionService(context);
-    // Refresh when config or todos change
+    // Refresh when config changes
     this.disposables.push(
       this.configService.onDidChange(() => this.refresh()),
       // Auto-refresh when workspace folders change (e.g. user opens a folder)
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh()),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration("battlestation")) {
-          // If enhanced mode setting changed and we are preparing generation config
-          if (
-            e.affectsConfiguration("battlestation.experimental.enableEnhancedMode") &&
-            this.showingForm === "generateConfig"
-          ) {
-            void this.handleShowGenerateConfig();
-            return;
-          }
           // Only refresh if we're in main view or a form (not transitioning)
           // This prevents race conditions when saving settings
           void this.refresh();
@@ -161,7 +139,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         void this.refresh();
         break;
       case "redetectTools":
-        void this.handleRedetectTools(message.detectionMethod || "hybrid");
+        void this.handleRedetectTools();
         break;
       case "createConfig":
         void this.handleCreateConfig(
@@ -210,9 +188,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         this.currentEditAction = message.item;
         void this.refresh();
         break;
-      case "setActionColor":
-        void this.handleSetActionColor(message.item);
-        break;
+
       case "submitEditAction":
         void this.updateAction(message.oldItem, message.newItem, message.customIcon);
         break;
@@ -320,30 +296,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     void this.refresh();
   }
 
-  /* ─── public API for TodoPanelProvider ─── */
 
-  public async getTodosData() {
-    return this.todosService.readTodos();
-  }
-
-  public async createTodo(title: string, description: string) {
-    await this.todosService.addTodo(title, description);
-    this.showToast("Todo added");
-  }
-
-  public async modifyTodo(id: string, updates: Partial<Omit<Todo, "order">>): Promise<void> {
-    await this.todosService.updateTodo(id, updates);
-    this.showToast("Todo updated");
-  }
-
-  public async removeTodo(id: string) {
-    await this.todosService.deleteTodo(id);
-    this.showToast("Todo deleted");
-  }
-
-  public async reorderTodoList(todoIds: string[]) {
-    await this.todosService.reorderTodos(todoIds);
-  }
 
   /* ─── form launchers (called from extension commands) ─── */
 
@@ -449,7 +402,6 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           hasLaunch,
           hasWorkspace,
           showWelcome: true,
-          enhancedMode: undefined,
         });
         return;
       }
@@ -527,11 +479,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         showGroup: wsConfig.get<boolean>("display.showGroup", true),
         hideIcon: wsConfig.get<string>("display.hideIcon", "eye-closed"),
         playButtonBg: wsConfig.get<string>("display.playButtonBackgroundColor", "transparent"),
-        density: wsConfig.get<string>("display.density", "comfortable"),
-        useEmojiLoader: wsConfig.get<boolean>("display.useEmojiLoader", false),
-        loaderEmoji: wsConfig.get<string>("display.loaderEmoji", "🌯"),
       },
-      secondaryGroups: wsConfig.get<Record<string, Group>>("secondaryGroups", {}),
     };
   }
 
@@ -863,50 +811,6 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async handleSetActionColor(item: Action) {
-    const THEME_COLORS = [
-      { label: "$(symbol-color) Remove Color", value: "" },
-      { label: "$(color-mode) Custom Color...", value: "CUSTOM" },
-      ...THEME_COLOR_OPTIONS.map((color) => ({
-        label: `$(circle-filled) ${color.name}`,
-        value: color.value,
-      })),
-    ];
-
-    const selected = await vscode.window.showQuickPick(THEME_COLORS, {
-      placeHolder: `Set background color for "${item.name}"`,
-      title: "Action Color",
-    });
-
-    if (selected) {
-      let colorToSet = selected.value;
-
-      if (colorToSet === "CUSTOM") {
-        const input = await vscode.window.showInputBox({
-          prompt: "Enter custom CSS color (hex, rgb, var, etc.)",
-          value: item.backgroundColor && !item.backgroundColor.startsWith("var(--vscode-charts") ? item.backgroundColor : "",
-          placeHolder: "e.g. #ff0000 or rgba(255, 100, 100, 0.5)"
-        });
-        if (input === undefined) return; // Cancelled
-        colorToSet = input.trim();
-      }
-
-      const config = await this.configService.readConfig();
-      const target = config.actions.find((i) => i.name === item.name && i.command === item.command);
-
-      if (target) {
-        if (!colorToSet) {
-          delete target.backgroundColor;
-        } else {
-          target.backgroundColor = colorToSet;
-        }
-        await this.configService.writeConfig(config);
-        void this.refresh();
-        this.showToast(colorToSet ? `Color set for "${item.name}"` : `Color removed for "${item.name}"`);
-      }
-    }
-  }
-
   private async assignActionToGroup(item: Action, groupName: string) {
     const config = await this.configService.readConfig();
     const target = config.actions.find((i) => i.name === item.name && i.command === item.command);
@@ -1228,35 +1132,12 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         const hasLaunch = await this.configService.hasSource("launch");
 
         progress.report({ increment: 30, message: "Scanning for development tools..." });
-        const wsConfig = vscode.workspace.getConfiguration("battlestation");
-        const enableEnhancedMode = wsConfig.get<boolean>("experimental.enableEnhancedMode", false);
-
-        // Use hybrid detection by default for initial load
-        const enhancedMode = enableEnhancedMode
-          ? (() => {
-            const availability = this.toolDetectionService.detectToolAvailability("hybrid");
-            return availability.then((tools) => ({
-              hasDocker: tools.docker,
-              hasDockerCompose: tools.dockerCompose,
-              hasPython: tools.python,
-              hasGo: tools.go,
-              hasRust: tools.rust,
-              hasMakefile: tools.make,
-              hasGradle: tools.gradle,
-              hasMaven: tools.maven,
-              hasCMake: tools.cmake,
-              hasGit: tools.git,
-            }));
-          })()
-          : undefined;
-
         progress.report({ increment: 50, message: "Preparing options..." });
         this.showingForm = "generateConfig";
         this.generateFormParams = {
           hasNpm,
           hasTasks,
           hasLaunch,
-          enhancedMode: enhancedMode ? await enhancedMode : undefined,
         };
 
         progress.report({ increment: 10, message: "Done" });
@@ -1341,37 +1222,26 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     );
   }
 
-  private async handleRedetectTools(detectionMethod: "file" | "command" | "hybrid") {
-    if (this.showingForm !== "generateConfig") return;
-
+  private async handleRedetectTools() {
     await vscode.window.withProgress(
       {
         location: { viewId: "battlestation.view" },
-        title: "Re-detecting tools...",
+        title: "Re-scanning workspace...",
         cancellable: false,
       },
       async (progress) => {
         try {
-          progress.report({ increment: 20, message: `Using ${detectionMethod} detection...` });
-          const availability = await this.toolDetectionService.detectToolAvailability(detectionMethod);
+          progress.report({ increment: 10, message: "Checking workspace files..." });
+          const hasNpm = await this.configService.hasSource("npm");
+          const hasTasks = await this.configService.hasSource("tasks");
+          const hasLaunch = await this.configService.hasSource("launch");
 
-          progress.report({ increment: 70, message: "Updating options..." });
-          const enhancedMode = {
-            hasDocker: availability.docker,
-            hasDockerCompose: availability.dockerCompose,
-            hasPython: availability.python,
-            hasGo: availability.go,
-            hasRust: availability.rust,
-            hasMakefile: availability.make,
-            hasGradle: availability.gradle,
-            hasMaven: availability.maven,
-            hasCMake: availability.cmake,
-            hasGit: availability.git,
+          progress.report({ increment: 50, message: "Preparing options..." });
+          this.generateFormParams = {
+            hasNpm,
+            hasTasks,
+            hasLaunch,
           };
-
-          if (this.generateFormParams) {
-            this.generateFormParams.enhancedMode = enhancedMode;
-          }
 
           progress.report({ increment: 10, message: "Done" });
           void this.refresh();

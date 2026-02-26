@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { Config, Action, Group, IconMapping, SecondaryGroup } from "../types";
+import type { Config, Action, Group, IconMapping } from "../types";
 import { getPreferredThemeColorForName, pickDistinctThemeColor } from "../utils/themeColors";
 
 interface HistoryEntry {
@@ -242,9 +242,7 @@ export class ConfigService {
       normalized.activeTodoList = defaultListId;
     }
 
-    if (raw.secondaryGroups) {
-      normalized.secondaryGroups = raw.secondaryGroups;
-    }
+
 
     if (Array.isArray(raw.customColors)) {
       normalized.customColors = raw.customColors;
@@ -634,52 +632,6 @@ export class ConfigService {
 
   /* ─── Scanning helpers ─── */
 
-  private applyColorRules(action: Action): void {
-    const config = vscode.workspace.getConfiguration("battlestation");
-    const colorRules = config.get<any[]>("colorRules", []);
-    const enableAuto = config.get<boolean>("display.enableAutoActionColors", false);
-
-    // If auto-color is disabled and we have one (from workspace scan), clear it
-    // UNLESS it was set by a rule? No, rules should override.
-    // Actually, scanNpmScriptsRecursive sets a bg color. We should probably clear it first if auto is disabled.
-    // But currently scanNpmScriptsRecursive sets it.
-    // Let's handle the "auto" part in scanNpmScriptsRecursive logic or here.
-    // If I clear it here, it simplifies scan logic change.
-
-    if (!enableAuto && action.backgroundColor && action.type === 'npm') {
-      // Only clear if it looks like an auto-color? 
-      // Simpler: configService logic for scanNpmScripts will just NOT set it if disabled.
-      // So here we just apply rules.
-    }
-
-    for (const rule of colorRules) {
-      if (!rule.color) continue;
-
-      // Check type
-      if (rule.type && rule.type !== action.type) continue;
-
-      // Check name pattern (simple * wildcard)
-      if (rule.namePattern && !this.matchesPattern(action.name, rule.namePattern)) continue;
-
-      // Check command pattern
-      if (rule.commandPattern && !this.matchesPattern(action.command, rule.commandPattern)) continue;
-
-      // Match!
-      action.backgroundColor = rule.color;
-      // Last rule wins? Or first? Usually last wins in cascading style, or first wins in priority.
-      // Let's assume standard "last one wins" or "first match". 
-      // Let's go with "override existing" so last rule in list wins if multiple match.
-    }
-  }
-
-  private matchesPattern(text: string, pattern: string): boolean {
-    // Simple * to .* regex conversion
-    // Escape special regex chars except *
-    const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-    const regexStr = '^' + escaped.replace(/\*/g, '.*') + '$';
-    return new RegExp(regexStr, 'i').test(text);
-  }
-
   async scanNpmScripts(): Promise<Action[]> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) return [];
@@ -711,7 +663,6 @@ export class ConfigService {
                 cwd: folder.uri.fsPath,
                 workspace: isRootWorkspace ? undefined : workspaceName,
               };
-              this.applyColorRules(action);
               allActions.push(action);
             }
           });
@@ -741,10 +692,7 @@ export class ConfigService {
     try {
       const entries = await vscode.workspace.fs.readDirectory(dirUri);
 
-      // Get workspace colors config
-      const wsConfig = vscode.workspace.getConfiguration("battlestation");
-      const workspaceColors = wsConfig.get<Record<string, string>>("workspaceColors", {});
-      const enableAutoColors = wsConfig.get<boolean>("display.enableAutoActionColors", false);
+
 
       for (const [name, type] of entries) {
         // Skip common directories
@@ -765,12 +713,6 @@ export class ConfigService {
 
               const workspaceLabel = isRootWorkspace ? relativePath : `${workspaceName}/${relativePath}`;
 
-              // Determine color for this workspace
-              let color: string | undefined;
-              if (enableAutoColors) {
-                color = this.getWorkspaceColor(relativePath, workspaceColors);
-              }
-
               Object.keys(scripts).forEach((scriptName) => {
                 // With cwd support, we don't need "cd ... &&" prefix anymore
                 const command = `npm run ${scriptName}`;
@@ -785,10 +727,8 @@ export class ConfigService {
                     command: command,
                     type: "npm",
                     cwd: subDirUri.fsPath,
-                    workspace: workspaceLabel,
-                    workspaceColor: color
+                    workspace: workspaceLabel
                   };
-                  this.applyColorRules(action);
                   actions.push(action);
                 }
               });
@@ -807,42 +747,7 @@ export class ConfigService {
     }
   }
 
-  private getWorkspaceColor(workspaceName: string, customColors: Record<string, string>): string {
-    // Check for user override first
-    if (customColors[workspaceName]) {
-      return customColors[workspaceName];
-    }
 
-    // Generate deterministic color from string
-    // Simple hash function
-    let hash = 0;
-    for (let i = 0; i < workspaceName.length; i++) {
-      hash = workspaceName.charCodeAt(i) + ((hash << 5) - hash);
-    }
-
-    // Convert to hex color
-    let color = '#';
-    for (let i = 0; i < 3; i++) {
-      const value = (hash >> (i * 8)) & 0xFF;
-      // Make it pastel/dark-mode friendly by forcing high value/saturation if possible, 
-      // or just use a predefined palette.
-      // Let's use a palette of VS Code chart colors instead for consistency
-      const palette = [
-        "var(--vscode-charts-red)",
-        "var(--vscode-charts-blue)",
-        "var(--vscode-charts-green)",
-        "var(--vscode-charts-yellow)",
-        "var(--vscode-charts-orange)",
-        "var(--vscode-charts-purple)",
-        "var(--vscode-button-secondaryHoverBackground)"
-      ];
-
-      const index = Math.abs(hash) % palette.length;
-      return palette[index];
-    }
-
-    return "var(--vscode-charts-blue)";
-  }
 
   async scanTasks(): Promise<Action[]> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -898,7 +803,6 @@ export class ConfigService {
               type: "task",
               workspace: workspaceValue,
             };
-            this.applyColorRules(action);
             allActions.push(action);
           });
       } catch {
@@ -939,7 +843,6 @@ export class ConfigService {
               type: "launch",
               workspace: isRootWorkspace ? undefined : folder.name,
             };
-            this.applyColorRules(action);
             allActions.push(action);
           });
 
@@ -956,7 +859,6 @@ export class ConfigService {
               type: "launch",
               workspace: isRootWorkspace ? undefined : folder.name,
             };
-            this.applyColorRules(action);
             allActions.push(action);
           });
       } catch {
@@ -1260,36 +1162,10 @@ export class ConfigService {
       }
     }
 
-    // Build secondaryGroups from workspace values
-    const secondaryGroups: Record<string, SecondaryGroup> = {};
-    finalActions.forEach(action => {
-      if (action.workspace && !secondaryGroups[action.workspace]) {
-        // Determine color and icon for secondary group
-        let color: string | undefined;
-        let backgroundColor: string | undefined;
-        
-        if (enableColoring) {
-          if (action.workspaceColor) {
-            // Use workspace color if available (from npm workspace detection)
-            backgroundColor = action.workspaceColor;
-          } else {
-            color = assignDistinctSecondaryColor(action.workspace);
-          }
-        }
-
-        secondaryGroups[action.workspace] = {
-          icon: this.getDefaultIconForGroup(action.workspace),
-          color,
-          backgroundColor
-        };
-      }
-    });
-
     const config: Config = {
       actions: finalActions,
       groups: finalGroups,
       icons: finalIcons,
-      secondaryGroups: Object.keys(secondaryGroups).length > 0 ? secondaryGroups : undefined,
     };
     await this.writeConfig(config);
   }

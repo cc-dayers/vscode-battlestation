@@ -42,5 +42,15 @@ suite('Flyout Menu Architecture Test Suite', () => {
         assert.ok(source.includes('.lp-menu-panel--action'), 'Should style action panel variant');
         assert.ok(source.includes('.lp-menu-item--action'), 'Should style action item variant');
         assert.ok(source.includes('.lp-menu-divider'), 'Should style shared divider class');
+
+        // Verify we prevent unintended stacking context overlaps (Issue #123 / the z-index bug)
+        const containerStart = source.indexOf('.lp-action-menu-container');
+        if (containerStart !== -1) {
+            const containerEnd = source.indexOf('}', containerStart);
+            const containerBlock = source.substring(containerStart, containerEnd);
+            assert.ok(!containerBlock.includes('transform'), 'Should not use transform for placement to avoid trapping z-index in a 3D stacking context');
+            assert.ok(!containerBlock.includes('z-index'), 'Should not use local container z-index wrapper to avoid breaking relative z-index logic');
+            assert.ok(containerBlock.includes('bottom: 0') && containerBlock.includes('display: flex'), 'Should use flex for vertical alignment to avoid stacking context');
+        }
     });
 });

@@ -1,5 +1,12 @@
 /** Shared types used across services and views. */
 
+export interface ActionParam {
+  name: string;       // Variable name used in command string, e.g. "ENV"
+  prompt: string;     // Label shown in VS Code input box
+  default?: string;   // Pre-filled default value
+  options?: string[]; // If present, show QuickPick instead of InputBox
+}
+
 export interface Action {
   name: string;
   command: string;
@@ -8,6 +15,9 @@ export interface Action {
   group?: string;
   hidden?: boolean;
   workspace?: string; // Can be used as secondary grouping key
+  params?: ActionParam[]; // Runtime input variables interpolated into command
+  backgroundColor?: string;
+  rowBackgroundColor?: string;
 }
 
 export interface IconMapping {

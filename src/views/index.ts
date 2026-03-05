@@ -1,4 +1,5 @@
 export { renderLoadingView } from "./loadingView";
+export { renderErrorView } from "./errorView";
 export { renderGenerateConfigView } from "./generateConfigView";
 export type { GenerateConfigContext } from "./generateConfigView";
 export { renderSettingsView } from "./settingsView";

@@ -74,6 +74,12 @@ body {
   cursor: pointer;
 }
 
+// Raise stacking context when a color picker popout is open on this header
+// so the popout renders above sibling sticky group headers
+.lp-group-header--picker-open {
+  z-index: 20;
+}
+
 .lp-group-chevron {
   font-size: 14px;
   color: var(--lp-group-accent, currentColor);
@@ -169,6 +175,11 @@ body {
   min-width: 170px;
 }
 
+.lp-menu-panel--group.lp-menu-flip {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
 .lp-flyout-item,
 .lp-group-flyout-item,
 .lp-menu-item--group,
@@ -230,6 +241,7 @@ body {
   align-items: stretch;
   min-height: 36px;
   --lp-action-border: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  background-color: var(--lp-row-bg, transparent);
   opacity: 1;
   animation: none !important;
   animation-delay: 0ms !important;
@@ -301,6 +313,11 @@ body {
   box-shadow: 0 2px 0 0 var(--vscode-focusBorder);
 }
 
+.lp-group-header.lp-drag-over-group {
+  outline: 2px solid var(--vscode-focusBorder);
+  border-radius: 3px;
+}
+
 .lp-btn-wrapper.lp-hidden-item {
   opacity: 0.5;
 }
@@ -333,7 +350,7 @@ body {
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  padding: 10px 5px;
+  padding: 5px 5px;
   border: 1px solid var(--lp-action-border);
   border-left: none;
   border-radius: 0 4px 4px 0;
@@ -354,6 +371,9 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  padding-right: 4px;
+  position: relative;
 }
 
 .lp-icon {
@@ -372,6 +392,254 @@ body {
   font-size: 10px;
   opacity: 0.7;
   margin-top: 3px;
+}
+
+/* Inline action toolbar — floats over .lp-btn-name on the right */
+.lp-action-toolbar {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px 0 28px;
+}
+
+.lp-btn-wrapper:hover .lp-action-toolbar {
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--vscode-button-secondaryHoverBackground) 0%, transparent),
+    var(--vscode-button-secondaryHoverBackground) 28px
+  );
+}
+
+/* Group action toolbar — floats over .lp-group-header on the right */
+.lp-group-action-toolbar {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px 0 28px;
+  color: var(--vscode-foreground);
+}
+
+.lp-group-header:hover .lp-group-action-toolbar {
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--vscode-editor-background) 0%, transparent),
+    var(--vscode-editor-background) 28px
+  );
+}
+
+.lp-inline-action-btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--vscode-button-secondaryForeground);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+
+// Smaller buttons for group header toolbar
+.lp-group-action-toolbar .lp-inline-action-btn {
+  width: 16px;
+  height: 16px;
+  font-size: 11px;
+}
+
+.lp-btn-wrapper:hover .lp-inline-action-btn {
+  opacity: 0.65;
+  border-color: rgba(128, 128, 128, 0.5);
+}
+
+.lp-group-header:hover .lp-inline-action-btn {
+  opacity: 0.65;
+  border-color: rgba(128, 128, 128, 0.5);
+}
+
+.lp-inline-action-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+  border-color: rgba(128, 128, 128, 0.65);
+  opacity: 1 !important;
+}
+
+.lp-inline-action-btn:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+.lp-btn-wrapper:hover .lp-btn-dangerous {
+  color: var(--vscode-errorForeground, #f48771);
+}
+
+.lp-btn-dangerous:hover {
+  border-color: var(--vscode-errorForeground, #f48771) !important;
+  color: var(--vscode-errorForeground, #f48771) !important;
+}
+
+// Color-picker button active state (picker is open)
+.lp-inline-action-btn.lp-cp-active {
+  opacity: 1 !important;
+  border-color: var(--vscode-focusBorder, rgba(128,128,128,0.65)) !important;
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+// Container that wraps the setColor button + popout
+.lp-cp-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+// Color picker popout panel
+.lp-cp-popout {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 200;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.35));
+  border-radius: 6px;
+  padding: 10px;
+  width: 210px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lp-cp-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.lp-cp-swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s, border-color 0.1s;
+
+  &:hover { transform: scale(1.15); border-color: rgba(255,255,255,0.4); }
+  &.lp-cp-swatch--active { border-color: var(--vscode-focusBorder, #007fd4) !important; transform: scale(1.1); }
+}
+
+.lp-cp-swatch--clear {
+  background: transparent !important;
+  border-color: rgba(128,128,128,0.4) !important;
+  color: var(--vscode-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.lp-cp-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lp-cp-preview {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  border: 1px solid rgba(128,128,128,0.4);
+  flex-shrink: 0;
+}
+
+.lp-cp-text {
+  flex: 1;
+  height: 22px;
+  padding: 0 4px;
+  font-size: 11px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, rgba(128,128,128,0.35));
+  border-radius: 3px;
+  min-width: 0;
+}
+
+.lp-cp-native-wrap {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(128,128,128,0.35);
+  border-radius: 3px;
+
+  input[type="color"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+  }
+
+  .codicon { font-size: 13px; pointer-events: none; }
+}
+
+.lp-cp-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 2px;
+  border-top: 1px solid rgba(128,128,128,0.2);
+}
+
+.lp-cp-target-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  opacity: 0.85;
+  user-select: none;
+
+  input[type="checkbox"] { cursor: pointer; margin: 0; }
+  &:hover { opacity: 1; }
+}
+
+.lp-status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-left: 4px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  transition: background-color 0.2s ease;
+  &.lp-status-ok {
+    background: var(--vscode-testing-iconPassed, #3fb950);
+  }
+  &.lp-status-fail {
+    background: var(--vscode-testing-iconFailed, #f85149);
+  }
 }
 
 .lp-workspace-label {
@@ -419,48 +687,65 @@ body {
 
 .lp-action-menu-container,
 .lp-menu-container--action {
-  position: absolute;
-  right: 4px;
-  top: 0;
-  bottom: 0;
+  position: relative;
   display: flex;
   align-items: center;
 }
 
 .lp-action-menu-trigger,
 .lp-menu-trigger--action {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   padding: 0;
+  border: 1px solid transparent;
   border-radius: 3px;
-  background: var(--vscode-button-secondaryBackground);
+  background: transparent;
   color: var(--vscode-button-secondaryForeground);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
 }
 
 .lp-btn-wrapper:hover .lp-action-menu-trigger,
-.lp-btn-wrapper:hover .lp-menu-trigger--action,
+.lp-btn-wrapper:hover .lp-menu-trigger--action {
+  opacity: 0.65;
+  border-color: rgba(128, 128, 128, 0.5);
+}
+
 .lp-action-menu-trigger[aria-expanded="true"],
 .lp-menu-trigger--action[aria-expanded="true"] {
   opacity: 1;
+  border-color: rgba(128, 128, 128, 0.65);
 }
 
 .lp-action-menu-trigger:hover,
 .lp-menu-trigger--action:hover {
   background: var(--vscode-button-secondaryHoverBackground);
+  border-color: rgba(128, 128, 128, 0.65);
+  opacity: 1 !important;
 }
 
 .lp-action-menu-trigger:focus-visible,
 .lp-menu-trigger--action:focus-visible {
   outline: 1px solid var(--vscode-focusBorder);
   outline-offset: 1px;
+  opacity: 1;
 }
 
 .lp-action-flyout,
 .lp-menu-panel--action {
   top: calc(100% + 6px);
   min-width: 190px;
+}
+
+.lp-menu-panel--action.lp-menu-flip {
+  top: auto;
+  bottom: calc(100% + 6px);
 }
 
 .lp-action-flyout-item .codicon,
@@ -586,6 +871,16 @@ body {
   border: 1px dashed var(--vscode-widget-border);
   border-radius: 4px;
   background: var(--vscode-editor-background);
+}
+
+.lp-empty-state.lp-no-results {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-style: solid;
+  font-size: 12px;
+  opacity: 0.65;
 }
 
 .lp-welcome {
@@ -1585,6 +1880,24 @@ form {
 
 .lp-settings-view .lp-icon-chip-name {
   opacity: 0.7;
+}
+
+/* Settings panel — action toolbar configurator drag list */
+.lp-toolbar-cfg-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 3px;
+  border-radius: 3px;
+  background: var(--vscode-input-background);
+  border: 1px solid transparent;
+  cursor: default;
+  user-select: none;
+}
+
+.lp-toolbar-cfg-item.lp-toolbar-cfg-drop {
+  border-top: 2px solid var(--vscode-focusBorder);
 }
 
 .lp-settings-loading {

@@ -14,6 +14,7 @@ export default defineConfig({
         'src/test/suite/flyoutMenuArchitecture.test.ts',
         'src/test/suite/dragAndGroupUI.test.ts',
         'src/test/suite/actionUI.test.ts',
+        'src/test/suite/features.test.ts',
     ],
     version: 'stable',
     workspaceFolder: '.',

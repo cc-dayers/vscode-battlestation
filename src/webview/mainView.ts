@@ -16,6 +16,7 @@ interface MainViewState {
         showGroup: boolean;
         hideIcon: string;
         playButtonBg: string;
+        actionToolbar: string[];
     };
     iconMap: Record<string, string>;
     collapsedGroups: string[];
@@ -25,6 +26,8 @@ interface MainViewState {
     selectionMode: boolean;
     selectedItems: Action[]; // References to items in actions
     openActionMenuFor: Action | null;
+    // Session-only run status (never persisted to disk)
+    runStatus: Record<string, { exitCode: number; timestamp: number }>;
 }
 
 // Global Types
@@ -79,6 +82,7 @@ const startState: MainViewState = {
         showGroup: true,
         hideIcon: "eye-closed",
         playButtonBg: "transparent",
+        actionToolbar: ["hide", "setColor", "edit", "delete"],
     },
     iconMap: {},
     collapsedGroups: [],
@@ -87,6 +91,7 @@ const startState: MainViewState = {
     selectionMode: false,
     selectedItems: [],
     openActionMenuFor: null,
+    runStatus: {},
 };
 
 
@@ -120,6 +125,19 @@ const state = new Proxy(startState, {
 let dragSrcAction: Action | null = null;
 let dragOverAction: Action | null = null;
 let dragOverTop = true; // true = insert before target, false = insert after
+let dragOverGroupName: string | null = null; // group header being hovered during drag
+
+// Color picker popout state
+let colorPickerOpenFor: string | null = null; // actionMenuId of the open picker
+let colorPickerColor = '';
+let colorPickerApplyToPlay = true;
+let colorPickerApplyToRow = false;
+
+// Group color picker state
+let groupColorPickerOpenFor: string | null = null;
+let groupColorPickerApplyToAccent = true;
+let groupColorPickerApplyToBg = false;
+let groupColorPickerApplyToBorder = false;
 
 const handleDragStart = (e: DragEvent, item: Action) => {
     dragSrcAction = item;
@@ -162,17 +180,31 @@ const handleDragLeave = (e: DragEvent, item: Action) => {
 const handleDrop = (e: DragEvent, item: Action) => {
     e.preventDefault();
     if (!dragSrcAction || dragSrcAction === item) return;
-    const newActions = [...state.actions];
-    const srcIdx = newActions.indexOf(dragSrcAction);
+
+    // Build updated src adopting the target item's group (handles cross-group drops)
+    const updatedSrc: Action = { ...dragSrcAction };
+    if (item.group !== undefined) {
+        updatedSrc.group = item.group;
+    } else {
+        delete updatedSrc.group;
+    }
+
+    const newActions = state.actions.map(a => a === dragSrcAction ? updatedSrc : a);
+    const srcIdx = newActions.indexOf(updatedSrc);
     const tgtIdx = newActions.indexOf(item);
-    if (srcIdx === -1 || tgtIdx === -1) { dragSrcAction = null; dragOverAction = null; return; }
+    if (srcIdx === -1 || tgtIdx === -1) {
+        dragSrcAction = null;
+        dragOverAction = null;
+        dragOverGroupName = null;
+        return;
+    }
     newActions.splice(srcIdx, 1);
-    // After removing src, recompute target index
     const adjustedTgt = newActions.indexOf(item);
     const insertIdx = dragOverTop ? adjustedTgt : adjustedTgt + 1;
-    newActions.splice(insertIdx, 0, dragSrcAction);
+    newActions.splice(insertIdx, 0, updatedSrc);
     dragSrcAction = null;
     dragOverAction = null;
+    dragOverGroupName = null;
     state.actions = newActions;
     vscode.postMessage({ command: 'reorderActions', actions: newActions });
 };
@@ -180,7 +212,57 @@ const handleDrop = (e: DragEvent, item: Action) => {
 const handleDragEnd = () => {
     dragSrcAction = null;
     dragOverAction = null;
+    dragOverGroupName = null;
     requestRender();
+};
+
+const handleDragOverGroupHeader = (e: DragEvent, group: Group) => {
+    if (!dragSrcAction) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer!.dropEffect = 'move';
+    if (dragOverGroupName !== group.name) {
+        dragOverAction = null;
+        dragOverGroupName = group.name;
+        requestRender();
+    }
+};
+
+const handleDragLeaveGroupHeader = (e: DragEvent, group: Group) => {
+    if (dragOverGroupName !== group.name) return;
+    dragOverGroupName = null;
+    requestRender();
+};
+
+const handleDropOnGroupHeader = (e: DragEvent, group: Group) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const src = dragSrcAction;
+    if (!src) return;
+
+    const updatedSrc: Action = { ...src, group: group.name };
+    const withoutSrc = state.actions.filter(a => a !== src);
+
+    // Insert after the last action already in this group, or at the end
+    let insertIdx = withoutSrc.length;
+    for (let i = withoutSrc.length - 1; i >= 0; i--) {
+        if (withoutSrc[i].group === group.name) {
+            insertIdx = i + 1;
+            break;
+        }
+    }
+
+    const newActions = [
+        ...withoutSrc.slice(0, insertIdx),
+        updatedSrc,
+        ...withoutSrc.slice(insertIdx),
+    ];
+
+    dragSrcAction = null;
+    dragOverAction = null;
+    dragOverGroupName = null;
+    state.actions = newActions;
+    vscode.postMessage({ command: 'reorderActions', actions: newActions });
 };
 
 const toggleGroup = (groupName: string) => {
@@ -201,8 +283,21 @@ const editAction = (item: Action) => {
     vscode.postMessage({ command: "editAction", item });
 };
 
-const setActionColor = (item: Action) => {
-    vscode.postMessage({ command: "setActionColor", item });
+const setActionColor = (item: Action, menuId: string) => {
+    closeActionMenu(); // Close ellipsis if open
+    groupColorPickerOpenFor = null; // Close group color picker if open
+    if (colorPickerOpenFor === menuId) {
+        colorPickerOpenFor = null;
+    } else {
+        colorPickerOpenFor = menuId;
+        colorPickerApplyToPlay = true;
+        colorPickerApplyToRow = !!item.rowBackgroundColor;
+    }
+    renderView();
+};
+
+const deleteAction = (item: Action) => {
+    vscode.postMessage({ command: "deleteAction", item });
 };
 
 const assignGroup = (item: Action, groupName: string) => {
@@ -331,6 +426,8 @@ const getActionMenuKeyboardConfig = (item: Action): FlyoutMenuKeyboardConfig => 
 
 const toggleActionMenu = (e: Event, item: Action) => {
     e.stopPropagation();
+    colorPickerOpenFor = null; // Close color picker if open
+    groupColorPickerOpenFor = null; // Close group color picker if open
     state.openActionMenuFor = state.openActionMenuFor === item ? null : item;
 };
 
@@ -366,6 +463,107 @@ const editGroup = (group: Group) => {
 
 const hideGroup = (group: Group) => {
     vscode.postMessage({ command: "hideGroup", group });
+};
+
+const getGroupMenuId = (group: Group): string => `grp-${encodeURIComponent(group.name)}`;
+
+const setGroupColorAction = (group: Group, menuId: string) => {
+    closeActionMenu();
+    colorPickerOpenFor = null; // close action color picker
+    if (groupColorPickerOpenFor === menuId) {
+        groupColorPickerOpenFor = null;
+    } else {
+        groupColorPickerOpenFor = menuId;
+        groupColorPickerApplyToAccent = true;
+        groupColorPickerApplyToBg = !!group.backgroundColor;
+        groupColorPickerApplyToBorder = !!group.borderColor;
+    }
+    renderView();
+};
+
+const renderGroupColorPickerPopout = (group: Group) => {
+    const currentColor = group.color || group.backgroundColor || group.borderColor || '';
+
+    const applyNow = (color: string) => {
+        vscode.postMessage({ command: "setGroupColor", group, color,
+            applyToAccent: groupColorPickerApplyToAccent, applyToBg: groupColorPickerApplyToBg, applyToBorder: groupColorPickerApplyToBorder });
+    };
+
+    const onNativeInput = (e: Event) => applyNow((e.target as HTMLInputElement).value);
+    const onTextChange = (e: Event) => { const v = (e.target as HTMLInputElement).value.trim(); if (v) applyNow(v); };
+
+    return html`
+        <div class="lp-cp-popout" @click=${(e: Event) => e.stopPropagation()}>
+            <div class="lp-cp-swatches">
+                ${THEME_COLORS.map(c => html`
+                    <button class="lp-cp-swatch ${currentColor === c.value ? 'lp-cp-swatch--active' : ''}"
+                        style="background:${c.value}" title=${c.name}
+                        @click=${() => applyNow(c.value)}></button>
+                `)}
+                <button class="lp-cp-swatch lp-cp-swatch--clear" title="Clear color"
+                    @click=${() => applyNow('')}>
+                    <span class="codicon codicon-circle-slash"></span>
+                </button>
+            </div>
+            <div class="lp-cp-custom-row">
+                <div class="lp-cp-preview" style="background:${currentColor || 'transparent'}"></div>
+                <input class="lp-cp-text" type="text" placeholder="#hex or var(--color)"
+                    value=${currentColor}
+                    @change=${onTextChange}>
+                <label class="lp-cp-native-wrap" title="Open color wheel">
+                    <input type="color" value=${currentColor.startsWith('#') ? currentColor : '#000000'}
+                        @input=${onNativeInput}>
+                    <span class="codicon codicon-color-mode"></span>
+                </label>
+            </div>
+            <div class="lp-cp-targets">
+                <label class="lp-cp-target-label">
+                    <input type="checkbox" .checked=${groupColorPickerApplyToAccent}
+                        @change=${(e: Event) => {
+                            groupColorPickerApplyToAccent = (e.target as HTMLInputElement).checked;
+                            if (groupColorPickerApplyToAccent) {
+                                if (currentColor) applyNow(currentColor);
+                            } else {
+                                vscode.postMessage({ command: "setGroupColor", group, color: '', applyToAccent: true, applyToBg: false, applyToBorder: false });
+                            }
+                        }}>
+                    Header accent
+                </label>
+                <label class="lp-cp-target-label">
+                    <input type="checkbox" .checked=${groupColorPickerApplyToBg}
+                        @change=${(e: Event) => {
+                            groupColorPickerApplyToBg = (e.target as HTMLInputElement).checked;
+                            if (groupColorPickerApplyToBg) {
+                                if (currentColor) applyNow(currentColor);
+                            } else {
+                                vscode.postMessage({ command: "setGroupColor", group, color: '', applyToAccent: false, applyToBg: true, applyToBorder: false });
+                            }
+                        }}>
+                    Items background
+                </label>
+                <label class="lp-cp-target-label">
+                    <input type="checkbox" .checked=${groupColorPickerApplyToBorder}
+                        @change=${(e: Event) => {
+                            groupColorPickerApplyToBorder = (e.target as HTMLInputElement).checked;
+                            if (groupColorPickerApplyToBorder) {
+                                if (currentColor) applyNow(currentColor);
+                            } else {
+                                vscode.postMessage({ command: "setGroupColor", group, color: '', applyToAccent: false, applyToBg: false, applyToBorder: true });
+                            }
+                        }}>
+                    Border accent
+                </label>
+            </div>
+        </div>
+    `;
+};
+
+const formatRelativeTime = (timestamp: number): string => {
+    const secs = Math.floor((Date.now() - timestamp) / 1000);
+    if (secs < 60) return `${secs}s ago`;
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `${mins}m ago`;
+    return `${Math.floor(mins / 60)}h ago`;
 };
 
 const formatCommandMeta = (item: Action): string => {
@@ -450,6 +648,88 @@ const renderFlyoutMenu = (config: FlyoutRenderConfig) => {
     `;
 };
 
+const THEME_COLORS = [
+    { name: "Red",      value: "var(--vscode-charts-red)" },
+    { name: "Orange",   value: "var(--vscode-charts-orange)" },
+    { name: "Yellow",   value: "var(--vscode-charts-yellow)" },
+    { name: "Green",    value: "var(--vscode-charts-green)" },
+    { name: "Blue",     value: "var(--vscode-charts-blue)" },
+    { name: "Purple",   value: "var(--vscode-charts-purple)" },
+    { name: "Pink",     value: "var(--vscode-charts-pink)" },
+    { name: "Error",    value: "var(--vscode-errorForeground)" },
+    { name: "Warning",  value: "var(--vscode-editorWarning-foreground)" },
+    { name: "Info",     value: "var(--vscode-editorInfo-foreground)" },
+    { name: "Success",  value: "var(--vscode-testing-iconPassed)" },
+];
+
+const renderColorPickerPopout = (item: Action, menuId: string) => {
+    const currentColor = item.backgroundColor || '';
+
+    const applyNow = (color: string) => {
+        vscode.postMessage({ command: "setActionColor", item, color, applyToPlay: colorPickerApplyToPlay, applyToRow: colorPickerApplyToRow });
+    };
+
+    const clearColor = () => {
+        vscode.postMessage({ command: "setActionColor", item, color: '', applyToPlay: colorPickerApplyToPlay, applyToRow: colorPickerApplyToRow });
+    };
+
+    const onNativeInput = (e: Event) => applyNow((e.target as HTMLInputElement).value);
+    const onTextChange = (e: Event) => { const v = (e.target as HTMLInputElement).value.trim(); if (v) applyNow(v); };
+
+    return html`
+        <div class="lp-cp-popout" @click=${(e: Event) => e.stopPropagation()}>
+            <div class="lp-cp-swatches">
+                ${THEME_COLORS.map(c => html`
+                    <button class="lp-cp-swatch ${currentColor === c.value ? 'lp-cp-swatch--active' : ''}"
+                        style="background:${c.value}" title=${c.name}
+                        @click=${() => applyNow(c.value)}></button>
+                `)}
+                <button class="lp-cp-swatch lp-cp-swatch--clear" title="Clear color"
+                    @click=${clearColor}>
+                    <span class="codicon codicon-circle-slash"></span>
+                </button>
+            </div>
+            <div class="lp-cp-custom-row">
+                <div class="lp-cp-preview" style="background:${currentColor || 'transparent'}"></div>
+                <input class="lp-cp-text" type="text" placeholder="#hex or var(--color)"
+                    value=${currentColor}
+                    @change=${onTextChange}>
+                <label class="lp-cp-native-wrap" title="Open color wheel">
+                    <input type="color" value=${currentColor.startsWith('#') ? currentColor : '#000000'}
+                        @input=${onNativeInput}>
+                    <span class="codicon codicon-color-mode"></span>
+                </label>
+            </div>
+            <div class="lp-cp-targets">
+                <label class="lp-cp-target-label">
+                    <input type="checkbox" .checked=${colorPickerApplyToPlay}
+                        @change=${(e: Event) => {
+                            colorPickerApplyToPlay = (e.target as HTMLInputElement).checked;
+                            if (colorPickerApplyToPlay) {
+                                if (currentColor) applyNow(currentColor);
+                            } else {
+                                vscode.postMessage({ command: "setActionColor", item, color: '', applyToPlay: true, applyToRow: false });
+                            }
+                        }}>
+                    Play button
+                </label>
+                <label class="lp-cp-target-label">
+                    <input type="checkbox" .checked=${colorPickerApplyToRow}
+                        @change=${(e: Event) => {
+                            colorPickerApplyToRow = (e.target as HTMLInputElement).checked;
+                            if (colorPickerApplyToRow) {
+                                if (currentColor) applyNow(currentColor);
+                            } else {
+                                vscode.postMessage({ command: "setActionColor", item, color: '', applyToPlay: false, applyToRow: true });
+                            }
+                        }}>
+                    Row background
+                </label>
+            </div>
+        </div>
+    `;
+};
+
 const renderButton = (item: Action) => {
     const isHidden = item.hidden;
     const { display, iconMap } = state;
@@ -486,8 +766,32 @@ const renderButton = (item: Action) => {
         isDragOver && !dragOverTop ? 'lp-drag-over-bottom' : '',
     ].filter(Boolean).join(' ');
 
+    const runEntry = state.runStatus[item.name];
+    const statusDot = runEntry
+        ? html`<span
+            class="lp-status-dot ${runEntry.exitCode === 0 ? 'lp-status-ok' : 'lp-status-fail'}"
+            title="Last run: ${formatRelativeTime(runEntry.timestamp)} — Exit ${runEntry.exitCode}">
+          </span>`
+        : null;
+
+    // Build inline toolbar and ellipsis menu from actionToolbar setting
+    type StaticBtn = { icon: string; label: string; action: () => void; dangerous?: boolean };
+    const staticBtnDefs: Record<string, StaticBtn> = {
+        edit:     { icon: 'edit',                              label: 'Edit',                  action: () => editAction(item) },
+        setColor: { icon: 'symbol-color',                     label: 'Set color',             action: () => setActionColor(item, actionMenuId) },
+        hide:     { icon: isHidden ? 'eye' : display.hideIcon, label: isHidden ? 'Show' : 'Hide', action: () => hideAction(item) },
+        delete:   { icon: 'trash',                            label: 'Delete',                action: () => deleteAction(item), dangerous: true },
+    };
+    const toolbar = display.actionToolbar ?? ['hide', 'setColor', 'edit', 'delete'];
+    const inlineBtns = toolbar.filter(id => staticBtnDefs[id]).map(id => ({ id, ...staticBtnDefs[id] }));
+    const ellipsisStaticBtns = (Object.keys(staticBtnDefs) as string[])
+        .filter(id => !toolbar.includes(id))
+        .map(id => ({ id, ...staticBtnDefs[id] }));
+    const hasEllipsisContent = ellipsisStaticBtns.length > 0 || showGroupActions;
+
     return html`
     <div class=${wrapperClass}
+        style=${item.rowBackgroundColor ? `--lp-row-bg:${item.rowBackgroundColor}` : ''}
         @dragover=${(e: DragEvent) => handleDragOver(e, item)}
         @dragleave=${(e: DragEvent) => handleDragLeave(e, item)}
         @drop=${(e: DragEvent) => handleDrop(e, item)}>
@@ -495,10 +799,10 @@ const renderButton = (item: Action) => {
             if (e.target.checked) state.selectedItems = [...state.selectedItems, item];
             else state.selectedItems = state.selectedItems.filter(i => i !== item);
         }}>` : null}
-        
+
         <button
             class="lp-play-btn"
-            style="--lp-play-btn-bg: ${display.playButtonBg}"
+            style="--lp-play-btn-bg: ${item.backgroundColor || display.playButtonBg}"
             title="Run"
             aria-label=${`Run ${item.name}`}
             @click=${() => executeAction(item)}>
@@ -510,55 +814,67 @@ const renderButton = (item: Action) => {
             @dragend=${handleDragEnd}>
             <span class="codicon codicon-gripper"></span>
         </button>` : null}
-        
+
         <div class="lp-btn ${state.selectionMode ? 'has-checkbox' : ''}">
              <span class="lp-btn-name">
                 ${icon ? html`<span class="codicon codicon-${icon} lp-icon"></span>` : null}
                 ${item.name}
                 ${isHidden ? html`<span class="lp-hidden-badge">(hidden)</span>` : null}
+                ${statusDot}
+                <span class="lp-action-toolbar">
+                    ${inlineBtns.map(btn => btn.id === 'setColor' ? html`
+                        <div class="lp-cp-container">
+                            <button class="lp-inline-action-btn ${colorPickerOpenFor === actionMenuId ? 'lp-cp-active' : ''}"
+                                title=${btn.label} aria-label="${btn.label} ${item.name}"
+                                @click=${(e: Event) => { e.stopPropagation(); btn.action(); }}>
+                                <span class="codicon codicon-${btn.icon}"></span>
+                            </button>
+                            ${colorPickerOpenFor === actionMenuId ? renderColorPickerPopout(item, actionMenuId) : null}
+                        </div>
+                    ` : html`
+                        <button class="lp-inline-action-btn ${btn.dangerous ? 'lp-btn-dangerous' : ''}"
+                            title=${btn.label} aria-label="${btn.label} ${item.name}"
+                            @click=${(e: Event) => { e.stopPropagation(); btn.action(); }}>
+                            <span class="codicon codicon-${btn.icon}"></span>
+                        </button>
+                    `)}
+                    ${hasEllipsisContent ? renderFlyoutMenu({
+                        kind: "action",
+                        menuId: actionMenuId,
+                        isOpen: isMenuOpen,
+                        triggerTitle: "More actions",
+                        triggerAriaLabel: `More actions for ${item.name}`,
+                        onTriggerClick: (e: Event) => toggleActionMenu(e, item),
+                        onTriggerKeydown: (e: KeyboardEvent) => onActionMenuTriggerKeydown(e, item),
+                        onMenuClick: (e: Event) => e.stopPropagation(),
+                        onMenuKeydown: (e: KeyboardEvent) => onActionMenuKeydown(e, item),
+                        menuContent: html`
+                            ${ellipsisStaticBtns.map(btn => html`
+                                <button class="lp-menu-item lp-menu-item--action" role="menuitem"
+                                    @click=${() => onActionMenuAction(() => btn.action())}>
+                                    <span class="codicon codicon-${btn.icon}"></span>
+                                    ${btn.label}
+                                </button>
+                            `)}
+                            ${showGroupActions ? html`
+                                <div class="lp-menu-divider"></div>
+                                <button class="lp-menu-item lp-menu-item--action" role="menuitem" @click=${() => onActionMenuAction(() => assignGroup(item, "__none__"))}>
+                                    <span class="codicon codicon-clear-all"></span>
+                                    Remove from group
+                                </button>
+                                ${state.groups.map(g => html`
+                                    <button class="lp-menu-item lp-menu-item--action" role="menuitem" @click=${() => onActionMenuAction(() => assignGroup(item, g.name))}>
+                                        ${g.icon ? html`<span class="codicon codicon-${g.icon}"></span>` : html`<span class="codicon codicon-folder"></span>`}
+                                        Assign to ${g.name}
+                                    </button>
+                                `)}
+                            ` : null}
+                        `,
+                    }) : null}
+                </span>
              </span>
              ${metaParts.length ? html`<span class="lp-btn-meta">${metaParts.map((part, idx) => html`${idx > 0 ? ' · ' : ''}${part}`)}</span>` : null}
         </div>
-
-        ${renderFlyoutMenu({
-            kind: "action",
-            menuId: actionMenuId,
-            isOpen: isMenuOpen,
-            triggerTitle: "More actions",
-            triggerAriaLabel: `More actions for ${item.name}`,
-            onTriggerClick: (e: Event) => toggleActionMenu(e, item),
-            onTriggerKeydown: (e: KeyboardEvent) => onActionMenuTriggerKeydown(e, item),
-            onMenuClick: (e: Event) => e.stopPropagation(),
-            onMenuKeydown: (e: KeyboardEvent) => onActionMenuKeydown(e, item),
-            menuContent: html`
-                <button class="lp-menu-item lp-menu-item--action" role="menuitem" @click=${() => onActionMenuAction(() => editAction(item))}>
-                    <span class="codicon codicon-edit"></span>
-                    Edit
-                </button>
-                <button class="lp-menu-item lp-menu-item--action" role="menuitem" @click=${() => onActionMenuAction(() => setActionColor(item))}>
-                    <span class="codicon codicon-symbol-color"></span>
-                    Set color
-                </button>
-                <button class="lp-menu-item lp-menu-item--action" role="menuitem" @click=${() => onActionMenuAction(() => hideAction(item))}>
-                    <span class="codicon codicon-${isHidden ? 'eye' : display.hideIcon}"></span>
-                    ${isHidden ? 'Show' : 'Hide'}
-                </button>
-
-                ${showGroupActions ? html`
-                    <div class="lp-menu-divider"></div>
-                    <button class="lp-menu-item lp-menu-item--action" role="menuitem" @click=${() => onActionMenuAction(() => assignGroup(item, "__none__"))}>
-                        <span class="codicon codicon-clear-all"></span>
-                        Remove from group
-                    </button>
-                    ${state.groups.map(g => html`
-                        <button class="lp-menu-item lp-menu-item--action" role="menuitem" @click=${() => onActionMenuAction(() => assignGroup(item, g.name))}>
-                            ${g.icon ? html`<span class="codicon codicon-${g.icon}"></span>` : html`<span class="codicon codicon-folder"></span>`}
-                            Assign to ${g.name}
-                        </button>
-                    `)}
-                ` : null}
-            `,
-        })}
     </div>
     `;
 };
@@ -588,9 +904,11 @@ const renderGroup = (group: Group, actions: Action[]) => {
     const itemsStyles = [];
     if (group.backgroundColor) itemsStyles.push(`background-color: ${group.backgroundColor}`);
 
+    const groupMenuId = getGroupMenuId(group);
+
     return html`
     <details class="lp-group" ?open=${isOpen} @toggle=${(e: Event) => {
-            // Prevent default toggle behavior to manage state manually if needed, 
+            // Prevent default toggle behavior to manage state manually if needed,
             // but <details> handles open/close natively. We just need to sync state.
             const d = e.target as HTMLDetailsElement;
             if (d.open && state.collapsedGroups.includes(group.name)) {
@@ -599,29 +917,40 @@ const renderGroup = (group: Group, actions: Action[]) => {
                 toggleGroup(group.name);
             }
         }}>
-        <summary class="lp-group-header ${isHiddenGroup ? 'lp-hidden-group' : ''}" style="${styles.join(';')}">
+        <summary class="lp-group-header ${isHiddenGroup ? 'lp-hidden-group' : ''} ${dragOverGroupName === group.name ? 'lp-drag-over-group' : ''} ${groupColorPickerOpenFor === groupMenuId ? 'lp-group-header--picker-open' : ''}"
+            style="${styles.join(';')}"
+            @dragover=${(e: DragEvent) => handleDragOverGroupHeader(e, group)}
+            @dragleave=${(e: DragEvent) => handleDragLeaveGroupHeader(e, group)}
+            @drop=${(e: DragEvent) => handleDropOnGroupHeader(e, group)}>
             <span class="codicon codicon-chevron-down lp-group-chevron"></span>
             <div class="lp-group-header-content">
                 ${group.icon ? html`<span class="codicon codicon-${group.icon} lp-group-icon"></span>` : null}
                 <span class="lp-group-name">${group.name}</span>
                 ${isHiddenGroup ? html`<span class="lp-hidden-badge">(hidden)</span>` : null}
             </div>
-            <div class="lp-menu-container lp-menu-container--group">
-                <button
-                    class="lp-menu-trigger lp-menu-trigger--group"
+            <span class="lp-group-action-toolbar">
+                <button class="lp-inline-action-btn"
                     title=${isHiddenGroup ? "Show group" : "Hide group"}
                     aria-label=${isHiddenGroup ? `Show group ${group.name}` : `Hide group ${group.name}`}
                     @click=${(e: Event) => { e.preventDefault(); e.stopPropagation(); hideGroup(group); }}>
                     <span class="codicon codicon-${isHiddenGroup ? 'eye' : state.display.hideIcon}"></span>
                 </button>
-                <button
-                    class="lp-menu-trigger lp-menu-trigger--group"
+                <div class="lp-cp-container">
+                    <button class="lp-inline-action-btn ${groupColorPickerOpenFor === groupMenuId ? 'lp-cp-active' : ''}"
+                        title="Set color"
+                        aria-label="Set color for group ${group.name}"
+                        @click=${(e: Event) => { e.preventDefault(); e.stopPropagation(); setGroupColorAction(group, groupMenuId); }}>
+                        <span class="codicon codicon-symbol-color"></span>
+                    </button>
+                    ${groupColorPickerOpenFor === groupMenuId ? renderGroupColorPickerPopout(group) : null}
+                </div>
+                <button class="lp-inline-action-btn"
                     title="Edit group"
                     aria-label="Edit group ${group.name}"
                     @click=${(e: Event) => { e.preventDefault(); e.stopPropagation(); editGroup(group); }}>
-                    <span class="codicon codicon-settings-gear"></span>
+                    <span class="codicon codicon-edit"></span>
                 </button>
-            </div>
+            </span>
         </summary>
         <div class="lp-group-items" style="${itemsStyles.join(';')}">
             ${actions.map((a) => renderButton(a))}
@@ -704,21 +1033,30 @@ const renderView = () => {
     }
 
     if (visibleActions.length === 0) {
-        // Empty State
-        content.push(html`
-        <div class="lp-empty-state">
-            <div class="lp-welcome"><h2 class="lp-welcome-title">Welcome</h2></div>
-            <div class="lp-empty-actions">
-                <button class="lp-empty-btn lp-empty-primary" @click=${() => {
-                state.generating = true; // Immediate feedback!
-                vscode.postMessage({ command: 'showGenerateConfig' });
-            }}>
-                    <span class="codicon ${state.generating ? 'codicon-loading codicon-modifier-spin' : 'codicon-sparkle'}"></span>
-                    <span class="lp-btn-label">${state.generating ? 'Detecting...' : 'Auto-detect'}</span>
-                </button>
+        if (state.searchQuery) {
+            content.push(html`
+            <div class="lp-empty-state lp-no-results">
+                <span class="codicon codicon-search"></span>
+                <span>No results for "<strong>${state.searchQuery}</strong>"</span>
             </div>
-        </div>
-      `);
+          `);
+        } else {
+            // Empty State
+            content.push(html`
+            <div class="lp-empty-state">
+                <div class="lp-welcome"><h2 class="lp-welcome-title">Welcome</h2></div>
+                <div class="lp-empty-actions">
+                    <button class="lp-empty-btn lp-empty-primary" @click=${() => {
+                    state.generating = true; // Immediate feedback!
+                    vscode.postMessage({ command: 'showGenerateConfig' });
+                }}>
+                        <span class="codicon ${state.generating ? 'codicon-loading codicon-modifier-spin' : 'codicon-sparkle'}"></span>
+                        <span class="lp-btn-label">${state.generating ? 'Detecting...' : 'Auto-detect'}</span>
+                    </button>
+                </div>
+            </div>
+          `);
+        }
     }
 
     render(html`
@@ -731,6 +1069,14 @@ const renderView = () => {
         ${content}
     </div>
   `, root);
+
+    // Flip any open menu panels that would overflow the viewport bottom
+    requestAnimationFrame(() => {
+        document.querySelectorAll<HTMLElement>('.lp-menu-panel--action, .lp-menu-panel--group').forEach(panel => {
+            const rect = panel.getBoundingClientRect();
+            panel.classList.toggle('lp-menu-flip', rect.bottom > window.innerHeight - 8);
+        });
+    });
 };
 
 // Handle Messages from Extension
@@ -763,6 +1109,10 @@ window.addEventListener('message', event => {
             // ... toast logic
             break;
     }
+    // Targeted status update — no full refresh
+    if (msg.command === 'statusUpdate') {
+        state.runStatus = { ...state.runStatus, [msg.name]: { exitCode: msg.exitCode, timestamp: msg.timestamp } };
+    }
 });
 
 // Initial Render
@@ -772,6 +1122,12 @@ document.addEventListener('click', (e: MouseEvent) => {
     const target = e.target as HTMLElement | null;
     if (!target?.closest('.lp-menu-container')) {
         closeActionMenu();
+    }
+    if (!target?.closest('.lp-cp-container')) {
+        let changed = false;
+        if (colorPickerOpenFor !== null) { colorPickerOpenFor = null; changed = true; }
+        if (groupColorPickerOpenFor !== null) { groupColorPickerOpenFor = null; changed = true; }
+        if (changed) renderView();
     }
 });
 

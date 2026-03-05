@@ -50,6 +50,10 @@ export function renderAddActionForm(ctx: AddActionContext): string {
       #customIconInput { margin-top: 8px; font-family: var(--vscode-editor-font-family); }
       ${colorPickerStyles}
       ${buttonStyles}
+      .param-row { display:grid; grid-template-columns:1fr 1fr 1fr 1fr auto; gap:4px; margin-bottom:4px; align-items:center; }
+      .param-row input { width:100%; padding:4px 6px; font-size:11px; font-family:inherit; background:var(--vscode-input-background); color:var(--vscode-input-foreground); border:1px solid var(--vscode-input-border,transparent); border-radius:2px; box-sizing:border-box; }
+      .param-row button { padding:2px 6px; font-size:11px; cursor:pointer; background:var(--vscode-button-secondaryBackground); color:var(--vscode-button-secondaryForeground); border:none; border-radius:2px; }
+      .param-header { display:grid; grid-template-columns:1fr 1fr 1fr 1fr auto; gap:4px; margin-bottom:2px; font-size:10px; opacity:.6; }
     `,
     body: `
       <h3>Add New Command</h3>
@@ -91,7 +95,13 @@ export function renderAddActionForm(ctx: AddActionContext): string {
         <div class="lp-form-group">
           <label for="command">Command *</label>
           <input type="text" id="command" placeholder="e.g., npm run build" required>
-          <div class="lp-hint" id="commandHint">Shell command to execute</div>
+          <div class="lp-hint" id="commandHint">Use <code>\${VAR}</code> for runtime inputs (see Parameters below)</div>
+        </div>
+        <div class="lp-form-group">
+          <label>Parameters <span style="font-weight:400;opacity:.7">(optional)</span></label>
+          <div id="paramsContainer"></div>
+          <button type="button" class="lp-btn lp-btn-secondary" id="addParamBtn" style="margin-top:6px;font-size:11px;padding:3px 8px">+ Add Parameter</button>
+          <div class="lp-hint">Each parameter prompts the user for input at run time and replaces <code>\${NAME}</code> in the command.</div>
         </div>
         <div class="lp-form-actions">
           <button type="button" class="lp-btn lp-btn-secondary" id="cancelBtn">Cancel</button>
@@ -169,6 +179,38 @@ export function renderAddActionForm(ctx: AddActionContext): string {
           vscode.postMessage({ command: 'cancelForm' });
         });
 
+        // ── Params ──
+        const paramsContainer = document.getElementById('paramsContainer');
+        function addParamRow(p) {
+          const hdr = paramsContainer.children.length === 0
+            ? '<div class="param-header"><span>Name</span><span>Prompt</span><span>Default</span><span>Options (csv)</span><span></span></div>'
+            : '';
+          const row = document.createElement('div');
+          row.innerHTML = hdr + '<div class="param-row">'
+            + '<input placeholder="ENV" value="' + (p?.name||'') + '">'
+            + '<input placeholder="Label shown to user" value="' + (p?.prompt||'') + '">'
+            + '<input placeholder="optional" value="' + (p?.default||'') + '">'
+            + '<input placeholder="a,b,c" value="' + ((p?.options||[]).join(',')) + '">'
+            + '<button type="button" title="Remove">✕</button>'
+            + '</div>';
+          row.querySelector('button').addEventListener('click', () => row.remove());
+          paramsContainer.appendChild(row);
+        }
+        document.getElementById('addParamBtn').addEventListener('click', () => addParamRow(null));
+
+        function collectParams() {
+          return Array.from(paramsContainer.querySelectorAll('.param-row')).map(row => {
+            const inputs = row.querySelectorAll('input');
+            const opts = inputs[3].value.trim();
+            return {
+              name: inputs[0].value.trim(),
+              prompt: inputs[1].value.trim(),
+              default: inputs[2].value.trim() || undefined,
+              options: opts ? opts.split(',').map(s => s.trim()).filter(Boolean) : undefined
+            };
+          }).filter(p => p.name && p.prompt);
+        }
+
         document.getElementById('addForm').addEventListener('submit', (e) => {
           e.preventDefault();
           let itemType = typeSelect.value;
@@ -176,11 +218,13 @@ export function renderAddActionForm(ctx: AddActionContext): string {
             itemType = customTypeInput.value.trim();
             if (!itemType) return;
           }
+          const params = collectParams();
           const item = {
             name: document.getElementById('name').value.trim(),
             type: itemType,
             command: document.getElementById('command').value.trim(),
-            backgroundColor: document.getElementById('customBgColor').value.trim() || undefined
+            backgroundColor: document.getElementById('customBgColor').value.trim() || undefined,
+            params: params.length ? params : undefined
           };
           if (item.name && item.command) {
             const customIconValue = customIconInput ? customIconInput.value.trim() : null;

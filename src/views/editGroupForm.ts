@@ -2,7 +2,6 @@ import { htmlShell } from "../templates/layout";
 import { buttonStyles, formStyles, iconPickerStyles } from "../templates/styles";
 import { esc } from "./helpers";
 import type { Group } from "../types";
-import { renderColorPicker, colorPickerScript } from "./components/colorPicker";
 
 export interface EditGroupContext {
   cspSource: string;
@@ -14,7 +13,7 @@ export interface EditGroupContext {
 }
 
 export function renderEditGroupForm(ctx: EditGroupContext): string {
-  const { group, customColors } = ctx;
+  const { group } = ctx;
   const groupJson = JSON.stringify(group);
   const iconOptions = ctx.availableIcons
     .map(
@@ -37,12 +36,37 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
         margin: 0;
       }
       h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; }
+      .lp-form-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+      .lp-form-header h3 { margin: 0; }
+      .lp-close-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--vscode-foreground);
+        opacity: 0.6;
+        padding: 2px 4px;
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        line-height: 1;
+      }
+      .lp-close-btn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
       ${formStyles}
       ${iconPickerStyles}
       ${buttonStyles}
     `,
     body: `
-      <h3>Edit Group: ${esc(group.name)}</h3>
+      <div class="lp-form-header">
+        <h3>Edit Group: ${esc(group.name)}</h3>
+        <button type="button" class="lp-close-btn" id="closeBtn" title="Cancel">
+          <span class="codicon codicon-close"></span>
+        </button>
+      </div>
       <form id="editGroupForm">
         <div class="lp-form-group">
           <label for="groupName">Group Name *</label>
@@ -57,36 +81,6 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
           <div class="lp-hint">Click an icon above or type codicon name/emoji</div>
         </div>
 
-        <div class="lp-form-group">
-          ${renderColorPicker({
-      id: "customColor",
-      value: group.color,
-      customColors,
-      label: "Text/Icon Color (optional)",
-      placeholder: "e.g. #ff0000 or var(--color)"
-    })}
-        </div>
-        
-        <div class="lp-form-group">
-          ${renderColorPicker({
-      id: "customBgColor",
-      value: group.backgroundColor,
-      customColors,
-      label: "Background Color (optional)",
-      placeholder: "e.g. #ff0000 or var(--color)"
-    })}
-        </div>
-
-        <div class="lp-form-group">
-           ${renderColorPicker({
-      id: "customBorderColor",
-      value: group.borderColor,
-      customColors,
-      label: "Border Color (optional)",
-      placeholder: "e.g. #ff0000 or var(--color)"
-    })}
-        </div>
-
         <div class="lp-form-actions">
           <button type="button" class="lp-btn lp-btn-secondary" id="cancelBtn">Cancel</button>
           <button type="submit" class="lp-btn lp-btn-primary">Save Changes</button>
@@ -94,20 +88,14 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
       </form>
     `,
     script: `
-      ${colorPickerScript}
       (function () {
         const vscode = acquireVsCodeApi();
         const oldGroup = ${groupJson};
         let selectedIcon = '${esc(group.icon || "")}';
 
-        // Initialize color pickers
-        window.initColorPicker('customColor');
-        window.initColorPicker('customBgColor');
-        window.initColorPicker('customBorderColor');
-
         // Event delegation for icon picker and cancel
         document.addEventListener('click', (e) => {
-          const target = e.target.closest('.lp-icon-option, #cancelBtn');
+          const target = e.target.closest('.lp-icon-option, #cancelBtn, #closeBtn');
           if (!target) return;
 
           // Icon selection
@@ -119,8 +107,8 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
             return;
           }
 
-          // Cancel button
-          if (target.id === 'cancelBtn') {
+          // Cancel / close button
+          if (target.id === 'cancelBtn' || target.id === 'closeBtn') {
             vscode.postMessage({ command: 'cancelForm' });
             return;
           }
@@ -131,33 +119,16 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
           selectedIcon = e.target.value;
         });
 
-        // Watch for custom color inputs to save them
-        ['customColor', 'customBgColor', 'customBorderColor'].forEach(id => {
-           document.getElementById(id).addEventListener('change', (e) => {
-               const val = e.target.value;
-               if (val && !val.startsWith('var(')) {
-                   vscode.postMessage({ command: 'saveCustomColor', color: val });
-               }
-           });
-        });
-
         document.getElementById('editGroupForm').addEventListener('submit', (e) => {
           e.preventDefault();
           const groupName = document.getElementById('groupName').value.trim();
           const customIcon = document.getElementById('customIcon').value.trim();
           const icon = customIcon || selectedIcon || '';
-          
-          const color = document.getElementById('customColor').value.trim();
-          const backgroundColor = document.getElementById('customBgColor').value.trim();
-          const borderColor = document.getElementById('customBorderColor').value.trim();
-          
+
           if (!groupName) return;
-          const newGroup = { 
-            name: groupName, 
-            icon: icon || undefined, 
-            color: color || undefined,
-            backgroundColor: backgroundColor || undefined,
-            borderColor: borderColor || undefined
+          const newGroup = {
+            name: groupName,
+            icon: icon || undefined,
           };
           vscode.postMessage({ command: 'submitEditGroup', oldGroup, newGroup });
         });

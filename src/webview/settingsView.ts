@@ -11,6 +11,7 @@ type SettingsState = {
   configExists: boolean;
   usedIcons: string[];
   customConfigPath: string | null;
+  actionToolbar: string[];
 };
 
 type HideIconOption = {
@@ -25,6 +26,13 @@ const HIDE_ICON_OPTIONS: HideIconOption[] = [
   { value: "close", label: "Close" },
   { value: "circle-slash", label: "Circle Slash" },
 ];
+
+const TOOLBAR_BTN_DEFS = [
+  { id: "edit",     icon: "edit",         label: "Edit" },
+  { id: "setColor", icon: "symbol-color", label: "Set Color" },
+  { id: "hide",     icon: "eye-closed",   label: "Hide / Show" },
+  { id: "delete",   icon: "trash",        label: "Delete" },
+] as const;
 
 declare global {
   interface Window {
@@ -50,10 +58,12 @@ const state: SettingsState = window.__SETTINGS__ || {
   configExists: false,
   usedIcons: [],
   customConfigPath: null,
+  actionToolbar: ["hide", "setColor", "edit", "delete"],
 };
 
 let showDeleteConfirm = false;
 let showAdvanced = false;
+let toolbarDragSrc: string | null = null;
 
 const setState = (partial: Partial<SettingsState>) => {
   Object.assign(state, partial);
@@ -81,6 +91,7 @@ const onSave = () => {
         showCommand: state.showCommand,
         showGroup: state.showGroup,
         hideIcon: state.hideIcon,
+        actionToolbar: state.actionToolbar,
       },
     });
     console.log('[SettingsView] Save message sent');
@@ -353,6 +364,57 @@ const renderView = () => {
         )}
           </select>
           </div>
+        </div>
+
+        <div class="lp-setting-group">
+          <div class="lp-setting-group-title">🛠️ Action Toolbar</div>
+          <div class="lp-setting-desc" style="margin-bottom: 8px; font-size: 11px; opacity: 0.75;">
+            Choose which buttons appear directly on each action card. Drag to reorder. Unchecked buttons move to the ellipsis menu.
+          </div>
+          ${(() => {
+            const allIds: string[] = TOOLBAR_BTN_DEFS.map(b => b.id);
+            const inlineIds = state.actionToolbar.filter(id => allIds.includes(id));
+            const offIds = allIds.filter(id => !inlineIds.includes(id));
+            const orderedIds = [...inlineIds, ...offIds];
+            return orderedIds.map(id => {
+              const def = TOOLBAR_BTN_DEFS.find(b => b.id === id)!;
+              const isEnabled = inlineIds.includes(id);
+              const isDragOver = toolbarDragSrc !== null && toolbarDragSrc !== id;
+              return html`
+                <div class="lp-toolbar-cfg-item ${isDragOver ? 'lp-toolbar-cfg-drop' : ''}"
+                    draggable="true"
+                    @dragstart=${() => { toolbarDragSrc = id; }}
+                    @dragover=${(e: DragEvent) => { e.preventDefault(); }}
+                    @drop=${(e: DragEvent) => {
+                      e.preventDefault();
+                      if (!toolbarDragSrc || toolbarDragSrc === id) { toolbarDragSrc = null; return; }
+                      const src = toolbarDragSrc;
+                      toolbarDragSrc = null;
+                      const newOrdered = orderedIds.filter((i: string) => i !== src);
+                      newOrdered.splice(newOrdered.indexOf(id), 0, src);
+                      // Preserve each item's enabled status; just reorder
+                      setState({ actionToolbar: newOrdered.filter((i: string) => inlineIds.includes(i)) });
+                    }}
+                    @dragend=${() => { toolbarDragSrc = null; renderView(); }}>
+                  <span class="codicon codicon-gripper" style="opacity:0.4; font-size:12px; cursor:grab; flex-shrink:0;"></span>
+                  <span class="codicon codicon-${def.icon}" style="font-size:13px; flex-shrink:0;"></span>
+                  <span style="flex:1; font-size:12px;">${def.label}</span>
+                  <label class="lp-setting-toggle" style="flex-shrink:0;">
+                    <input type="checkbox" .checked=${isEnabled}
+                      @change=${(e: Event) => {
+                        const checked = (e.target as HTMLInputElement).checked;
+                        if (checked) {
+                          setState({ actionToolbar: [...inlineIds, id] });
+                        } else {
+                          setState({ actionToolbar: inlineIds.filter(i => i !== id) });
+                        }
+                      }} />
+                    <span class="lp-toggle-slider"></span>
+                  </label>
+                </div>
+              `;
+            });
+          })()}
         </div>
 
         <div class="lp-setting-group">

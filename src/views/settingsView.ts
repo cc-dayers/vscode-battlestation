@@ -16,6 +16,7 @@ export interface SettingsViewContext {
   settingsScriptUri: string;
   cssUri?: string;
   customConfigPath?: string;
+  actionToolbar: string[];
 }
 
 export function renderSettingsView(ctx: SettingsViewContext): string {
@@ -29,6 +30,7 @@ export function renderSettingsView(ctx: SettingsViewContext): string {
     configExists: ctx.configExists,
     usedIcons: ctx.usedIcons,
     customConfigPath: ctx.customConfigPath ?? null,
+    actionToolbar: ctx.actionToolbar,
   };
 
   return htmlShell({

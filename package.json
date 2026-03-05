@@ -192,6 +192,12 @@
           "type": "string",
           "default": "transparent",
           "description": "Background color of the play button (default: transparent)"
+        },
+        "battlestation.display.actionToolbar": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["edit", "setColor", "hide", "delete"] },
+          "default": ["hide", "setColor", "edit", "delete"],
+          "description": "Which action buttons appear inline on each action card. Drag to reorder in the Settings panel. Buttons not listed fall back to the ellipsis menu."
         }
       }
     }
@@ -201,7 +207,7 @@
     "build": "npm run check-types && node esbuild.js --production",
     "watch": "node --no-deprecation esbuild.js --watch",
     "test": "vscode-test",
-    "test:ui": "vscode-test --grep \"Manual\"",
+    "test:ui": "node scripts/test-ui-runner.mjs",
     "test:ui-server": "node scripts/serve-ui.js",
     "test:unit": "vscode-test --grep -v \"Manual\"",
     "test:settings": "vscode-test --grep \"Settings\"",
@@ -237,6 +243,7 @@
     "glob": "^13.0.3",
     "lit": "^3.1.2",
     "mocha": "^11.7.5",
+    "playwright": "^1.58.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.0"
   }

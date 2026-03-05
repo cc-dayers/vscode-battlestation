@@ -48,11 +48,12 @@ const indexHtml = `
       window.__INITIAL_DATA__ = {
         actions: [
           { name: "Build Tool", command: "npm run build", type: "npm" },
-          { name: "Deploy Script", command: "bash ./deploy.sh", type: "shell" }
+          { name: "Deploy Script", command: "bash ./deploy.sh", type: "shell" },
+          { name: "Test Suite", command: "npm test", type: "npm" }
         ],
         iconMap: { npm: "package", shell: "terminal" },
         display: {
-          showIcon: false, // We disabled icons to verify the bug fix!
+          showIcon: true,
           showType: true,
           showCommand: true,
           showGroup: true,
@@ -61,6 +62,11 @@ const indexHtml = `
           density: 'comfortable',
           useEmojiLoader: false,
           loaderEmoji: '🌯'
+        },
+        // Feature 3: test status dots — Build=ok, Deploy=fail, Test=never run
+        runStatus: {
+          "Build Tool": { exitCode: 0, timestamp: Date.now() - 90000 },
+          "Deploy Script": { exitCode: 1, timestamp: Date.now() - 5000 }
         }
       };
     </script>
@@ -132,6 +138,20 @@ const server = http.createServer((req, res) => {
   if (req.url === '/settings' || req.url === '/settings.html') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(settingsHtml, 'utf-8');
+    return;
+  }
+
+  // Generated test pages (run `npx ts-node scripts/gen-test-pages.ts` to rebuild)
+  const testPageRoutes = { '/error': 'error.html', '/add-action': 'add-action.html', '/edit-action': 'edit-action.html' };
+  if (testPageRoutes[req.url]) {
+    const pagePath = path.join(__dirname, 'test-pages', testPageRoutes[req.url]);
+    if (fs.existsSync(pagePath)) {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(fs.readFileSync(pagePath, 'utf-8'), 'utf-8');
+    } else {
+      res.writeHead(404);
+      res.end('Test page not found. Run: npx ts-node scripts/gen-test-pages.ts');
+    }
     return;
   }
 

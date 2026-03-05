@@ -6,6 +6,7 @@ import { getNonce } from "./templates/nonce";
 import {
   renderMainView,
   renderLoadingView,
+  renderErrorView,
   renderGenerateConfigView,
   renderSettingsView,
   renderAddGroupForm,
@@ -40,6 +41,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   };
 
   private readonly disposables: vscode.Disposable[] = [];
+  // In-memory run status — session only, never written to disk
+  private readonly runStatus = new Map<string, { exitCode: number; timestamp: number }>();
 
   public static readonly defaultIcons: IconMapping[] = [
     { type: "shell", icon: "terminal" },
@@ -183,6 +186,14 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       case "submitEditGroup":
         void this.updateGroup(message.oldGroup, message.newGroup);
         break;
+      case "setActionColor":
+        void this.handleSetActionColor(message.item, message.color, message.applyToPlay, message.applyToRow);
+        break;
+
+      case "setGroupColor":
+        void this.handleSetGroupColor(message.group, message.color, message.applyToAccent, message.applyToBg, message.applyToBorder);
+        break;
+
       case "editAction":
         this.showingForm = "editAction";
         this.currentEditAction = message.item;
@@ -198,6 +209,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         break;
       case "hideAction":
         void this.hideAction(message.item);
+        break;
+      case "deleteAction":
+        void this.deleteAction(message.item);
         break;
       case "assignGroup":
         void this.assignActionToGroup(message.item, message.groupName);
@@ -349,24 +363,20 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       const cspSource = this.view.webview.cspSource;
       const nonce = getNonce();
 
-      // Optimized refresh: if we are staying in the main view, just update data
+      // Fast-path: only send a postMessage update (no HTML reload) when already in main view.
+      // _currentViewMode is set at each render site — never speculatively before the validity check.
       const isMainView = this.showingForm === false;
-      const wasMainView = this._currentViewMode === "main"; // We need to track this
-
-      if (isMainView) {
-        this._currentViewMode = "main";
-      } else {
-        const activeForm = this.showingForm;
-        this._currentViewMode = typeof activeForm === "boolean" ? "addAction" : activeForm;
-      }
+      const wasMainView = this._currentViewMode === "main";
 
       if (this.showingForm === "settings") {
+        this._currentViewMode = "settings";
         this.view.webview.html = await this.renderSettings(cspSource, nonce);
         return;
       }
 
       // Check for generateConfig form BEFORE no-config screen
       if (this.showingForm === "generateConfig") {
+        this._currentViewMode = "generateConfig";
         const params = this.generateFormParams || {
           hasNpm: false,
           hasTasks: false,
@@ -382,8 +392,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      if (!exists || !valid) {
+      if (!exists) {
         this.showingForm = false;
+        this._currentViewMode = "noConfig";
         const codiconStyles = this.getCodiconStyles();
         const hasWorkspace = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
 
@@ -406,17 +417,28 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      if (!valid) {
+        this.showingForm = false;
+        this._currentViewMode = "error";
+        const errorMsg = configStatus.error ?? "Invalid config structure";
+        this.view.webview.html = renderErrorView(errorMsg, cspSource, nonce, this.getCodiconStyles());
+        return;
+      }
+
       if (this.showingForm === "group") {
+        this._currentViewMode = "group";
         this.view.webview.html = await this.renderAddGroup(cspSource, nonce);
         return;
       }
 
       if (this.showingForm === "editGroup") {
+        this._currentViewMode = "editGroup";
         this.view.webview.html = await this.renderEditGroup(cspSource, nonce);
         return;
       }
 
       if (this.showingForm === "editAction") {
+        this._currentViewMode = "editAction";
         if (!this.currentEditAction) {
           this.view.webview.html = await this.renderAddAction(cspSource, nonce);
           return;
@@ -426,29 +448,29 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       }
 
       if (this.showingForm === true) {
+        this._currentViewMode = "addAction";
         this.view.webview.html = await this.renderAddAction(cspSource, nonce);
         return;
       }
 
-      // Main view
+      // Main view — only use the fast-path postMessage when we were actually in main view last render
       const config = configStatus.config || (await this.configService.readConfig());
 
-      if (isMainView) {
-        // If we were already in main view and it's visible, try to update via specific message
-        // instead of replacing the whole HTML which causes a reload/flash.
-        if (wasMainView && this.view.visible) {
-          const enrichedConfig = this.getEnrichedConfig(config);
-          this.view.webview.postMessage({
-            type: "update",
-            data: {
-              ...enrichedConfig,
-              showHidden: this.showHidden
-            }
-          });
-          return;
-        }
+      if (isMainView && wasMainView && this.view.visible) {
+        // Already in main view: send targeted data update instead of replacing HTML
+        this._currentViewMode = "main";
+        const enrichedConfig = this.getEnrichedConfig(config);
+        this.view.webview.postMessage({
+          type: "update",
+          data: {
+            ...enrichedConfig,
+            showHidden: this.showHidden
+          }
+        });
+        return;
       }
 
+      this._currentViewMode = "main";
       this.view.webview.html = this.renderMain(config, cspSource, nonce);
     }, 100);
   }
@@ -479,6 +501,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         showGroup: wsConfig.get<boolean>("display.showGroup", true),
         hideIcon: wsConfig.get<string>("display.hideIcon", "eye-closed"),
         playButtonBg: wsConfig.get<string>("display.playButtonBackgroundColor", "transparent"),
+        actionToolbar: wsConfig.get<string[]>("display.actionToolbar", ["hide", "setColor", "edit", "delete"]),
       },
     };
   }
@@ -494,7 +517,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       nonce,
       codiconStyles: this.getCodiconStyles(),
       config: enrichedConfig,
-      initialData: enrichedConfig,
+      initialData: { ...enrichedConfig, runStatus: Object.fromEntries(this.runStatus) },
       showHidden: this.showHidden,
       searchVisible: this.searchVisible,
       scriptUri,
@@ -523,6 +546,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       showCommand: wsConfig.get<boolean>("display.showCommand", true),
       showGroup: wsConfig.get<boolean>("display.showGroup", true),
       hideIcon: wsConfig.get<string>("display.hideIcon", "eye-closed"),
+      actionToolbar: wsConfig.get<string[]>("display.actionToolbar", ["edit", "setColor", "hide"]),
       backupCount: backups.length,
       configExists,
       usedIcons,
@@ -693,21 +717,44 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
   private async executeCommand(item: Action) {
     try {
-      switch (item.type) {
+      // Resolve parametric inputs before executing
+      const resolvedItem = await this.resolveParams(item);
+      if (!resolvedItem) return; // user cancelled a prompt
+
+      switch (resolvedItem.type) {
         case "launch":
-          await this.executeLaunchConfig(item.command);
+          await this.executeLaunchConfig(resolvedItem.command);
           break;
         case "vscode":
         case "task":
-          await this.executeVSCodeCommand(item.command);
+          await this.executeVSCodeCommand(resolvedItem.command);
           break;
         default:
-          await this.executeShellCommand(item);
+          await this.executeShellCommand(resolvedItem);
           break;
       }
     } catch (error) {
       vscode.window.showErrorMessage(`Failed to execute: ${(error as Error).message}`);
     }
+  }
+
+  /** Prompt user for each declared param, interpolate values into command. Returns undefined if cancelled. */
+  private async resolveParams(item: Action): Promise<Action | undefined> {
+    if (!item.params || item.params.length === 0) return item;
+
+    let cmd = item.command;
+    for (const param of item.params) {
+      let value: string | undefined;
+      if (param.options && param.options.length > 0) {
+        value = await vscode.window.showQuickPick(param.options, { title: param.prompt });
+      } else {
+        value = await vscode.window.showInputBox({ prompt: param.prompt, value: param.default ?? "" });
+      }
+      if (value === undefined) return undefined; // user pressed Escape
+      cmd = cmd.replaceAll(`\${${param.name}}`, value);
+    }
+
+    return { ...item, command: cmd };
   }
 
   private async executeLaunchConfig(command: string) {
@@ -738,7 +785,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
     // Construct options
     const terminalOptions: vscode.TerminalOptions = {
-      name: `Launchpad${item.workspace ? ` (${item.workspace})` : ""}`,
+      name: item.name,
       cwd: item.cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
     };
 
@@ -746,11 +793,70 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       terminalOptions.shellPath = shellEnv;
     }
 
-    // Try to reuse terminal if not specifically configured otherwise (could be a future setting)
-    // For now, let's create a new one to ensure clean state and correct shell
     const terminal = vscode.window.createTerminal(terminalOptions);
     terminal.show();
-    terminal.sendText(item.command);
+
+    let resolved = false;
+    const reportStatus = (exitCode: number) => {
+      if (resolved) return;
+      resolved = true;
+      const timestamp = Date.now();
+      this.runStatus.set(item.name, { exitCode, timestamp });
+      void this.view?.webview.postMessage({ command: 'statusUpdate', name: item.name, exitCode, timestamp });
+    };
+
+    // onDidEndTerminalShellExecution only fires for commands run via
+    // shellIntegration.executeCommand() — NOT for sendText(). We must use the
+    // integration API to get accurate exit codes without closing the terminal.
+    const runViaIntegration = (integration: vscode.TerminalShellIntegration) => {
+      const execution = integration.executeCommand(item.command);
+      const execEndListener = vscode.window.onDidEndTerminalShellExecution(e => {
+        if (e.execution !== execution) return;
+        execEndListener.dispose();
+        reportStatus(e.exitCode ?? -1);
+      });
+      this.disposables.push(execEndListener);
+    };
+
+    if (terminal.shellIntegration) {
+      // Shell integration already active on this terminal (uncommon for brand-new terminals)
+      runViaIntegration(terminal.shellIntegration);
+    } else {
+      // Wait for shell integration to activate before sending the command.
+      // This gives us accurate exit codes as soon as the command finishes,
+      // without needing to close the terminal tab.
+      let commandSent = false;
+      let fallbackTimer: ReturnType<typeof setTimeout>;
+
+      const integrationListener = vscode.window.onDidChangeTerminalShellIntegration(({ terminal: t, shellIntegration }) => {
+        if (t !== terminal) return;
+        integrationListener.dispose();
+        clearTimeout(fallbackTimer);
+        commandSent = true;
+        runViaIntegration(shellIntegration);
+      });
+      this.disposables.push(integrationListener);
+
+      // If shell integration doesn't activate within 2s (fish, cmd, remote shells),
+      // fall back to sendText. The close listener below will capture the exit code.
+      fallbackTimer = setTimeout(() => {
+        integrationListener.dispose();
+        if (!commandSent) {
+          commandSent = true;
+          terminal.sendText(item.command);
+        }
+      }, 2000);
+      this.disposables.push({ dispose: () => clearTimeout(fallbackTimer) });
+    }
+
+    // Fallback: fires when terminal tab is closed (covers non-integrated shells
+    // that went through the sendText path above)
+    const closeListener = vscode.window.onDidCloseTerminal(t => {
+      if (t !== terminal) return;
+      closeListener.dispose();
+      reportStatus(t.exitStatus?.code ?? -1);
+    });
+    this.disposables.push(closeListener);
   }
 
   /* ─── config CRUD (delegates to configService) ─── */
@@ -779,9 +885,13 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     config.actions[index] = {
+      // Spread oldItem first so all original fields are preserved (workspace, backgroundColor, etc.),
+      // then spread newItem to apply edits. Explicit fallbacks handle optional fields the edit form omits.
+      ...oldItem,
       ...newItem,
       group: newItem.group !== undefined ? newItem.group : oldItem.group,
       hidden: newItem.hidden !== undefined ? newItem.hidden : oldItem.hidden,
+      backgroundColor: newItem.backgroundColor !== undefined ? newItem.backgroundColor : oldItem.backgroundColor,
     };
     if (customIcon) {
       await this.saveCustomIconMapping(newItem.type, customIcon);
@@ -806,6 +916,38 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     const target = config.actions.find((i) => i.name === item.name && i.command === item.command);
     if (target) {
       target.hidden = true;
+      await this.configService.writeConfig(config);
+      void this.refresh();
+    }
+  }
+
+  private async deleteAction(item: Action) {
+    const config = await this.configService.readConfig();
+    config.actions = (config.actions || []).filter(
+      (a) => !(a.name === item.name && a.command === item.command && a.type === item.type)
+    );
+    await this.configService.writeConfig(config);
+    void this.refresh();
+  }
+
+  private async handleSetActionColor(item: Action, color: string, applyToPlay: boolean, applyToRow: boolean) {
+    const config = await this.configService.readConfig();
+    const target = config.actions.find((a) => a.name === item.name && a.command === item.command);
+    if (target) {
+      if (applyToPlay) { target.backgroundColor = color || undefined; }
+      if (applyToRow) { target.rowBackgroundColor = color || undefined; }
+      await this.configService.writeConfig(config);
+      void this.refresh();
+    }
+  }
+
+  private async handleSetGroupColor(group: Group, color: string, applyToAccent: boolean, applyToBg: boolean, applyToBorder: boolean) {
+    const config = await this.configService.readConfig();
+    const target = (config.groups || []).find((g) => g.name === group.name);
+    if (target) {
+      if (applyToAccent) { target.color = color || undefined; }
+      if (applyToBg) { target.backgroundColor = color || undefined; }
+      if (applyToBorder) { target.borderColor = color || undefined; }
       await this.configService.writeConfig(config);
       void this.refresh();
     }
@@ -918,6 +1060,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     hideIcon?: string;
     useEmojiLoader?: boolean;
     loaderEmoji?: string;
+    actionToolbar?: string[];
   }) {
     console.log('[View Provider] saveSettings called, showingForm before:', this.showingForm);
     // IMPORTANT: Set showingForm to false BEFORE updating config
@@ -947,6 +1090,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         normalizedEmoji,
         vscode.ConfigurationTarget.Workspace
       );
+    }
+    if (Array.isArray(settings.actionToolbar)) {
+      await cfg.update("display.actionToolbar", settings.actionToolbar, vscode.ConfigurationTarget.Workspace);
     }
     console.log('[ViewProvider] All settings updated, calling refresh');
     void this.refresh();

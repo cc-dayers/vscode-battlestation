@@ -764,6 +764,8 @@ const renderButton = (item: Action) => {
         isDragging ? 'lp-dragging' : '',
         isDragOver && dragOverTop ? 'lp-drag-over-top' : '',
         isDragOver && !dragOverTop ? 'lp-drag-over-bottom' : '',
+        colorPickerOpenFor === actionMenuId ? 'lp-cp-open' : '',
+        isMenuOpen ? 'lp-menu-open' : '',
     ].filter(Boolean).join(' ');
 
     const runEntry = state.runStatus[item.name];
@@ -926,7 +928,7 @@ const renderGroup = (group: Group, actions: Action[]) => {
             <div class="lp-group-header-content">
                 ${group.icon ? html`<span class="codicon codicon-${group.icon} lp-group-icon"></span>` : null}
                 <span class="lp-group-name">${group.name}</span>
-                ${isHiddenGroup ? html`<span class="lp-hidden-badge">(hidden)</span>` : null}
+                ${isHiddenGroup ? html`<span class="lp-hidden-badge"><span class="codicon codicon-eye-closed"></span>hidden</span>` : null}
             </div>
             <span class="lp-group-action-toolbar">
                 <button class="lp-inline-action-btn"

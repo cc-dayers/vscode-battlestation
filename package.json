@@ -2,7 +2,7 @@
   "name": "battlestation",
   "displayName": "Battlestation",
   "description": "A configurable panel with action buttons driven by battle.json",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "cc-dayers",
   "repository": {
     "type": "git",
@@ -220,8 +220,9 @@
     "build": "npm run check-types && node esbuild.js --production",
     "watch": "node --no-deprecation esbuild.js --watch",
     "test": "vscode-test",
-    "test:ui": "node scripts/test-ui-runner.mjs",
+    "test:ui": "playwright test",
     "test:ui-server": "node scripts/serve-ui.js",
+    "test:ui-headed": "playwright test --headed",
     "test:unit": "vscode-test --grep -v \"Manual\"",
     "test:settings": "vscode-test --grep \"Settings\"",
     "test:settings:manual": "vscode-test --grep \"Manual test: Open settings panel\"",
@@ -239,6 +240,7 @@
     "release:tag": "node scripts/release-tag.js"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.11.0",

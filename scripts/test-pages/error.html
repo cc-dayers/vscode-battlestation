@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline' 'unsafe-inline'; font-src 'unsafe-inline'; script-src 'unsafe-inline' 'nonce-test-nonce-12345';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <title>Config Error</title>
+  <style>
+      body {
+        font-family: var(--vscode-font-family);
+        color: var(--vscode-foreground);
+        background: transparent;
+        padding: 20px;
+        margin: 0;
+      }
+      .error-card {
+        border: 1px solid var(--vscode-inputValidation-errorBorder);
+        background: var(--vscode-inputValidation-errorBackground, rgba(255,0,0,0.05));
+        border-radius: 4px;
+        padding: 16px;
+      }
+      .error-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground));
+      }
+      .error-icon::before {
+        content: "\ea87";
+        font-family: codicon;
+        font-size: 16px;
+      }
+      .error-message {
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: 12px;
+        background: var(--vscode-textCodeBlock-background);
+        border-radius: 3px;
+        padding: 10px;
+        margin-bottom: 14px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        color: var(--vscode-foreground);
+        opacity: 0.9;
+      }
+      .error-actions {
+        display: flex;
+        gap: 8px;
+      }
+      button {
+        padding: 5px 12px;
+        font-size: 12px;
+        font-family: var(--vscode-font-family);
+        border-radius: 2px;
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+      .btn-primary {
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+      }
+      .btn-primary:hover { background: var(--vscode-button-hoverBackground); }
+      .btn-secondary {
+        background: var(--vscode-button-secondaryBackground);
+        color: var(--vscode-button-secondaryForeground);
+        border-color: var(--vscode-button-secondaryBackground);
+      }
+      .btn-secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
+    </style>
+
+<script nonce="test-nonce-12345">
+  window.acquireVsCodeApi = () => ({
+    postMessage: (msg) => {
+      const t = document.getElementById('vsc-toast') || document.createElement('div');
+      t.id = 'vsc-toast';
+      t.style = 'position:fixed;bottom:10px;right:10px;background:#0e639c;color:#fff;padding:8px 16px;border-radius:4px;z-index:9999;font-family:sans-serif;font-size:13px';
+      t.innerText = 'COMMAND: ' + JSON.stringify(msg);
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    },
+    getState: () => ({}),
+    setState: () => {}
+  });
+</script>
+</head>
+<body>
+
+      <div class="error-card">
+        <div class="error-header">
+          <span class="error-icon"></span>
+          Config Error
+        </div>
+        <div class="error-message">Unexpected token } in JSON at position 42</div>
+        <div class="error-actions">
+          <button class="btn-primary" id="openConfigBtn">Open battle.json</button>
+          <button class="btn-secondary" id="refreshBtn">Refresh</button>
+        </div>
+      </div>
+    
+<script nonce="test-nonce-12345">
+
+      const vscode = acquireVsCodeApi();
+      document.getElementById('openConfigBtn').addEventListener('click', () => vscode.postMessage({ command: 'openConfig' }));
+      document.getElementById('refreshBtn').addEventListener('click', () => vscode.postMessage({ command: 'refresh' }));
+    
+</script>
+
+</body>
+</html>

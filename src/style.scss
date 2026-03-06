@@ -225,10 +225,6 @@ body {
   color: var(--vscode-foreground);
 }
 
-.lp-group-header.lp-hidden-group {
-  opacity: 0.65;
-}
-
 .lp-group-items {
   display: flex;
   flex-direction: column;
@@ -305,6 +301,17 @@ body {
   opacity: 0.35;
 }
 
+// Raise stacking context when a color picker popout is open on this row
+// so the popout renders above sibling rows (same fix as lp-group-header--picker-open)
+.lp-btn-wrapper.lp-cp-open {
+  z-index: 10;
+}
+
+// Raise stacking context when the ellipsis flyout menu is open on this row
+.lp-btn-wrapper.lp-menu-open {
+  z-index: 10;
+}
+
 .lp-btn-wrapper.lp-drag-over-top {
   box-shadow: 0 -2px 0 0 var(--vscode-focusBorder);
 }
@@ -329,6 +336,13 @@ body {
 
 .lp-btn-wrapper.lp-hidden-item:hover {
   opacity: 0.75;
+}
+
+// When a popup (menu or color picker) is open on a hidden row, restore full opacity
+// so the popup itself is not dimmed — opacity is inherited by all descendants
+.lp-btn-wrapper.lp-hidden-item.lp-menu-open,
+.lp-btn-wrapper.lp-hidden-item.lp-cp-open {
+  opacity: 1;
 }
 
 .lp-btn-checkbox {
@@ -383,9 +397,16 @@ body {
 }
 
 .lp-hidden-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 9px;
-  opacity: 0.5;
   font-weight: normal;
+  color: var(--vscode-descriptionForeground);
+  .codicon {
+    font-size: 11px;
+    line-height: 1;
+  }
 }
 
 .lp-btn-meta {
@@ -2122,5 +2143,6 @@ form {
     min-width: 34px;
     padding: 4px;
     gap: 0;
+    justify-content: center;
   }
 }

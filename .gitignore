@@ -20,6 +20,8 @@ media/output.css
 .vscode-test/
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
 
 # OS files
 .DS_Store

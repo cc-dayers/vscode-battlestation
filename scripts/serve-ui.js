@@ -6,8 +6,10 @@ const port = 3000;
 
 // Mock VS Code API
 const mockVscodeApi = `
+  window.__lastCommand = null;
   window.acquireVsCodeApi = () => ({
     postMessage: (msg) => {
+      window.__lastCommand = msg;
       console.log('VSCode API received message:', msg);
       // add a visual toast so we can see it!
       const toast = document.createElement('div');
@@ -47,9 +49,16 @@ const indexHtml = `
       ${mockVscodeApi}
       window.__INITIAL_DATA__ = {
         actions: [
-          { name: "Build Tool", command: "npm run build", type: "npm" },
-          { name: "Deploy Script", command: "bash ./deploy.sh", type: "shell" },
-          { name: "Test Suite", command: "npm test", type: "npm" }
+          { name: "Build Tool", command: "npm run build", type: "npm", group: "Build" },
+          { name: "Deploy Script", command: "bash ./deploy.sh", type: "shell", group: "Build" },
+          { name: "Test Suite", command: "npm test", type: "npm", group: "Build" },
+          { name: "Hidden Action", command: "echo hidden", type: "shell", hidden: true },
+          { name: "Launch Reports", command: "npm run reports", type: "npm", group: "Launch" },
+          { name: "Launch All", command: "npm run all", type: "npm", group: "Launch" }
+        ],
+        groups: [
+          { name: "Build", icon: "package", color: "#4a90d9" },
+          { name: "Launch", icon: "rocket" }
         ],
         iconMap: { npm: "package", shell: "terminal" },
         display: {
@@ -63,6 +72,7 @@ const indexHtml = `
           useEmojiLoader: false,
           loaderEmoji: '🌯'
         },
+        showHidden: true,
         // Feature 3: test status dots — Build=ok, Deploy=fail, Test=never run
         runStatus: {
           "Build Tool": { exitCode: 0, timestamp: Date.now() - 90000 },

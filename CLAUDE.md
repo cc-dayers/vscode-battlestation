@@ -20,9 +20,9 @@ npm run lint         # Lint TypeScript code
 ### UI Testing Harness
 When working agentically to build or modify UI/Webview features, use the visual test harness:
 ```bash
-npm run test:ui-server  # Starts localhost:3000 to test UI views independently 
+npm run test:ui-server  # Starts localhost:3000 to test UI views independently
 ```
-Instead of writing manual tests or interacting with the host tests, run this server and visually observe changes or rely on browser subagents to click features and verify `postMessage` outputs via toasts.
+Use this for manual visual inspection. For automated verification, write Playwright specs (see Testing Requirements below).
 
 ### Debugging
 - Press **F5** in VS Code to launch Extension Development Host
@@ -35,6 +35,53 @@ Instead of writing manual tests or interacting with the host tests, run this ser
 npm run package  # Create .vsix file for distribution
 npm run publish  # Publish to VS Code Marketplace (requires publisher credentials)
 ```
+
+## Testing Requirements
+
+**A feature or bug fix is not complete until tests are written and passing.** This is non-negotiable.
+
+### Two layers of tests are required
+
+| Layer | Tool | Location | Covers |
+|---|---|---|---|
+| Unit / integration | `vscode-test` (Mocha) | `src/test/suite/` | Extension host logic, config service, HTML rendering |
+| E2E / UI | Playwright (`@playwright/test`) | `tests/*.spec.ts` | Real browser interactions against the live webview |
+
+### Running tests
+```bash
+npm run test:unit   # VS Code extension host tests (Mocha)
+npm run test:ui     # Playwright E2E suite (auto-starts UI server)
+npm run test:ui-server  # Start UI server for manual inspection
+```
+
+### Playwright specs — how to write them
+
+- Tests live in `tests/` and use the `@playwright/test` framework.
+- The `playwright.config.ts` auto-starts `scripts/serve-ui.js` as a web server before the suite runs.
+- Use `test.describe.configure({ mode: 'serial' })` + a shared `beforeAll` page when tests are sequential state changes.
+- The mock `acquireVsCodeApi` in `serve-ui.js` writes every `postMessage` to `window.__lastCommand` — assert on that to verify dispatched commands.
+- Trigger messages to the webview via:
+  ```js
+  await page.evaluate(() => {
+    window.dispatchEvent(new MessageEvent('message', { data: { command: '...', ... } }));
+  });
+  ```
+- The trigger buttons (`lp-menu-trigger--action`) start at `opacity:0`; open menus via synthetic `dispatchEvent` rather than Playwright's `.click()` to avoid actionability timeouts.
+
+### What to test in Playwright vs unit tests
+
+**Playwright** (interaction + rendering):
+- Clicking a play/hide/edit button dispatches the right `postMessage` command
+- Search filters the visible action list; no-results state appears on zero matches
+- Group collapse/expand toggles action visibility
+- Menus are visually on top (use `document.elementFromPoint` to verify stacking)
+- Hidden items show/hide based on `showHidden` state
+
+**Unit tests** (pure logic — no browser needed):
+- Config read/write round-trips
+- HTML rendering output of view functions
+- ConfigService scanning methods
+- Architecture assertions (CSS class names, shared helpers)
 
 ## Architecture Overview
 

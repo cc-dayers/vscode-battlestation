@@ -3,7 +3,7 @@ body {
   font-family: var(--vscode-font-family);
   color: var(--vscode-foreground);
   background: transparent;
-  padding: 8px;
+  padding: 0px 0px 4px 0px;
   margin: 0;
   overflow-x: hidden;
 }
@@ -15,7 +15,7 @@ body {
 .lp-grid {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   animation: lp-grid-fade-in 80ms ease-out;
 }
 
@@ -55,8 +55,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  padding: 4px 8px 4px 6px;
+  gap: 4px;
+  padding: 4px 0;
   margin-bottom: 2px;
   font-size: 11px;
   font-weight: 600;
@@ -206,6 +206,13 @@ body {
   background: var(--vscode-list-hoverBackground);
 }
 
+.lp-menu-item--action:disabled,
+.lp-menu-item--group:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
 .lp-flyout-item:focus-visible,
 .lp-group-flyout-item:focus-visible,
 .lp-menu-item--group:focus-visible,
@@ -228,7 +235,8 @@ body {
 .lp-group-items {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  padding-left: 5px;
 }
 
 .lp-btn-wrapper {
@@ -250,55 +258,175 @@ body {
 
 /* ─── Drag-and-drop reorder ─── */
 
-.lp-drag-handle {
-  width: 20px;
-  flex: 0 0 20px;
-  align-self: stretch;
+// Shared base for both action and group drag handles.
+// Width is always reserved — at rest it reads as natural left margin.
+// The gripper only materialises on interaction.
+.lp-drag-handle,
+.lp-group-drag-handle {
+  flex: 0 0 12px;
+  width: 12px;
   padding: 0;
-  border: 1px solid var(--lp-action-border);
-  border-right: none;
-  // border-radius: 4px 0 0 4px;
+  border: none;
   background: transparent;
   color: var(--vscode-foreground);
-  opacity: 1;
   cursor: grab;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
   flex-shrink: 0;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
+  align-self: stretch;
+
+  .codicon {
+    opacity: 0;
+    transform: scale(0.8);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
 }
 
-.lp-drag-handle .codicon {
-  opacity: 0;
-  transition: opacity 0.15s ease;
+// .lp-drag-handle is no longer rendered in normal mode — only .lp-reorder-handle
+// (which replaces the play button) is used during reorder mode.
+
+/* ─── Reorder mode ─── */
+
+// Sticky banner shown while reorder mode is active
+.lp-reorder-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  background: color-mix(in srgb, var(--vscode-focusBorder) 12%, var(--vscode-editor-background));
+  border: 1px solid color-mix(in srgb, var(--vscode-focusBorder) 35%, transparent);
+  border-radius: 4px;
+  font-size: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 6;
 }
 
-.lp-drag-handle:active {
-  cursor: grabbing;
+.lp-reorder-banner-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.8;
+  .codicon { font-size: 14px; }
 }
 
-.lp-btn-wrapper:hover .lp-drag-handle {
-  background: var(--vscode-button-secondaryBackground);
+.lp-reorder-banner-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 3px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+
+  &:hover { background: var(--vscode-button-hoverBackground); }
+  .codicon { font-size: 12px; }
 }
 
-.lp-btn-wrapper:hover .lp-drag-handle .codicon {
-  opacity: 0.7;
+// The drag zone that replaces the play button in reorder mode
+.lp-reorder-handle {
+  width: 36px;
+  max-width: 36px;
+  flex: 0 0 36px;
+  align-self: stretch;
+  padding: 0;
+  border: 1px solid var(--lp-action-border);
+  border-right: none;
+  border-radius: 4px 0 0 4px;
+  background: color-mix(in srgb, var(--vscode-focusBorder) 8%, var(--vscode-button-secondaryBackground));
+  color: var(--vscode-foreground);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+
+  .codicon {
+    opacity: 0.45;
+    transition: opacity 0.1s ease;
+  }
+
+  &:hover .codicon {
+    opacity: 1;
+    color: var(--vscode-focusBorder);
+  }
+
+  &:active {
+    cursor: grabbing;
+    .codicon { opacity: 1; color: var(--vscode-focusBorder); }
+  }
 }
 
-.lp-drag-handle:hover {
-  background: var(--vscode-button-hoverBackground);
+// Rows in reorder mode: grab cursor on the label area too
+.lp-reorder-mode-row .lp-btn {
+  cursor: grab;
+  &:active { cursor: grabbing; }
 }
 
-.lp-drag-handle:hover .codicon {
+// Row/header hover: gripper emerges in the margin space
+.lp-btn-wrapper:hover .lp-drag-handle .codicon,
+.lp-group-header:hover .lp-group-drag-handle .codicon {
+  opacity: 0.45;
+  transform: scale(1);
+}
+
+// Direct handle hover: full brightness + accent tint
+.lp-drag-handle:hover .codicon,
+.lp-group-drag-handle:hover .codicon {
   opacity: 1;
+  transform: scale(1);
+  color: var(--vscode-focusBorder, inherit);
 }
 
+// Active grab: accent color snaps on
+.lp-drag-handle:active .codicon,
+.lp-group-drag-handle:active .codicon {
+  color: var(--vscode-focusBorder, inherit);
+  opacity: 1;
+  transform: scale(1);
+}
+
+// Hovering the drag handle highlights the entire container with a subtle accent ring
+// and dissolves the card's own borders so the ring is the sole boundary.
+// outline-offset: -1px draws inside the element to avoid clipping by overflow-x: hidden.
+.lp-btn-wrapper:has(.lp-drag-handle:hover) {
+  outline: 1px solid color-mix(in srgb, var(--vscode-focusBorder) 40%, transparent);
+  outline-offset: -1px;
+  border-radius: 4px;
+
+  .lp-play-btn,
+  .lp-btn {
+    border-color: transparent;
+  }
+}
+
+.lp-group-header:has(.lp-group-drag-handle:hover) {
+  outline: 1px solid color-mix(in srgb, var(--vscode-focusBorder) 40%, transparent);
+  outline-offset: -1px;
+  border-bottom-color: transparent;
+}
+
+// Dragging row: dimmed enough to feel "lifted" but still readable as context
 .lp-btn-wrapper.lp-dragging {
-  opacity: 0.35;
+  opacity: 0.4;
+}
+
+// Dragging group: same lifted treatment
+.lp-group.lp-dragging-group {
+  opacity: 0.4;
 }
 
 // Raise stacking context when a color picker popout is open on this row
@@ -312,17 +440,35 @@ body {
   z-index: 10;
 }
 
+// Drop-target insertion line: thick, full-color, unmissable
 .lp-btn-wrapper.lp-drag-over-top {
-  box-shadow: 0 -2px 0 0 var(--vscode-focusBorder);
+  box-shadow:
+    0 -3px 0 0 var(--vscode-focusBorder),
+    0 -8px 16px -2px color-mix(in srgb, var(--vscode-focusBorder) 70%, transparent);
 }
 
 .lp-btn-wrapper.lp-drag-over-bottom {
-  box-shadow: 0 2px 0 0 var(--vscode-focusBorder);
+  box-shadow:
+    0 3px 0 0 var(--vscode-focusBorder),
+    0 8px 16px -2px color-mix(in srgb, var(--vscode-focusBorder) 70%, transparent);
 }
 
 .lp-group-header.lp-drag-over-group {
   outline: 2px solid var(--vscode-focusBorder);
+  box-shadow: 0 0 14px -2px color-mix(in srgb, var(--vscode-focusBorder) 60%, transparent);
   border-radius: 3px;
+}
+
+.lp-group.lp-drag-over-top-group > summary {
+  box-shadow:
+    0 -3px 0 0 var(--vscode-focusBorder),
+    0 -8px 16px -2px color-mix(in srgb, var(--vscode-focusBorder) 70%, transparent);
+}
+
+.lp-group.lp-drag-over-bottom-group > summary {
+  box-shadow:
+    0 3px 0 0 var(--vscode-focusBorder),
+    0 8px 16px -2px color-mix(in srgb, var(--vscode-focusBorder) 70%, transparent);
 }
 
 .lp-btn-wrapper.lp-hidden-item {
@@ -368,7 +514,7 @@ body {
   border: 1px solid var(--lp-action-border);
   border-left: none;
   border-radius: 0 4px 4px 0;
-  background: var(--vscode-button-secondaryBackground);
+  background: var(--lp-row-bg, var(--vscode-button-secondaryBackground));
   color: var(--vscode-button-secondaryForeground);
   text-align: left;
   font-family: inherit;
@@ -377,7 +523,7 @@ body {
 }
 
 .lp-btn-wrapper > .lp-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--lp-row-bg, var(--vscode-button-secondaryHoverBackground));
 }
 
 .lp-btn-name {
@@ -430,8 +576,8 @@ body {
 .lp-btn-wrapper:hover .lp-action-toolbar {
   background: linear-gradient(
     to right,
-    color-mix(in srgb, var(--vscode-button-secondaryHoverBackground) 0%, transparent),
-    var(--vscode-button-secondaryHoverBackground) 28px
+    color-mix(in srgb, var(--lp-row-bg, var(--vscode-button-secondaryHoverBackground)) 0%, transparent),
+    var(--lp-row-bg, var(--vscode-button-secondaryHoverBackground)) 28px
   );
 }
 
@@ -530,19 +676,27 @@ body {
 // Color picker popout panel
 .lp-cp-popout {
   position: absolute;
-  top: calc(100% + 6px);
+  top: 100%;
   right: 0;
   z-index: 200;
-  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-  border: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.35));
-  border-radius: 6px;
+  margin-top: 5px;
+  background: var(--vscode-editor-background, #1e1e1e);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-top: 2px solid var(--vscode-focusBorder, rgba(255,255,255,0.14));
+  border-radius: 8px;
   padding: 10px;
-  width: 210px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+  width: 224px;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.55),
+    0 6px 16px rgba(0,0,0,0.5),
+    0 20px 40px rgba(0,0,0,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.05);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
+
+// ── Swatches ─────────────────────────────────────────────────────────────────
 
 .lp-cp-swatches {
   display: grid;
@@ -553,63 +707,94 @@ body {
 .lp-cp-swatch {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 4px;
-  border: 2px solid transparent;
+  border-radius: 5px;
+  border: none;
   cursor: pointer;
   padding: 0;
-  transition: transform 0.1s, border-color 0.1s;
+  transition: transform 0.1s, box-shadow 0.1s;
+  position: relative;
 
-  &:hover { transform: scale(1.15); border-color: rgba(255,255,255,0.4); }
-  &.lp-cp-swatch--active { border-color: var(--vscode-focusBorder, #007fd4) !important; transform: scale(1.1); }
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.55), 0 2px 6px rgba(0,0,0,0.45);
+    z-index: 1;
+  }
+
+  &.lp-cp-swatch--active {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 2.5px #fff, 0 0 0 4px rgba(0,0,0,0.4) !important;
+    z-index: 1;
+  }
 }
 
 .lp-cp-swatch--clear {
   background: transparent !important;
-  border-color: rgba(128,128,128,0.4) !important;
-  color: var(--vscode-foreground);
+  border: 1px dashed rgba(255,255,255,0.2) !important;
+  color: rgba(255,255,255,0.35);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 12px;
+
+  &:hover {
+    color: rgba(255,255,255,0.65);
+    box-shadow: none !important;
+    border-color: rgba(255,255,255,0.45) !important;
+    transform: none;
+  }
 }
+
+// ── Hex input row ─────────────────────────────────────────────────────────────
 
 .lp-cp-custom-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  padding: 4px 6px;
+  background: rgba(0,0,0,0.22);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 5px;
 }
 
 .lp-cp-preview {
-  width: 22px;
-  height: 22px;
-  border-radius: 3px;
-  border: 1px solid rgba(128,128,128,0.4);
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.22);
   flex-shrink: 0;
 }
 
 .lp-cp-text {
   flex: 1;
-  height: 22px;
-  padding: 0 4px;
+  height: 19px;
+  padding: 0 2px;
   font-size: 11px;
-  background: var(--vscode-input-background);
-  color: var(--vscode-input-foreground);
-  border: 1px solid var(--vscode-input-border, rgba(128,128,128,0.35));
-  border-radius: 3px;
+  font-family: var(--vscode-editor-font-family, 'Consolas', monospace);
+  letter-spacing: 0.02em;
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: none;
+  outline: none;
   min-width: 0;
+
+  &::placeholder { opacity: 0.28; font-family: var(--vscode-font-family, sans-serif); }
 }
 
 .lp-cp-native-wrap {
   position: relative;
-  width: 22px;
-  height: 22px;
+  width: 19px;
+  height: 19px;
   flex-shrink: 0;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(128,128,128,0.35);
-  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  opacity: 0.5;
+  transition: opacity 0.1s;
+
+  &:hover { opacity: 1; }
 
   input[type="color"] {
     position: absolute;
@@ -621,29 +806,133 @@ body {
     padding: 0;
   }
 
-  .codicon { font-size: 13px; pointer-events: none; }
+  .codicon { font-size: 11px; pointer-events: none; }
 }
+
+// ── Harmonies ─────────────────────────────────────────────────────────────────
+
+.lp-cp-harmonies-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lp-cp-harmonies-label {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.38;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.lp-cp-harmonies {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.lp-cp-swatch--sm {
+  width: 100%;
+  flex: 1;
+  aspect-ratio: 1;
+}
+
+// ── VSCode theme colors accordion ─────────────────────────────────────────────
+
+.lp-cp-theme-section {
+  margin: 0;
+}
+
+.lp-cp-theme-section[open] .lp-cp-theme-chevron {
+  transform: rotate(90deg);
+}
+
+.lp-cp-theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.42;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  padding: 1px 0;
+
+  &::-webkit-details-marker { display: none; }
+  &:hover { opacity: 0.72; }
+}
+
+.lp-cp-theme-chevron {
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+
+.lp-cp-theme-swatches {
+  margin-top: 6px;
+}
+
+// ── Apply-to targets (horizontal pill toggles) ────────────────────────────────
 
 .lp-cp-targets {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-top: 2px;
-  border-top: 1px solid rgba(128,128,128,0.2);
+  align-items: center;
+  gap: 5px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+.lp-cp-targets-hd {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.36;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.lp-cp-target-btns {
+  display: flex;
+  gap: 3px;
+  flex: 1;
 }
 
 .lp-cp-target-label {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
+  justify-content: center;
+  gap: 3px;
+  font-size: 10px;
   color: var(--vscode-foreground);
   cursor: pointer;
-  opacity: 0.85;
   user-select: none;
+  padding: 2px 0;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  opacity: 0.48;
+  transition: opacity 0.1s, background 0.1s, border-color 0.1s;
+  flex: 1;
+  white-space: nowrap;
 
-  input[type="checkbox"] { cursor: pointer; margin: 0; }
-  &:hover { opacity: 1; }
+  // Hide native checkbox
+  input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+
+  &:hover { opacity: 0.78; border-color: rgba(255,255,255,0.16); }
+
+  // Active / checked state
+  &:has(input:checked) {
+    opacity: 1;
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.22);
+  }
 }
 
 .lp-status-dot {
@@ -681,7 +970,7 @@ body {
   border: 1px solid var(--lp-action-border);
   border-right: none;
   border-radius: 4px 0 0 4px;
-  background: var(--lp-play-btn-bg, transparent);
+  background: var(--lp-play-btn-bg, var(--vscode-button-secondaryBackground));
   color: var(--vscode-foreground);
   cursor: pointer;
   display: flex;

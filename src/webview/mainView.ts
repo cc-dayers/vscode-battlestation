@@ -125,19 +125,44 @@ const state = new Proxy(startState, {
 let dragSrcAction: Action | null = null;
 let dragOverAction: Action | null = null;
 let dragOverTop = true; // true = insert before target, false = insert after
-let dragOverGroupName: string | null = null; // group header being hovered during drag
+let dragOverGroupName: string | null = null; // group header being hovered during action drag
+
+// Group drag-and-drop reorder state
+let dragSrcGroup: Group | null = null;
+let dragOverGroup: Group | null = null;
+let dragOverGroupTop = true; // true = insert before target, false = insert after
 
 // Color picker popout state
 let colorPickerOpenFor: string | null = null; // actionMenuId of the open picker
 let colorPickerColor = '';
-let colorPickerApplyToPlay = true;
-let colorPickerApplyToRow = false;
+let colorPickerApplyToPlay = false;
+let colorPickerApplyToRow = true;
+let colorPickerThemeExpanded = false;
 
 // Group color picker state
 let groupColorPickerOpenFor: string | null = null;
 let groupColorPickerApplyToAccent = true;
 let groupColorPickerApplyToBg = false;
 let groupColorPickerApplyToBorder = false;
+
+// Reorder mode (transient UI state — not persisted)
+let reorderMode = false;
+
+const enterReorderMode = () => {
+    closeActionMenu();
+    colorPickerOpenFor = null;
+    groupColorPickerOpenFor = null;
+    reorderMode = true;
+    requestRender();
+};
+
+const exitReorderMode = () => {
+    dragSrcAction = null;
+    dragOverAction = null;
+    dragOverGroupName = null;
+    reorderMode = false;
+    requestRender();
+};
 
 const handleDragStart = (e: DragEvent, item: Action) => {
     dragSrcAction = item;
@@ -209,14 +234,59 @@ const handleDrop = (e: DragEvent, item: Action) => {
     vscode.postMessage({ command: 'reorderActions', actions: newActions });
 };
 
+const moveAction = (item: Action, direction: 'up' | 'down') => {
+    const actions = [...state.actions];
+    const idx = actions.indexOf(item);
+    if (direction === 'up' && idx <= 0) return;
+    if (direction === 'down' && idx >= actions.length - 1) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    [actions[idx], actions[swapIdx]] = [actions[swapIdx], actions[idx]];
+    state.actions = actions;
+    vscode.postMessage({ command: 'reorderActions', actions });
+};
+
 const handleDragEnd = () => {
     dragSrcAction = null;
     dragOverAction = null;
     dragOverGroupName = null;
+    dragSrcGroup = null;
+    dragOverGroup = null;
+    requestRender();
+};
+
+const handleGroupDragStart = (e: DragEvent, group: Group) => {
+    dragSrcGroup = group;
+    e.dataTransfer!.effectAllowed = 'move';
+    const summary = (e.currentTarget as HTMLElement).closest('.lp-group-header') as HTMLElement;
+    if (summary) {
+        const rect = summary.getBoundingClientRect();
+        e.dataTransfer!.setDragImage(summary, e.clientX - rect.left, e.clientY - rect.top);
+    }
+    setTimeout(() => requestRender(), 0);
+};
+
+const handleGroupDragEnd = () => {
+    dragSrcGroup = null;
+    dragOverGroup = null;
     requestRender();
 };
 
 const handleDragOverGroupHeader = (e: DragEvent, group: Group) => {
+    if (dragSrcGroup) {
+        if (dragSrcGroup === group) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer!.dropEffect = 'move';
+        const target = e.currentTarget as HTMLElement;
+        const rect = target.getBoundingClientRect();
+        const top = e.clientY < rect.top + rect.height / 2;
+        if (dragOverGroup !== group || dragOverGroupTop !== top) {
+            dragOverGroup = group;
+            dragOverGroupTop = top;
+            requestRender();
+        }
+        return;
+    }
     if (!dragSrcAction) return;
     e.preventDefault();
     e.stopPropagation();
@@ -229,6 +299,15 @@ const handleDragOverGroupHeader = (e: DragEvent, group: Group) => {
 };
 
 const handleDragLeaveGroupHeader = (e: DragEvent, group: Group) => {
+    if (dragSrcGroup) {
+        const related = e.relatedTarget as HTMLElement | null;
+        const wrapper = e.currentTarget as HTMLElement;
+        if (!wrapper.contains(related) && dragOverGroup === group) {
+            dragOverGroup = null;
+            requestRender();
+        }
+        return;
+    }
     if (dragOverGroupName !== group.name) return;
     dragOverGroupName = null;
     requestRender();
@@ -237,6 +316,29 @@ const handleDragLeaveGroupHeader = (e: DragEvent, group: Group) => {
 const handleDropOnGroupHeader = (e: DragEvent, group: Group) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (dragSrcGroup) {
+        if (dragSrcGroup === group) return;
+        const groups = [...state.groups];
+        const src = dragSrcGroup;
+        const srcIdx = groups.findIndex(g => g === src);
+        const tgtIdx = groups.findIndex(g => g === group);
+        if (srcIdx === -1 || tgtIdx === -1) {
+            dragSrcGroup = null;
+            dragOverGroup = null;
+            return;
+        }
+        const [removed] = groups.splice(srcIdx, 1);
+        const adjustedTgt = groups.findIndex(g => g === group);
+        const insertIdx = dragOverGroupTop ? adjustedTgt : adjustedTgt + 1;
+        groups.splice(insertIdx, 0, removed);
+        dragSrcGroup = null;
+        dragOverGroup = null;
+        state.groups = groups;
+        vscode.postMessage({ command: 'reorderGroups', groups });
+        return;
+    }
+
     const src = dragSrcAction;
     if (!src) return;
 
@@ -290,8 +392,8 @@ const setActionColor = (item: Action, menuId: string) => {
         colorPickerOpenFor = null;
     } else {
         colorPickerOpenFor = menuId;
-        colorPickerApplyToPlay = true;
-        colorPickerApplyToRow = !!item.rowBackgroundColor;
+        colorPickerApplyToRow = true;
+        colorPickerApplyToPlay = !!item.backgroundColor;
     }
     renderView();
 };
@@ -517,42 +619,45 @@ const renderGroupColorPickerPopout = (group: Group) => {
                 </label>
             </div>
             <div class="lp-cp-targets">
-                <label class="lp-cp-target-label">
-                    <input type="checkbox" .checked=${groupColorPickerApplyToAccent}
-                        @change=${(e: Event) => {
-                            groupColorPickerApplyToAccent = (e.target as HTMLInputElement).checked;
-                            if (groupColorPickerApplyToAccent) {
-                                if (currentColor) applyNow(currentColor);
-                            } else {
-                                vscode.postMessage({ command: "setGroupColor", group, color: '', applyToAccent: true, applyToBg: false, applyToBorder: false });
-                            }
-                        }}>
-                    Header accent
-                </label>
-                <label class="lp-cp-target-label">
-                    <input type="checkbox" .checked=${groupColorPickerApplyToBg}
-                        @change=${(e: Event) => {
-                            groupColorPickerApplyToBg = (e.target as HTMLInputElement).checked;
-                            if (groupColorPickerApplyToBg) {
-                                if (currentColor) applyNow(currentColor);
-                            } else {
-                                vscode.postMessage({ command: "setGroupColor", group, color: '', applyToAccent: false, applyToBg: true, applyToBorder: false });
-                            }
-                        }}>
-                    Items background
-                </label>
-                <label class="lp-cp-target-label">
-                    <input type="checkbox" .checked=${groupColorPickerApplyToBorder}
-                        @change=${(e: Event) => {
-                            groupColorPickerApplyToBorder = (e.target as HTMLInputElement).checked;
-                            if (groupColorPickerApplyToBorder) {
-                                if (currentColor) applyNow(currentColor);
-                            } else {
-                                vscode.postMessage({ command: "setGroupColor", group, color: '', applyToAccent: false, applyToBg: false, applyToBorder: true });
-                            }
-                        }}>
-                    Border accent
-                </label>
+                <span class="lp-cp-targets-hd">Apply to</span>
+                <div class="lp-cp-target-btns">
+                    <label class="lp-cp-target-label">
+                        <input type="checkbox" .checked=${groupColorPickerApplyToAccent}
+                            @change=${(e: Event) => {
+                                groupColorPickerApplyToAccent = (e.target as HTMLInputElement).checked;
+                                if (groupColorPickerApplyToAccent) {
+                                    if (currentColor) applyNow(currentColor);
+                                } else {
+                                    vscode.postMessage({ command: "setGroupColor", group, color: '', applyToAccent: true, applyToBg: false, applyToBorder: false });
+                                }
+                            }}>
+                        Accent
+                    </label>
+                    <label class="lp-cp-target-label">
+                        <input type="checkbox" .checked=${groupColorPickerApplyToBg}
+                            @change=${(e: Event) => {
+                                groupColorPickerApplyToBg = (e.target as HTMLInputElement).checked;
+                                if (groupColorPickerApplyToBg) {
+                                    if (currentColor) applyNow(currentColor);
+                                } else {
+                                    vscode.postMessage({ command: "setGroupColor", group, color: '', applyToAccent: false, applyToBg: true, applyToBorder: false });
+                                }
+                            }}>
+                        BG
+                    </label>
+                    <label class="lp-cp-target-label">
+                        <input type="checkbox" .checked=${groupColorPickerApplyToBorder}
+                            @change=${(e: Event) => {
+                                groupColorPickerApplyToBorder = (e.target as HTMLInputElement).checked;
+                                if (groupColorPickerApplyToBorder) {
+                                    if (currentColor) applyNow(currentColor);
+                                } else {
+                                    vscode.postMessage({ command: "setGroupColor", group, color: '', applyToAccent: false, applyToBg: false, applyToBorder: true });
+                                }
+                            }}>
+                        Border
+                    </label>
+                </div>
             </div>
         </div>
     `;
@@ -648,6 +753,19 @@ const renderFlyoutMenu = (config: FlyoutRenderConfig) => {
     `;
 };
 
+// Curated dark-friendly row background presets
+const ROW_BG_PRESETS = [
+    { name: "Forest",  value: "#162d1e" },
+    { name: "Ocean",   value: "#0e1e30" },
+    { name: "Dusk",    value: "#1e1030" },
+    { name: "Ember",   value: "#2e160a" },
+    { name: "Slate",   value: "#141e28" },
+    { name: "Olive",   value: "#1e2210" },
+    { name: "Teal",    value: "#0e2828" },
+    { name: "Crimson", value: "#2e0e0e" },
+];
+
+// VSCode theme colors (shown in collapsible section)
 const THEME_COLORS = [
     { name: "Red",      value: "var(--vscode-charts-red)" },
     { name: "Orange",   value: "var(--vscode-charts-orange)" },
@@ -662,8 +780,53 @@ const THEME_COLORS = [
     { name: "Success",  value: "var(--vscode-testing-iconPassed)" },
 ];
 
+// Derive 4 harmonious row-background colors from a hex value using HSL rotation
+const hexToHsl = (hex: string): [number, number, number] | null => {
+    const m = hex.match(/^#([0-9a-f]{6})$/i);
+    if (!m) return null;
+    let r = parseInt(m[1].slice(0,2), 16) / 255;
+    let g = parseInt(m[1].slice(2,4), 16) / 255;
+    let b = parseInt(m[1].slice(4,6), 16) / 255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min;
+    let h = 0, s = 0;
+    const l = (max + min) / 2;
+    if (d > 0) {
+        s = d / (l > 0.5 ? 2 - max - min : max + min);
+        h = max === r ? (g - b) / d + (g < b ? 6 : 0) :
+            max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+        h /= 6;
+    }
+    return [h * 360, s * 100, l * 100];
+};
+
+const hslToHex = (h: number, s: number, l: number): string => {
+    h /= 360; s /= 100; l /= 100;
+    const f = (n: number) => {
+        const k = (n + h * 12) % 12;
+        const a = s * Math.min(l, 1 - l);
+        return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    };
+    return '#' + [f(0), f(8), f(4)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
+};
+
+const deriveHarmonies = (hex: string): string[] => {
+    const hsl = hexToHsl(hex);
+    if (!hsl) return [];
+    const [h, s, l] = hsl;
+    // Clamp to dark, muted range appropriate for row backgrounds
+    const rs = Math.max(Math.min(s, 65), 25);
+    const rl = Math.max(Math.min(l, 32), 8);
+    return [
+        hslToHex((h + 30) % 360, rs, rl),
+        hslToHex((h - 30 + 360) % 360, rs, rl),
+        hslToHex((h + 150) % 360, rs, rl),
+        hslToHex((h + 180) % 360, rs, rl),
+    ];
+};
+
 const renderColorPickerPopout = (item: Action, menuId: string) => {
-    const currentColor = item.backgroundColor || '';
+    const currentColor = item.rowBackgroundColor || item.backgroundColor || '';
+    const harmonies = currentColor.startsWith('#') ? deriveHarmonies(currentColor) : [];
 
     const applyNow = (color: string) => {
         vscode.postMessage({ command: "setActionColor", item, color, applyToPlay: colorPickerApplyToPlay, applyToRow: colorPickerApplyToRow });
@@ -679,7 +842,7 @@ const renderColorPickerPopout = (item: Action, menuId: string) => {
     return html`
         <div class="lp-cp-popout" @click=${(e: Event) => e.stopPropagation()}>
             <div class="lp-cp-swatches">
-                ${THEME_COLORS.map(c => html`
+                ${ROW_BG_PRESETS.map(c => html`
                     <button class="lp-cp-swatch ${currentColor === c.value ? 'lp-cp-swatch--active' : ''}"
                         style="background:${c.value}" title=${c.name}
                         @click=${() => applyNow(c.value)}></button>
@@ -689,6 +852,18 @@ const renderColorPickerPopout = (item: Action, menuId: string) => {
                     <span class="codicon codicon-circle-slash"></span>
                 </button>
             </div>
+            ${harmonies.length ? html`
+                <div class="lp-cp-harmonies-row">
+                    <span class="lp-cp-harmonies-label">Harmonies</span>
+                    <div class="lp-cp-harmonies">
+                        ${harmonies.map(c => html`
+                            <button class="lp-cp-swatch lp-cp-swatch--sm ${currentColor === c ? 'lp-cp-swatch--active' : ''}"
+                                style="background:${c}" title=${c}
+                                @click=${() => applyNow(c)}></button>
+                        `)}
+                    </div>
+                </div>
+            ` : null}
             <div class="lp-cp-custom-row">
                 <div class="lp-cp-preview" style="background:${currentColor || 'transparent'}"></div>
                 <input class="lp-cp-text" type="text" placeholder="#hex or var(--color)"
@@ -700,31 +875,48 @@ const renderColorPickerPopout = (item: Action, menuId: string) => {
                     <span class="codicon codicon-color-mode"></span>
                 </label>
             </div>
+            <details class="lp-cp-theme-section" .open=${colorPickerThemeExpanded}
+                @toggle=${(e: Event) => { colorPickerThemeExpanded = (e.target as HTMLDetailsElement).open; }}>
+                <summary class="lp-cp-theme-toggle">
+                    <span class="codicon codicon-chevron-right lp-cp-theme-chevron"></span>
+                    VSCode theme colors
+                </summary>
+                <div class="lp-cp-swatches lp-cp-theme-swatches">
+                    ${THEME_COLORS.map(c => html`
+                        <button class="lp-cp-swatch ${currentColor === c.value ? 'lp-cp-swatch--active' : ''}"
+                            style="background:${c.value}" title=${c.name}
+                            @click=${() => applyNow(c.value)}></button>
+                    `)}
+                </div>
+            </details>
             <div class="lp-cp-targets">
-                <label class="lp-cp-target-label">
-                    <input type="checkbox" .checked=${colorPickerApplyToPlay}
-                        @change=${(e: Event) => {
-                            colorPickerApplyToPlay = (e.target as HTMLInputElement).checked;
-                            if (colorPickerApplyToPlay) {
-                                if (currentColor) applyNow(currentColor);
-                            } else {
-                                vscode.postMessage({ command: "setActionColor", item, color: '', applyToPlay: true, applyToRow: false });
-                            }
-                        }}>
-                    Play button
-                </label>
-                <label class="lp-cp-target-label">
-                    <input type="checkbox" .checked=${colorPickerApplyToRow}
-                        @change=${(e: Event) => {
-                            colorPickerApplyToRow = (e.target as HTMLInputElement).checked;
-                            if (colorPickerApplyToRow) {
-                                if (currentColor) applyNow(currentColor);
-                            } else {
-                                vscode.postMessage({ command: "setActionColor", item, color: '', applyToPlay: false, applyToRow: true });
-                            }
-                        }}>
-                    Row background
-                </label>
+                <span class="lp-cp-targets-hd">Apply to</span>
+                <div class="lp-cp-target-btns">
+                    <label class="lp-cp-target-label">
+                        <input type="checkbox" .checked=${colorPickerApplyToPlay}
+                            @change=${(e: Event) => {
+                                colorPickerApplyToPlay = (e.target as HTMLInputElement).checked;
+                                if (colorPickerApplyToPlay) {
+                                    if (currentColor) applyNow(currentColor);
+                                } else {
+                                    vscode.postMessage({ command: "setActionColor", item, color: '', applyToPlay: true, applyToRow: false });
+                                }
+                            }}>
+                        <span class="codicon codicon-play"></span>Play
+                    </label>
+                    <label class="lp-cp-target-label">
+                        <input type="checkbox" .checked=${colorPickerApplyToRow}
+                            @change=${(e: Event) => {
+                                colorPickerApplyToRow = (e.target as HTMLInputElement).checked;
+                                if (colorPickerApplyToRow) {
+                                    if (currentColor) applyNow(currentColor);
+                                } else {
+                                    vscode.postMessage({ command: "setActionColor", item, color: '', applyToPlay: false, applyToRow: true });
+                                }
+                            }}>
+                        Row bg
+                    </label>
+                </div>
             </div>
         </div>
     `;
@@ -766,6 +958,7 @@ const renderButton = (item: Action) => {
         isDragOver && !dragOverTop ? 'lp-drag-over-bottom' : '',
         colorPickerOpenFor === actionMenuId ? 'lp-cp-open' : '',
         isMenuOpen ? 'lp-menu-open' : '',
+        reorderMode ? 'lp-reorder-mode-row' : '',
     ].filter(Boolean).join(' ');
 
     const runEntry = state.runStatus[item.name];
@@ -789,7 +982,8 @@ const renderButton = (item: Action) => {
     const ellipsisStaticBtns = (Object.keys(staticBtnDefs) as string[])
         .filter(id => !toolbar.includes(id))
         .map(id => ({ id, ...staticBtnDefs[id] }));
-    const hasEllipsisContent = ellipsisStaticBtns.length > 0 || showGroupActions;
+    const canReorder = !state.searchQuery;
+    const hasEllipsisContent = !reorderMode && (ellipsisStaticBtns.length > 0 || showGroupActions || canReorder);
 
     return html`
     <div class=${wrapperClass}
@@ -802,20 +996,22 @@ const renderButton = (item: Action) => {
             else state.selectedItems = state.selectedItems.filter(i => i !== item);
         }}>` : null}
 
+        ${reorderMode ? html`
+        <button class="lp-reorder-handle" draggable="true"
+            title="Drag to reorder"
+            aria-label=${`Drag ${item.name} to reorder`}
+            @dragstart=${(e: DragEvent) => handleDragStart(e, item)}
+            @dragend=${handleDragEnd}>
+            <span class="codicon codicon-gripper"></span>
+        </button>` : html`
         <button
             class="lp-play-btn"
-            style="--lp-play-btn-bg: ${item.backgroundColor || display.playButtonBg}"
+            style=${item.backgroundColor ? `--lp-play-btn-bg: ${item.backgroundColor}` : display.playButtonBg && display.playButtonBg !== 'transparent' ? `--lp-play-btn-bg: ${display.playButtonBg}` : ''}
             title="Run"
             aria-label=${`Run ${item.name}`}
             @click=${() => executeAction(item)}>
             <span class="codicon codicon-play"></span>
-        </button>
-        ${!state.searchQuery ? html`
-        <button class="lp-drag-handle" draggable="true" title="Drag to reorder" aria-label=${`Drag ${item.name} to reorder`}
-            @dragstart=${(e: DragEvent) => handleDragStart(e, item)}
-            @dragend=${handleDragEnd}>
-            <span class="codicon codicon-gripper"></span>
-        </button>` : null}
+        </button>`}
 
         <div class="lp-btn ${state.selectionMode ? 'has-checkbox' : ''}">
              <span class="lp-btn-name">
@@ -823,7 +1019,7 @@ const renderButton = (item: Action) => {
                 ${item.name}
                 ${isHidden ? html`<span class="lp-hidden-badge">(hidden)</span>` : null}
                 ${statusDot}
-                <span class="lp-action-toolbar">
+                <span class="lp-action-toolbar" style=${reorderMode ? 'display:none' : ''}>
                     ${inlineBtns.map(btn => btn.id === 'setColor' ? html`
                         <div class="lp-cp-container">
                             <button class="lp-inline-action-btn ${colorPickerOpenFor === actionMenuId ? 'lp-cp-active' : ''}"
@@ -831,7 +1027,6 @@ const renderButton = (item: Action) => {
                                 @click=${(e: Event) => { e.stopPropagation(); btn.action(); }}>
                                 <span class="codicon codicon-${btn.icon}"></span>
                             </button>
-                            ${colorPickerOpenFor === actionMenuId ? renderColorPickerPopout(item, actionMenuId) : null}
                         </div>
                     ` : html`
                         <button class="lp-inline-action-btn ${btn.dangerous ? 'lp-btn-dangerous' : ''}"
@@ -871,12 +1066,33 @@ const renderButton = (item: Action) => {
                                     </button>
                                 `)}
                             ` : null}
+                            ${canReorder ? html`
+                                <div class="lp-menu-divider"></div>
+                                <button class="lp-menu-item lp-menu-item--action" role="menuitem"
+                                    @click=${() => onActionMenuAction(() => enterReorderMode())}>
+                                    <span class="codicon codicon-grabber"></span>
+                                    Reorder actions
+                                </button>
+                                <button class="lp-menu-item lp-menu-item--action" role="menuitem"
+                                    ?disabled=${state.actions.indexOf(item) === 0}
+                                    @click=${() => onActionMenuAction(() => moveAction(item, 'up'))}>
+                                    <span class="codicon codicon-arrow-up"></span>
+                                    Move up
+                                </button>
+                                <button class="lp-menu-item lp-menu-item--action" role="menuitem"
+                                    ?disabled=${state.actions.indexOf(item) === state.actions.length - 1}
+                                    @click=${() => onActionMenuAction(() => moveAction(item, 'down'))}>
+                                    <span class="codicon codicon-arrow-down"></span>
+                                    Move down
+                                </button>
+                            ` : null}
                         `,
                     }) : null}
                 </span>
              </span>
              ${metaParts.length ? html`<span class="lp-btn-meta">${metaParts.map((part, idx) => html`${idx > 0 ? ' · ' : ''}${part}`)}</span>` : null}
         </div>
+        ${colorPickerOpenFor === actionMenuId ? renderColorPickerPopout(item, actionMenuId) : null}
     </div>
     `;
 };
@@ -908,8 +1124,12 @@ const renderGroup = (group: Group, actions: Action[]) => {
 
     const groupMenuId = getGroupMenuId(group);
 
+    const isDraggingGroup = dragSrcGroup === group;
+    const isDragOverGroupTop = dragOverGroup === group && dragOverGroupTop;
+    const isDragOverGroupBottom = dragOverGroup === group && !dragOverGroupTop;
+
     return html`
-    <details class="lp-group" ?open=${isOpen} @toggle=${(e: Event) => {
+    <details class="lp-group ${isDraggingGroup ? 'lp-dragging-group' : ''} ${isDragOverGroupTop ? 'lp-drag-over-top-group' : ''} ${isDragOverGroupBottom ? 'lp-drag-over-bottom-group' : ''}" ?open=${isOpen} @toggle=${(e: Event) => {
             // Prevent default toggle behavior to manage state manually if needed,
             // but <details> handles open/close natively. We just need to sync state.
             const d = e.target as HTMLDetailsElement;
@@ -925,6 +1145,13 @@ const renderGroup = (group: Group, actions: Action[]) => {
             @dragleave=${(e: DragEvent) => handleDragLeaveGroupHeader(e, group)}
             @drop=${(e: DragEvent) => handleDropOnGroupHeader(e, group)}>
             <span class="codicon codicon-chevron-down lp-group-chevron"></span>
+            <button class="lp-group-drag-handle" draggable="true"
+                title="Drag to reorder group" aria-label=${`Drag ${group.name} to reorder`}
+                @click=${(e: Event) => { e.preventDefault(); e.stopPropagation(); }}
+                @dragstart=${(e: DragEvent) => handleGroupDragStart(e, group)}
+                @dragend=${handleGroupDragEnd}>
+                <span class="codicon codicon-gripper"></span>
+            </button>
             <div class="lp-group-header-content">
                 ${group.icon ? html`<span class="codicon codicon-${group.icon} lp-group-icon"></span>` : null}
                 <span class="lp-group-name">${group.name}</span>
@@ -944,7 +1171,6 @@ const renderGroup = (group: Group, actions: Action[]) => {
                         @click=${(e: Event) => { e.preventDefault(); e.stopPropagation(); setGroupColorAction(group, groupMenuId); }}>
                         <span class="codicon codicon-symbol-color"></span>
                     </button>
-                    ${groupColorPickerOpenFor === groupMenuId ? renderGroupColorPickerPopout(group) : null}
                 </div>
                 <button class="lp-inline-action-btn"
                     title="Edit group"
@@ -953,6 +1179,7 @@ const renderGroup = (group: Group, actions: Action[]) => {
                     <span class="codicon codicon-edit"></span>
                 </button>
             </span>
+            ${groupColorPickerOpenFor === groupMenuId ? renderGroupColorPickerPopout(group) : null}
         </summary>
         <div class="lp-group-items" style="${itemsStyles.join(';')}">
             ${actions.map((a) => renderButton(a))}
@@ -1067,6 +1294,17 @@ const renderView = () => {
             ? html`<div class="lp-loading-overlay"><span class="codicon codicon-loading codicon-modifier-spin"></span></div>`
             : null}
     ${renderSearch()}
+    ${reorderMode ? html`
+    <div class="lp-reorder-banner">
+        <span class="lp-reorder-banner-label">
+            <span class="codicon codicon-grabber"></span>
+            Drag rows to reorder
+        </span>
+        <button class="lp-reorder-banner-done" @click=${exitReorderMode}>
+            <span class="codicon codicon-check"></span>
+            Done
+        </button>
+    </div>` : null}
     <div class="lp-grid">
         ${content}
     </div>
@@ -1138,3 +1376,44 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
         closeActionMenu();
     }
 });
+
+// ── Auto-scroll while dragging near viewport edges ───────────────────────────
+let autoScrollRAF: number | null = null;
+let autoScrollSpeed = 0;
+
+const stopAutoScroll = () => {
+    if (autoScrollRAF !== null) {
+        cancelAnimationFrame(autoScrollRAF);
+        autoScrollRAF = null;
+    }
+    autoScrollSpeed = 0;
+};
+
+const runAutoScroll = () => {
+    if (autoScrollSpeed === 0) { autoScrollRAF = null; return; }
+    document.documentElement.scrollTop += autoScrollSpeed;
+    autoScrollRAF = requestAnimationFrame(runAutoScroll);
+};
+
+document.addEventListener('dragover', (e: DragEvent) => {
+    if (!dragSrcAction && !dragSrcGroup) return;
+    const ZONE = 80;    // px from viewport edge that activates scroll
+    const MAX_PX = 14;  // max scroll pixels per frame at the very edge
+    const { clientY } = e;
+    const vh = window.innerHeight;
+    let speed = 0;
+    if (clientY < ZONE) {
+        speed = -Math.ceil(MAX_PX * (1 - clientY / ZONE));
+    } else if (clientY > vh - ZONE) {
+        speed = Math.ceil(MAX_PX * (1 - (vh - clientY) / ZONE));
+    }
+    autoScrollSpeed = speed;
+    if (speed !== 0 && autoScrollRAF === null) {
+        autoScrollRAF = requestAnimationFrame(runAutoScroll);
+    } else if (speed === 0) {
+        stopAutoScroll();
+    }
+});
+
+document.addEventListener('dragend', stopAutoScroll);
+document.addEventListener('drop', stopAutoScroll);

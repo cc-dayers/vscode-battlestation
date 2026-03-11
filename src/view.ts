@@ -280,6 +280,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       case "reorderActions":
         void this.handleReorderActions(message.actions);
         break;
+      case "reorderGroups":
+        void this.handleReorderGroups(message.groups);
+        break;
     }
   }
 
@@ -1181,6 +1184,20 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     config.actions = [...newActions, ...notReordered];
     await this.configService.writeConfig(config);
     // Update the webview in-place without a full HTML reload
+    if (this.view?.visible && this._currentViewMode === "main") {
+      const enrichedConfig = this.getEnrichedConfig(config);
+      this.view.webview.postMessage({
+        type: "update",
+        data: { ...enrichedConfig, showHidden: this.showHidden },
+      });
+    }
+  }
+
+  private async handleReorderGroups(newGroups: Group[]) {
+    if (!Array.isArray(newGroups)) { return; }
+    const config = await this.configService.readConfig();
+    config.groups = newGroups;
+    await this.configService.writeConfig(config);
     if (this.view?.visible && this._currentViewMode === "main") {
       const enrichedConfig = this.getEnrichedConfig(config);
       this.view.webview.postMessage({

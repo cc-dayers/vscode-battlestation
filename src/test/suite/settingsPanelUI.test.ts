@@ -19,7 +19,7 @@ suite('Settings Panel Integration Test Suite', () => {
     } as any;
 
     // Track original values for cleanup
-    let originalShowIcon: boolean | undefined;
+    let originalShowCommand: boolean | undefined;
 
     setup(async () => {
         configService = new ConfigService(mockContext);
@@ -32,13 +32,13 @@ suite('Settings Panel Integration Test Suite', () => {
             ]);
         }
 
-        originalShowIcon = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.showIcon');
+        originalShowCommand = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.showCommand');
     });
 
     teardown(async () => {
         // Restore original setting value
         await vscode.workspace.getConfiguration('battlestation')
-            .update('display.showIcon', originalShowIcon, vscode.ConfigurationTarget.Workspace);
+            .update('display.showCommand', originalShowCommand, vscode.ConfigurationTarget.Workspace);
     });
 
     test('battlestation.open and battlestation.openSettings execute without error', async function () {
@@ -57,24 +57,24 @@ suite('Settings Panel Integration Test Suite', () => {
         assert.strictEqual(status.valid, true, 'Config must remain valid after opening settings');
     });
 
-    test('display.showIcon setting round-trips through Configuration API', async function () {
+    test('display.showCommand setting round-trips through Configuration API', async function () {
         this.timeout(10000);
 
         const config = vscode.workspace.getConfiguration('battlestation');
-        const initial = config.get<boolean>('display.showIcon');
+        const initial = config.get<boolean>('display.showCommand');
 
         // Toggle
-        await config.update('display.showIcon', !initial, vscode.ConfigurationTarget.Workspace);
+        await config.update('display.showCommand', !initial, vscode.ConfigurationTarget.Workspace);
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        const toggled = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.showIcon');
+        const toggled = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.showCommand');
         assert.strictEqual(toggled, !initial, 'Setting value should be toggled');
 
         // Toggle back
-        await config.update('display.showIcon', initial, vscode.ConfigurationTarget.Workspace);
+        await config.update('display.showCommand', initial, vscode.ConfigurationTarget.Workspace);
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        const restored = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.showIcon');
+        const restored = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.showCommand');
         assert.strictEqual(restored, initial, 'Setting value should be restored');
     });
 
@@ -86,7 +86,7 @@ suite('Settings Panel Integration Test Suite', () => {
 
         // Change a display setting
         await vscode.workspace.getConfiguration('battlestation')
-            .update('display.showIcon', true, vscode.ConfigurationTarget.Workspace);
+            .update('display.showCommand', true, vscode.ConfigurationTarget.Workspace);
         await new Promise(resolve => setTimeout(resolve, 300));
 
         const configAfter = await configService.readConfig();

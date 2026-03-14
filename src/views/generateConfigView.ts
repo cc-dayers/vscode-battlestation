@@ -25,6 +25,7 @@ export interface GenerateConfigContext {
   showWelcome: boolean;
   enhancedMode?: EnhancedModeContext;
   hasWorkspace?: boolean;
+  isFirstTimer?: boolean;
 }
 
 export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
@@ -54,6 +55,341 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
           });
         })();
       `,
+    });
+  }
+
+  const isFirstTimer = ctx.isFirstTimer && ctx.showWelcome;
+
+  if (isFirstTimer) {
+    return htmlShell({
+      title: "Battlestation",
+      cspSource: ctx.cspSource,
+      nonce: ctx.nonce,
+      codiconStyles: ctx.codiconStyles,
+      styles: `
+        body {
+          font-family: var(--vscode-font-family);
+          color: var(--vscode-foreground);
+          background: transparent;
+          padding: 16px 8px;
+          margin: 0;
+          text-align: center;
+          overflow: hidden;
+        }
+        .lp-anim-container {
+          position: relative;
+          padding: 60px 16px 40px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 250px;
+        }
+        .lp-welcome-text {
+          margin-bottom: 50px;
+          animation: slideDown 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+          position: relative;
+          z-index: 2;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+          will-change: transform, opacity;
+        }
+        .lp-welcome-prefix {
+           font-size: 16px;
+           font-weight: 400;
+           opacity: 0.8;
+           text-transform: uppercase;
+           letter-spacing: 2px;
+        }
+        .lp-battle-word {
+          font-weight: 900;
+          font-size: 42px;
+          text-transform: uppercase;
+          letter-spacing: 6px;
+          color: var(--vscode-textLink-foreground);
+          animation: textShake 1.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+          line-height: 1;
+          will-change: transform, opacity, color;
+        }
+        .lp-emojis {
+          position: absolute;
+          top: 100%; left: 50%;
+          width: 0; height: 0;
+          z-index: 10;
+          pointer-events: none;
+        }
+        .lp-emoji {
+          position: absolute;
+          font-size: 32px;
+          margin-top: -16px; margin-left: -16px;
+          animation: battleClash 1.5s ease-in-out both;
+          will-change: transform, opacity;
+          transform: translateZ(0);
+        }
+        /* Emojis Starting Points & Rotations */
+        .e1 { --startX: -160px; --startY: -100px; --rot: 45deg; animation-delay: 0.3s; z-index: 5; }
+        .e2 { --startX: 160px; --startY: -80px; --rot: -30deg; animation-delay: 0.4s; z-index: 5; }
+        .e3 { --startX: -120px; --startY: 80px; --rot: 15deg; animation-delay: 0.5s; z-index: 5; }
+        .e4 { --startX: 120px; --startY: 100px; --rot: -60deg; animation-delay: 0.35s; z-index: 5; }
+        .e5 { --startX: 0px;  --startY: -160px; --rot: 90deg; animation-delay: 0.45s; z-index: 5; }
+        .e6 { --startX: 80px;  --startY: 120px; --rot: -90deg; animation-delay: 0.55s; z-index: 5; }
+        .e7 { --startX: -80px;  --startY: -140px; --rot: -15deg; animation-delay: 0.4s; z-index: 5; }
+        
+        /* Food pushed to the background - no blur during animation (blur prevents GPU compositing) */
+        .e8, .e9, .e10, .e11, .e12 {
+          z-index: 1;
+          font-size: 20px;
+          opacity: 0.65;
+        }
+        .e8 { --startX: -180px; --startY: 20px; --rot: 60deg; animation-delay: 0.38s; }
+        .e9 { --startX: 180px; --startY: 40px; --rot: -45deg; animation-delay: 0.42s; }
+        .e10 { --startX: -60px; --startY: 160px; --rot: 120deg; animation-delay: 0.52s; }
+        .e11 { --startX: 140px; --startY: -140px; --rot: -75deg; animation-delay: 0.32s; }
+        .e12 { --startX: -100px; --startY: -20px; --rot: 30deg; animation-delay: 0.48s; }
+        
+        .lp-welcome-actions {
+          display: flex;
+          justify-content: center;
+          animation: slideInLeft 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+          animation-delay: 1.5s;
+          width: 100%;
+        }
+
+        @keyframes slideDown {
+          0% { transform: translateY(-30px); opacity: 0; }
+          100% { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes slideInLeft {
+          0% { transform: translateX(-40px); opacity: 0; }
+          100% { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideInRight {
+          0% { transform: translateX(40px); opacity: 0; }
+          100% { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes textShake {
+          0% { transform: scale(0.5); opacity: 0; }
+          15% { transform: scale(1.1); opacity: 1; }
+          20% { transform: scale(1); }
+          /* Battle time: 15% to 80% */
+          35% { transform: translate(-4px, 2px) rotate(-2deg) scale(1.05); color: var(--vscode-errorForeground); }
+          40% { transform: translate(4px, -2px) rotate(2deg) scale(1.1); }
+          45% { transform: translate(-4px, -2px) rotate(-1deg) scale(1.15); }
+          50% { transform: translate(4px, 2px) rotate(2deg) scale(1.05); }
+          55% { transform: translate(-3px, 1px) rotate(-2deg) scale(1.1); color: var(--vscode-errorForeground); }
+          65% { transform: translate(3px, -1px) rotate(1deg) scale(1.05); }
+          85% { transform: translate(0, 0) rotate(0) scale(1); color: var(--vscode-textLink-foreground); }
+          100% { transform: translate(0, 0) rotate(0) scale(1); }
+        }
+        @keyframes battleClash {
+          0%   { transform: translate(calc(var(--startX) * 1.5), calc(var(--startY) * 1.5)) scale(0);   opacity: 0; }
+          12%  { transform: translate(calc(var(--startX) * 1.1), calc(var(--startY) * 1.1)) scale(0.8); opacity: 1; }
+          28%  { transform: translate(calc(var(--startX) * 0.6), calc(var(--startY) * 0.6)) scale(1.1); opacity: 1; }
+          44%  { transform: translate(calc(var(--startX) * 0.15), calc(var(--startY) * 0.15)) scale(1.5) rotate(calc(var(--rot) * 0.7)); opacity: 1; }
+          55%  { transform: translate(0px, 0px) scale(2) rotate(var(--rot));                             opacity: 1; }
+          72%  { transform: translate(0px, 0px) scale(1.4) rotate(calc(var(--rot) * -0.5));             opacity: 0.9; }
+          100% { transform: translate(0px, 0px) scale(0);                                               opacity: 0; }
+        }
+
+        .lp-btn-autodetect {
+          background-color: var(--vscode-button-background);
+          color: var(--vscode-button-foreground);
+          border: none;
+          border-radius: 4px;
+          padding: 16px 32px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          width: 80%;
+          max-width: 300px;
+          transition: background-color 0.2s ease;
+        }
+        .lp-btn-autodetect:hover {
+          background-color: var(--vscode-button-hoverBackground);
+        }
+        .lp-btn-autodetect .codicon {
+          font-size: 24px;
+        }
+        .lp-welcome-desc {
+          font-size: 13px;
+          opacity: 0.8;
+          margin-top: 16px;
+          animation: slideInRight 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+          animation-delay: 1.7s;
+        }
+        .lp-advanced-link {
+          font-size: 12px;
+          margin-top: 24px;
+          color: var(--vscode-textLink-foreground);
+          text-decoration: none;
+          animation: slideInLeft 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+          animation-delay: 1.9s;
+          display: inline-block;
+          cursor: pointer;
+        }
+        .lp-advanced-link:hover {
+          text-decoration: underline;
+        }
+        .lp-generation-overlay {
+          position: fixed;
+          inset: 0;
+          display: none;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 24px;
+          background: color-mix(in srgb, var(--vscode-editor-background) 86%, transparent);
+          backdrop-filter: blur(4px);
+          z-index: 100;
+          font-size: 15px;
+          font-weight: 600;
+        }
+        .lp-generation-overlay.visible {
+          display: flex;
+        }
+        .lp-generation-pulse {
+          position: relative;
+          width: 80px;
+          height: 80px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .lp-generation-pulse::before,
+        .lp-generation-pulse::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          border: 2px solid var(--vscode-textLink-foreground);
+          opacity: 0;
+          animation: radarPulse 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+        }
+        .lp-generation-pulse::after {
+          animation-delay: 1s;
+        }
+        @keyframes radarPulse {
+          0% { transform: scale(0.6); opacity: 0.8; }
+          100% { transform: scale(2.2); opacity: 0; }
+        }
+        .lp-generation-icon {
+          font-size: 36px !important;
+          color: var(--vscode-textLink-foreground);
+          z-index: 2;
+          animation: iconFloat 2s ease-in-out infinite;
+        }
+        @keyframes iconFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
+        }
+        .lp-generation-text {
+          color: var(--vscode-foreground);
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          animation: pulseOpacity 1.5s infinite alternate;
+        }
+        @keyframes pulseOpacity {
+          0% { opacity: 0.5; }
+          100% { opacity: 1; }
+        }
+      `,
+      body: `
+        <div class="lp-anim-container">
+          <div class="lp-welcome-text">
+            <span class="lp-welcome-prefix">Welcome to the</span>
+            <span class="lp-battle-word">BATTLE</span>
+            <div class="lp-emojis">
+              <span class="lp-emoji e1">⚔️</span>
+              <span class="lp-emoji e2">🤖</span>
+              <span class="lp-emoji e3">👾</span>
+              <span class="lp-emoji e4">🚀</span>
+              <span class="lp-emoji e5">💥</span>
+              <span class="lp-emoji e6">💣</span>
+              <span class="lp-emoji e7">🛡️</span>
+              <span class="lp-emoji e8">🍔</span>
+              <span class="lp-emoji e9">🌮</span>
+              <span class="lp-emoji e10">🌯</span>
+              <span class="lp-emoji e11">🍺</span>
+              <span class="lp-emoji e12">☕</span>
+            </div>
+          </div>
+          <div class="lp-welcome-actions">
+            <button type="button" class="lp-btn-autodetect" id="autoDetectBtn">
+              <span class="codicon codicon-sparkle"></span>
+              Auto-detect
+            </button>
+          </div>
+          <div class="lp-welcome-desc">
+            Instantly detect NPM, Tasks, and Launch configs. Groups and colors included.
+          </div>
+          <a class="lp-advanced-link" id="advancedOptionsLink">Need more control? View Advanced Options</a>
+        </div>
+        <div id="generationOverlay" class="lp-generation-overlay" aria-live="polite" aria-hidden="true">
+          <div class="lp-generation-pulse">
+            <span class="codicon codicon-search lp-generation-icon"></span>
+          </div>
+          <span class="lp-generation-text">Scanning Battlefield...</span>
+        </div>
+      `,
+      script: `
+        (function() {
+          const vscode = acquireVsCodeApi();
+          const autoDetectBtn = document.getElementById('autoDetectBtn');
+          const generationOverlay = document.getElementById('generationOverlay');
+
+          function setGenerationLoading(isLoading) {
+            if (generationOverlay) {
+              generationOverlay.classList.toggle('visible', isLoading);
+              generationOverlay.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
+            }
+          }
+
+          if (autoDetectBtn) {
+            autoDetectBtn.addEventListener('click', () => {
+              setGenerationLoading(true);
+              autoDetectBtn.disabled = true;
+              autoDetectBtn.innerHTML = '<span class="codicon codicon-loading codicon-modifier-spin" style="font-size: 24px; margin-bottom: 8px;"></span><span style="font-size: 14px; font-weight: 600;">Scanning...</span>';
+              
+              vscode.postMessage({
+                command: 'createConfig',
+                sources: { npm: true, tasks: true, launch: true },
+                detectionMethod: 'hybrid',
+                enableGrouping: true,
+                enableColoring: true,
+                autoOpen: false
+              });
+            });
+          }
+
+          const advancedOptionsLink = document.getElementById('advancedOptionsLink');
+          if (advancedOptionsLink) {
+            advancedOptionsLink.addEventListener('click', (e) => {
+              e.preventDefault();
+              vscode.postMessage({ command: 'showAdvancedOptions' });
+            });
+          }
+
+          window.addEventListener('message', (event) => {
+            const message = event.data;
+            if (message?.type === 'configGenerationStarted') {
+              setGenerationLoading(true);
+            }
+            if (message?.type === 'configGenerationComplete') {
+              setGenerationLoading(false);
+              if (autoDetectBtn) {
+                autoDetectBtn.disabled = false;
+                autoDetectBtn.innerHTML = '<span class="codicon codicon-sparkle" style="font-size: 24px; margin-bottom: 8px;"></span><span style="font-size: 14px; font-weight: 600;">Auto-detect</span>';
+              }
+            }
+          });
+        })();
+      `
     });
   }
 
@@ -263,12 +599,18 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
           ${renderCheckbox("npmCheck", "npm scripts (package.json)", true)}
           ${renderCheckbox("tasksCheck", "VS Code tasks (tasks.json)", true)}
           ${renderCheckbox("launchCheck", "Launch configs (launch.json)", true)}
+          ${renderCheckbox("dockerCheck", "Docker Compose", !!ctx.hasWorkspace)}
+          ${renderCheckbox("makeCheck", "Makefiles", !!ctx.hasWorkspace)}
+          ${renderCheckbox("rustCheck", "Rust (Cargo)", !!ctx.hasWorkspace)}
+          ${renderCheckbox("goCheck", "Go (go.mod)", !!ctx.hasWorkspace)}
         </div>
         ${enhancedSection}
         <div class="lp-sources">
           <div class="lp-sources-title">Global Options:</div>
-          ${renderCheckbox("groupCheck", "Group by type", ctx.hasNpm || ctx.hasTasks || ctx.hasLaunch)}
-          ${renderCheckbox("colorCheck", "Auto-colorize groups", false)}
+          ${renderCheckbox("groupCheck", "Group by type", true)}
+          ${renderCheckbox("colorCheck", "Auto-colorize groups", true)}
+          ${renderCheckbox("autoOpenCheck", "Auto-open config file", false)}
+          ${renderCheckbox("deepScanCheck", "Deep Scan (Recursive) - thorough but slower", false)}
         </div>
       </div>
       
@@ -356,45 +698,21 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
         function collectSources() {
           const sources = {};
           
-          // Basic sources
           const npmCheck = document.getElementById('npmCheck');
           const tasksCheck = document.getElementById('tasksCheck');
           const launchCheck = document.getElementById('launchCheck');
+          const dockerCheck = document.getElementById('dockerCheck');
+          const makeCheck = document.getElementById('makeCheck');
+          const rustCheck = document.getElementById('rustCheck');
+          const goCheck = document.getElementById('goCheck');
           
           if (npmCheck) sources.npm = npmCheck.checked;
           if (tasksCheck) sources.tasks = tasksCheck.checked;
           if (launchCheck) sources.launch = launchCheck.checked;
-
-          // Enhanced sources
-          const dockerCheck = document.getElementById('dockerCheck');
           if (dockerCheck) sources.docker = dockerCheck.checked;
-          
-          const dockerComposeCheck = document.getElementById('dockerComposeCheck');
-          if (dockerComposeCheck) sources.dockerCompose = dockerComposeCheck.checked;
-          
-          const pythonCheck = document.getElementById('pythonCheck');
-          if (pythonCheck) sources.python = pythonCheck.checked;
-          
-          const goCheck = document.getElementById('goCheck');
-          if (goCheck) sources.go = goCheck.checked;
-          
-          const rustCheck = document.getElementById('rustCheck');
-          if (rustCheck) sources.rust = rustCheck.checked;
-          
-          const makeCheck = document.getElementById('makeCheck');
           if (makeCheck) sources.make = makeCheck.checked;
-          
-          const gradleCheck = document.getElementById('gradleCheck');
-          if (gradleCheck) sources.gradle = gradleCheck.checked;
-          
-          const mavenCheck = document.getElementById('mavenCheck');
-          if (mavenCheck) sources.maven = mavenCheck.checked;
-          
-          const cmakeCheck = document.getElementById('cmakeCheck');
-          if (cmakeCheck) sources.cmake = cmakeCheck.checked;
-          
-          const gitCheck = document.getElementById('gitCheck');
-          if (gitCheck) sources.git = gitCheck.checked;
+          if (rustCheck) sources.rust = rustCheck.checked;
+          if (goCheck) sources.go = goCheck.checked;
           
           return sources;
         }
@@ -409,20 +727,19 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
             const sources = collectSources();
             const effectiveSources = optionsVisible
               ? sources
-              : { ...sources, npm: true, tasks: true, launch: true };
+              : { ...sources, npm: true, tasks: true, launch: true, docker: true, make: true, rust: true, go: true };
             const enableGrouping = optionsVisible ? document.getElementById('groupCheck').checked : true;
-            const enableColoring = optionsVisible ? document.getElementById('colorCheck').checked : false;
-            
-            // Get detection method (only if options visible)
-            const detectionMethodRadio = document.querySelector('input[name="detectionMethod"]:checked');
-            const detectionMethod = (optionsVisible && detectionMethodRadio) ? detectionMethodRadio.value : 'hybrid';
+            const enableColoring = optionsVisible ? document.getElementById('colorCheck').checked : true;
+            const autoOpen = optionsVisible ? document.getElementById('autoOpenCheck').checked : false;
+            const deepScan = optionsVisible ? document.getElementById('deepScanCheck').checked : false;
             
             vscode.postMessage({
               command: 'createConfig',
               sources: effectiveSources,
-              detectionMethod,
               enableGrouping,
-              enableColoring
+              enableColoring,
+              autoOpen,
+              deepScan
             });
           });
         }
@@ -437,23 +754,27 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
             const sources = collectSources();
             const effectiveSources = optionsVisible
               ? sources
-              : { ...sources, npm: true, tasks: true, launch: true };
+              : { ...sources, npm: true, tasks: true, launch: true, docker: true, make: true, rust: true, go: true };
             const enableGrouping = optionsVisible
               ? (document.getElementById('groupCheck')?.checked ?? true)
               : true;
             const enableColoring = optionsVisible
-              ? (document.getElementById('colorCheck')?.checked ?? false)
+              ? (document.getElementById('colorCheck')?.checked ?? true)
+              : true;
+            const autoOpen = optionsVisible
+              ? (document.getElementById('autoOpenCheck')?.checked ?? false)
               : false;
-
-            const detectionMethodRadio = document.querySelector('input[name="detectionMethod"]:checked');
-            const detectionMethod = detectionMethodRadio ? detectionMethodRadio.value : 'hybrid';
+            const deepScan = optionsVisible
+              ? (document.getElementById('deepScanCheck')?.checked ?? false)
+              : false;
 
             vscode.postMessage({
               command: 'createConfig',
               sources: effectiveSources,
-              detectionMethod,
               enableGrouping,
-              enableColoring
+              enableColoring,
+              autoOpen,
+              deepScan
             });
           });
         }

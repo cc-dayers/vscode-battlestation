@@ -58,6 +58,7 @@ suite('Generate Config UI Test Suite', () => {
 
         assert.ok(html.includes('id="dockerCheck"'), 'Should render docker checkbox');
         assert.ok(html.includes('id="pythonCheck"'), 'Should render python checkbox');
+        assert.ok(html.includes('id="makeCheck"'), 'Should render make checkbox');
         assert.ok(html.includes('id="gitCheck"'), 'Should render git checkbox');
 
         // Regression test: the collectSources function should not accept an optionsVisible argument 
@@ -91,7 +92,8 @@ suite('Generate Config UI Test Suite', () => {
 
         // Enhanced section should not be present
         assert.ok(!html.includes('Enhanced Mode (Advanced Options)'), 'Enhanced Mode section should be hidden when context is missing');
-        assert.ok(!html.includes('id="dockerCheck"'), 'Docker checkbox should not be rendered');
+        assert.ok(html.includes('id="dockerCheck"'), 'Docker checkbox should be rendered in main section');
+        assert.ok(!html.includes('id="pythonCheck"'), 'Python checkbox should not be rendered (enhanced only)');
     });
 
     test('Should include generation loading lifecycle hooks', () => {

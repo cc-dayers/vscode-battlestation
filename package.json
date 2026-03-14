@@ -84,7 +84,7 @@
         {
           "type": "webview",
           "id": "battlestation.view",
-          "name": "Actions",
+          "name": "BattleStation",
           "icon": "media/icon.svg",
           "contextualTitle": "Battlestation"
         }
@@ -142,16 +142,6 @@
     "configuration": {
       "title": "Battlestation",
       "properties": {
-        "battlestation.display.showIcon": {
-          "type": "boolean",
-          "default": false,
-          "description": "Show icons next to button names"
-        },
-        "battlestation.display.showType": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show the type (NPM, Task, etc.) on the button"
-        },
         "battlestation.display.showCommand": {
           "type": "boolean",
           "default": true,

@@ -1,0 +1,37 @@
+[WebServer] (node:46644) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+[WebServer] (Use `node --trace-deprecation ...` to show where the warning was created)
+
+Running 2 tests using 1 worker
+
+  Γ£ÿ  1 [chromium] ΓÇ║ tests\settings-view.spec.ts:16:7 ΓÇ║ Settings View ΓÇ║ Shows Delete History button when config does not exist but history exists (5.1s)
+  Γ£ô  2 [chromium] ΓÇ║ tests\settings-view.spec.ts:43:7 ΓÇ║ Settings View ΓÇ║ Shows correct delete logic when config exists (212ms)
+
+
+  1) [chromium] ΓÇ║ tests\settings-view.spec.ts:16:7 ΓÇ║ Settings View ΓÇ║ Shows Delete History button when config does not exist but history exists 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('.lp-config-btn').filter({ hasText: 'Delete History' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('.lp-config-btn').filter({ hasText: 'Delete History' })[22m
+
+
+      22 |
+      23 |     const deleteHistoryBtn = page.locator('.lp-config-btn').filter({ hasText: 'Delete History' });
+    > 24 |     await expect(deleteHistoryBtn).toBeVisible();
+         |                                    ^
+      25 |
+      26 |     // Click Delete History
+      27 |     await deleteHistoryBtn.click();
+        at C:\Users\Don\Documents\Projects\vscode-battlestation\tests\settings-view.spec.ts:24:36
+
+    Error Context: test-results\settings-view-Settings-Vie-21d2c-ot-exist-but-history-exists-chromium\error-context.md
+
+  1 failed
+    [chromium] ΓÇ║ tests\settings-view.spec.ts:16:7 ΓÇ║ Settings View ΓÇ║ Shows Delete History button when config does not exist but history exists 
+  1 passed (7.9s)

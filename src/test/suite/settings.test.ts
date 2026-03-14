@@ -7,8 +7,6 @@ suite('Settings View Test Suite', () => {
             cspSource: "default-src 'none'",
             nonce: "test-nonce",
             codiconStyles: "",
-            showIcon: true,
-            showType: false,
             showCommand: true,
             showGroup: true,
             hideIcon: "trash",
@@ -24,7 +22,7 @@ suite('Settings View Test Suite', () => {
 
         // Check for state injection
         assert.ok(html.includes('window.__SETTINGS__'), 'Should inject initial settings');
-        assert.ok(html.includes('"showIcon":true'), 'Should inject correct showIcon value');
+        assert.ok(html.includes('"showCommand":true'), 'Should inject correct showCommand value');
         assert.ok(html.includes('"hideIcon":"trash"'), 'Should inject correct hideIcon value');
 
         // Check for script loading
@@ -39,8 +37,6 @@ suite('Settings View Test Suite', () => {
             cspSource: "default-src 'none'",
             nonce: "test-nonce",
             codiconStyles: "",
-            showIcon: false,
-            showType: true,
             showCommand: false,
             showGroup: false,
             hideIcon: "eye-closed",

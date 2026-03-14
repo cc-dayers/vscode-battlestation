@@ -42,6 +42,34 @@ export function htmlShell(opts: LayoutOptions): string {
 <body>
 ${opts.body}
 <script nonce="${opts.nonce}">
+  (function() {
+    if (typeof acquireVsCodeApi === 'function') {
+      const originalAcquire = acquireVsCodeApi;
+      let cachedApi = null;
+      window.acquireVsCodeApi = function() {
+        if (!cachedApi) {
+          cachedApi = originalAcquire.apply(this, arguments);
+          
+          // Support mice with "Back" buttons (button 3 or 4 are standard)
+          window.addEventListener('mouseup', (e) => {
+            if (e.button === 3 || e.button === 4) {
+              cachedApi.postMessage({ command: 'cancelForm' });
+            }
+          });
+          
+          // Support keyboard back (Alt+Left on Windows/Linux, Cmd+Left on Mac)
+          window.addEventListener('keydown', (e) => {
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            if ((!isMac && e.altKey && e.key === 'ArrowLeft') || 
+                (isMac && e.metaKey && e.key === 'ArrowLeft')) {
+              cachedApi.postMessage({ command: 'cancelForm' });
+            }
+          });
+        }
+        return cachedApi;
+      };
+    }
+  })();
 ${opts.script}
 </script>
 ${externalScript}

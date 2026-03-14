@@ -10,8 +10,6 @@ interface MainViewState {
     generating: boolean;
     // Configuration / Settings
     display: {
-        showIcon: boolean;
-        showType: boolean;
         showCommand: boolean;
         showGroup: boolean;
         hideIcon: string;
@@ -76,8 +74,6 @@ const startState: MainViewState = {
     loading: false,
     generating: false,
     display: {
-        showIcon: true,
-        showType: true,
         showCommand: true,
         showGroup: true,
         hideIcon: "eye-closed",
@@ -101,7 +97,7 @@ if (window.__INITIAL_DATA__) {
 }
 
 // Restore minimal state (collapsed groups)
-const storedState = (vscode.getState() as any) || {};
+const storedState = (vscode.getState() as Partial<MainViewState>) || {};
 if (storedState.collapsedGroups) {
     startState.collapsedGroups = storedState.collapsedGroups;
 }
@@ -109,7 +105,7 @@ if (storedState.collapsedGroups) {
 // Reactive State Container
 const state = new Proxy(startState, {
     set(target, p, value) {
-        (target as any)[p] = value;
+        Reflect.set(target, p, value);
         requestRender();
         // Persist certain state
         if (p === "collapsedGroups") {
@@ -134,7 +130,7 @@ let dragOverGroupTop = true; // true = insert before target, false = insert afte
 
 // Color picker popout state
 let colorPickerOpenFor: string | null = null; // actionMenuId of the open picker
-let colorPickerColor = '';
+
 let colorPickerApplyToPlay = false;
 let colorPickerApplyToRow = true;
 let colorPickerThemeExpanded = false;
@@ -673,26 +669,26 @@ const formatRelativeTime = (timestamp: number): string => {
 
 const formatCommandMeta = (item: Action): string => {
     if (item.type === "npm" && item.command.startsWith("npm run ")) {
-        return `npm: ${item.command.replace("npm run ", "")}`;
+        return item.command.replace("npm run ", "");
     }
 
     if (item.type === "task") {
         const taskLabel = item.command.split("|")[1];
-        return taskLabel ? `task: ${taskLabel}` : "task";
+        return taskLabel ? taskLabel : "task";
     }
 
     if (item.type === "launch") {
         const launchLabel = item.command.split("|")[1];
-        return launchLabel ? `launch: ${launchLabel}` : "launch";
+        return launchLabel ? launchLabel : "launch";
     }
 
     if (item.type === "vscode") {
         const [commandId, commandArg] = item.command.split("|");
         if (commandId === "workbench.action.tasks.runTask") {
-            return commandArg ? `task: ${commandArg}` : "task";
+            return commandArg ? commandArg : "task";
         }
         if (commandId === "workbench.action.debug.start") {
-            return commandArg ? `launch: ${commandArg}` : "launch";
+            return commandArg ? commandArg : "launch";
         }
         return commandArg ? `${commandId} ${commandArg}` : commandId;
     }
@@ -729,7 +725,7 @@ const renderFlyoutMenu = (config: FlyoutRenderConfig) => {
                 class=${triggerClass}
                 title=${config.triggerTitle}
                 aria-label=${config.triggerAriaLabel}
-                aria-haspopup="menu"
+                aria-haspopup="true"
                 aria-expanded=${config.isOpen ? "true" : "false"}
                 data-action-menu-id=${config.kind === "action" ? config.menuId : ""}
                 data-group-menu-id=${config.kind === "group" ? config.menuId : ""}
@@ -824,7 +820,7 @@ const deriveHarmonies = (hex: string): string[] => {
     ];
 };
 
-const renderColorPickerPopout = (item: Action, menuId: string) => {
+const renderColorPickerPopout = (item: Action) => {
     const currentColor = item.rowBackgroundColor || item.backgroundColor || '';
     const harmonies = currentColor.startsWith('#') ? deriveHarmonies(currentColor) : [];
 
@@ -924,24 +920,19 @@ const renderColorPickerPopout = (item: Action, menuId: string) => {
 
 const renderButton = (item: Action) => {
     const isHidden = item.hidden;
-    const { display, iconMap } = state;
-
-    const icon = display.showIcon ? (iconMap[item.type] || "") : "";
+    const { display } = state;
 
     // Determine meta parts (can be strings or HTML templates)
     const metaParts = [];
 
+    let topLabel = null;
     if (item.workspace) {
-        metaParts.push(html`<span class="lp-workspace-label">${item.workspace}</span>`);
+        topLabel = html`<span class="lp-workspace-label">${item.workspace}</span>`;
     }
 
-    const prettyCommand = formatCommandMeta(item);
-
-    if (display.showType && display.showCommand) {
-        metaParts.push(item.type);
-        metaParts.push(prettyCommand);
-    } else if (display.showType) metaParts.push(item.type);
-    else if (display.showCommand) metaParts.push(prettyCommand);
+    if (display.showCommand) {
+        metaParts.push(formatCommandMeta(item));
+    }
 
     const isInGroup = !!item.group;
     const hasGroups = state.groups.length > 0;
@@ -991,8 +982,8 @@ const renderButton = (item: Action) => {
         @dragover=${(e: DragEvent) => handleDragOver(e, item)}
         @dragleave=${(e: DragEvent) => handleDragLeave(e, item)}
         @drop=${(e: DragEvent) => handleDrop(e, item)}>
-        ${state.selectionMode ? html`<input type="checkbox" class="lp-btn-checkbox" .checked=${state.selectedItems.includes(item)} @change=${(e: any) => {
-            if (e.target.checked) state.selectedItems = [...state.selectedItems, item];
+        ${state.selectionMode ? html`<input type="checkbox" class="lp-btn-checkbox" .checked=${state.selectedItems.includes(item)} @change=${(e: Event) => {
+            if ((e.target as HTMLInputElement).checked) state.selectedItems = [...state.selectedItems, item];
             else state.selectedItems = state.selectedItems.filter(i => i !== item);
         }}>` : null}
 
@@ -1014,8 +1005,8 @@ const renderButton = (item: Action) => {
         </button>`}
 
         <div class="lp-btn ${state.selectionMode ? 'has-checkbox' : ''}">
+             ${topLabel}
              <span class="lp-btn-name">
-                ${icon ? html`<span class="codicon codicon-${icon} lp-icon"></span>` : null}
                 ${item.name}
                 ${isHidden ? html`<span class="lp-hidden-badge">(hidden)</span>` : null}
                 ${statusDot}
@@ -1092,7 +1083,7 @@ const renderButton = (item: Action) => {
              </span>
              ${metaParts.length ? html`<span class="lp-btn-meta">${metaParts.map((part, idx) => html`${idx > 0 ? ' · ' : ''}${part}`)}</span>` : null}
         </div>
-        ${colorPickerOpenFor === actionMenuId ? renderColorPickerPopout(item, actionMenuId) : null}
+        ${colorPickerOpenFor === actionMenuId ? renderColorPickerPopout(item) : null}
     </div>
     `;
 };
@@ -1196,7 +1187,7 @@ const renderSearch = () => {
         <input type="text" class="lp-search-box" 
             placeholder="🔍 Search actions..." 
             .value=${state.searchQuery}
-            @input=${(e: any) => { state.searchQuery = e.target.value; }}
+            @input=${(e: Event) => { state.searchQuery = (e.target as HTMLInputElement).value; }}
         >
         <!-- Additional search buttons (Select Multiple, etc) could go here -->
     </div>

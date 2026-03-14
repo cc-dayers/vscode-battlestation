@@ -7,28 +7,46 @@ const port = 3000;
 // Mock VS Code API
 const mockVscodeApi = `
   window.__lastCommand = null;
-  window.acquireVsCodeApi = () => ({
-    postMessage: (msg) => {
-      window.__lastCommand = msg;
-      console.log('VSCode API received message:', msg);
-      // add a visual toast so we can see it!
-      const toast = document.createElement('div');
-      toast.style.position = 'fixed';
-      toast.style.bottom = '10px';
-      toast.style.right = '10px';
-      toast.style.background = '#0e639c';
-      toast.style.color = 'white';
-      toast.style.padding = '8px 16px';
-      toast.style.borderRadius = '4px';
-      toast.style.zIndex = '9999';
-      toast.id = 'toast-msg';
-      toast.innerText = 'COMMAND SENT: ' + msg.command;
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 2000);
-    },
-    getState: () => ({}),
-    setState: (state) => {}
-  });
+  window.acquireVsCodeApi = () => {
+    const api = {
+      postMessage: (msg) => {
+        window.__lastCommand = msg;
+        console.log('VSCode API received message:', msg);
+        // add a visual toast so we can see it!
+        const toast = document.createElement('div');
+        toast.style.position = 'fixed';
+        toast.style.bottom = '10px';
+        toast.style.right = '10px';
+        toast.style.background = '#0e639c';
+        toast.style.color = 'white';
+        toast.style.padding = '8px 16px';
+        toast.style.borderRadius = '4px';
+        toast.style.zIndex = '9999';
+        toast.id = 'toast-msg';
+        toast.innerText = 'COMMAND SENT: ' + msg.command;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+      },
+      getState: () => ({}),
+      setState: (state) => {}
+    };
+
+    window.addEventListener('mouseup', (e) => {
+      if (e.button === 3 || e.button === 4) {
+        api.postMessage({ command: 'cancelForm' });
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      if ((!isMac && e.altKey && e.key === 'ArrowLeft') || 
+          (isMac && e.metaKey && e.key === 'ArrowLeft')) {
+        api.postMessage({ command: 'cancelForm' });
+      }
+    });
+
+    return api;
+  };
 `;
 
 const indexHtml = `
@@ -85,7 +103,14 @@ const indexHtml = `
 </html>
 `;
 
-const settingsHtml = `
+const url = require('url');
+
+const getSettingsHtml = (reqUrl) => {
+  const parsedUrl = url.parse(reqUrl, true);
+  const configExists = parsedUrl.query.configExists !== 'false';
+  const backupCount = parsedUrl.query.backupCount ? parseInt(parsedUrl.query.backupCount, 10) : 3;
+
+  return `
 <!DOCTYPE html>
 <html>
   <head>
@@ -107,16 +132,18 @@ const settingsHtml = `
         showCommand: true,
         showGroup: true,
         hideIcon: 'eye-closed',
-        backupCount: 3,
-        configExists: true,
+        backupCount: ${backupCount},
+        configExists: ${configExists},
         usedIcons: ['package', 'terminal', 'play', 'gear', 'history', 'trash'],
-        customConfigPath: null
+        customConfigPath: null,
+        actionToolbar: ['hide', 'setColor', 'edit', 'delete']
       };
     </script>
     <script type="module" src="/settingsView.js"></script>
   </body>
 </html>
 `;
+};
 
 const mimeTypes = {
   '.html': 'text/html',
@@ -139,22 +166,24 @@ const mimeTypes = {
 const server = http.createServer((req, res) => {
   console.log('GET', req.url);
 
-  if (req.url === '/' || req.url === '/index.html') {
+  const parsedReq = url.parse(req.url);
+
+  if (parsedReq.pathname === '/' || parsedReq.pathname === '/index.html') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(indexHtml, 'utf-8');
     return;
   }
 
-  if (req.url === '/settings' || req.url === '/settings.html') {
+  if (parsedReq.pathname === '/settings' || parsedReq.pathname === '/settings.html') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(settingsHtml, 'utf-8');
+    res.end(getSettingsHtml(req.url), 'utf-8');
     return;
   }
 
   // Generated test pages (run `npx ts-node scripts/gen-test-pages.ts` to rebuild)
   const testPageRoutes = { '/error': 'error.html', '/add-action': 'add-action.html', '/edit-action': 'edit-action.html' };
-  if (testPageRoutes[req.url]) {
-    const pagePath = path.join(__dirname, 'test-pages', testPageRoutes[req.url]);
+  if (testPageRoutes[parsedReq.pathname]) {
+    const pagePath = path.join(__dirname, 'test-pages', testPageRoutes[parsedReq.pathname]);
     if (fs.existsSync(pagePath)) {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(fs.readFileSync(pagePath, 'utf-8'), 'utf-8');
@@ -165,7 +194,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  let filePath = path.join(__dirname, '../media', req.url);
+  let filePath = path.join(__dirname, '../media', parsedReq.pathname);
   let extname = String(path.extname(filePath)).toLowerCase();
   let contentType = mimeTypes[extname] || 'application/octet-stream';
 

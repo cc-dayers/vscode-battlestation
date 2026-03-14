@@ -4,6 +4,8 @@ As an AI agent working on this project, you MUST strictly adhere to the followin
 
 ## 1. You Are Not Done Until Tests Pass
 
+**CRITICAL DIRECTIVE**: In order for ANY item to be considered done, ALL tests (both unit and UI) HAVE to pass. Do not hand off any task until all tests pass with zero failures.
+
 Every new feature and every bug fix requires **both** a unit/integration test **and** a Playwright E2E test before the task is considered complete. This is a hard requirement — do not hand off without them.
 
 - **Unit tests** → `src/test/suite/*.test.ts` — run with `npm run test:unit`
@@ -34,13 +36,13 @@ If any of the above fail, the task is not done. Fix the failures, then verify ag
 
 When you encounter untested existing functionality, add tests for it proactively — don't leave gaps. Use the following guide:
 
-| Feature | Test type | Where |
-|---|---|---|
-| Config read/write round-trips | Unit | `src/test/suite/` |
-| HTML rendering output | Unit | `src/test/suite/` |
-| Play button dispatches `executeCommand` | Playwright | `tests/main-view.spec.ts` |
-| Search filters actions | Playwright | `tests/main-view.spec.ts` |
-| Group collapse/expand | Playwright | `tests/main-view.spec.ts` |
-| Hide/show action | Playwright | `tests/main-view.spec.ts` |
-| Menu stacking / z-index | Playwright | `tests/menu-layering.spec.ts` |
-| Status indicator dots | Playwright | `tests/status-indicator.spec.ts` |
+| Feature                                 | Test type  | Where                            |
+| --------------------------------------- | ---------- | -------------------------------- |
+| Config read/write round-trips           | Unit       | `src/test/suite/`                |
+| HTML rendering output                   | Unit       | `src/test/suite/`                |
+| Play button dispatches `executeCommand` | Playwright | `tests/main-view.spec.ts`        |
+| Search filters actions                  | Playwright | `tests/main-view.spec.ts`        |
+| Group collapse/expand                   | Playwright | `tests/main-view.spec.ts`        |
+| Hide/show action                        | Playwright | `tests/main-view.spec.ts`        |
+| Menu stacking / z-index                 | Playwright | `tests/menu-layering.spec.ts`    |
+| Status indicator dots                   | Playwright | `tests/status-indicator.spec.ts` |

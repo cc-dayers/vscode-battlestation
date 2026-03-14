@@ -121,7 +121,7 @@ suite('Config Lifecycle Test Suite', () => {
         const initialConfig: Config = {
             actions: [
                 { name: "Custom Action", command: "echo custom", type: "shell" },
-                { name: "npm: build", command: "npm run build", type: "npm" }
+                { name: "build", command: "npm run build", type: "npm" }
             ],
             icons: [{ type: "shell", icon: "terminal" }]
         };
@@ -169,9 +169,44 @@ suite('Config Lifecycle Test Suite', () => {
         };
         await configService.writeConfig(config2);
 
-        // Check history
         const versions = await configService.listConfigVersions();
         assert.ok(versions.length > 0, 'Should have at least one history entry');
+    });
+
+    test('Should clear config history backups', async function () {
+        this.timeout(5000);
+
+        // Create initial config
+        const config1: Config = {
+            actions: [{ name: "Action 1", command: "cmd1", type: "shell" }],
+            icons: []
+        };
+        await configService.writeConfig(config1);
+
+        // Wait a bit to ensure different timestamps
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Update config (this should create a history entry)
+        const config2: Config = {
+            actions: [
+                { name: "Action 1", command: "cmd1", type: "shell" },
+                { name: "Action 2", command: "cmd2", type: "shell" }
+            ],
+            icons: []
+        };
+        await configService.writeConfig(config2);
+
+        // Check history
+        let versions = await configService.listConfigVersions();
+        assert.ok(versions.length > 0, 'Should have at least one history entry before clear');
+
+        // Clear history
+        const result = await configService.clearHistory();
+        assert.strictEqual(result.deleted, true, 'clearHistory should report success');
+
+        // Verify history is gone
+        versions = await configService.listConfigVersions();
+        assert.strictEqual(versions.length, 0, 'History should be empty after clearing');
     });
 
     test('Should immediately report valid status with generated actions after auto-generate', async function () {
@@ -217,15 +252,13 @@ suite('Config Lifecycle Test Suite', () => {
         const config = await configService.readConfig();
         assert.ok(config, 'Should be able to read generated config');
 
-        // Find watch task
-        const watchTask = config.actions.find(a => a.name === 'Task: watch');
-        assert.ok(watchTask, 'Should find watch task');
+        const watchTask = config.actions.find(a => a.name === 'watch' && a.type === 'task');
 
         // Primary group should be "VS Code Tasks"
-        assert.strictEqual(watchTask.group, 'VS Code Tasks', 'Task should have VS Code Tasks as primary group');
+        assert.strictEqual(watchTask!.group, 'VS Code Tasks', 'Task should have VS Code Tasks as primary group');
 
         // Secondary group (Build) should be in workspace field
-        assert.strictEqual(watchTask.workspace, 'Build', 'Task group from tasks.json should be in workspace field (secondary grouping)');
+        assert.strictEqual(watchTask!.workspace, 'Build', 'Task group from tasks.json should be in workspace field (secondary grouping)');
 
         // Verify that VS Code Tasks group exists in groups array
         const tasksGroup = config.groups?.find(g => g.name === 'VS Code Tasks');
@@ -252,15 +285,14 @@ suite('Config Lifecycle Test Suite', () => {
         const config = await configService.readConfig();
         assert.ok(config, 'Should be able to read generated config');
 
-        // Task should have VS Code Tasks as primary group
-        const watchTask = config.actions.find(a => a.name === 'Task: watch');
+        const watchTask = config.actions.find(a => a.name === 'watch' && a.type === 'task');
         if (watchTask) {
             assert.strictEqual(watchTask.group, 'VS Code Tasks', 'Task should have VS Code Tasks as primary group');
             assert.strictEqual(watchTask.workspace, 'Build', 'Task should have Build as secondary group (in workspace field)');
         }
 
         // NPM actions should have NPM Scripts as primary group
-        const npmAction = config.actions.find(a => a.name.startsWith('npm:'));
+        const npmAction = config.actions.find(a => a.type === 'npm');
         if (npmAction) {
             assert.strictEqual(npmAction.group, 'NPM Scripts', 'NPM action should have NPM Scripts as primary group');
         }

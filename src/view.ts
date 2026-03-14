@@ -150,7 +150,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           message.enableGrouping || false,
           message.enhancedSources || {},
           message.detectionMethod || "hybrid",
-          message.enableColoring || false
+          message.enableColoring || false,
+          message.autoOpen || false,
+          message.deepScan || false
         );
         break;
       case "executeCommand":
@@ -257,6 +259,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         void this.handleImportConfig();
         break;
       case "showGenerateConfig":
+      case "showAdvancedOptions":
         void this.handleShowGenerateConfig();
         break;
       case "createBlankConfig":
@@ -266,7 +269,10 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         void this.handleCreateExampleConfig();
         break;
       case "deleteConfig":
-        void this.handleDeleteConfig();
+        void this.handleDeleteConfig(message.deleteHistory === true);
+        break;
+      case "clearHistory":
+        void this.handleClearHistory();
         break;
       case "restoreConfig":
         void this.handleRestoreConfig();
@@ -407,6 +413,11 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         const hasTasks = await this.configService.hasSource("tasks");
         const hasLaunch = await this.configService.hasSource("launch");
 
+        const history = await this.configService.listConfigVersions();
+        const hasHistory = history.length > 0;
+
+        const isFirstTimer = !hasHistory;
+
         this.view.webview.html = renderGenerateConfigView({
           cspSource,
           nonce,
@@ -416,6 +427,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           hasLaunch,
           hasWorkspace,
           showWelcome: true,
+          isFirstTimer,
         });
         return;
       }
@@ -498,8 +510,6 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       ...config,
       icons: mergedIcons,
       display: {
-        showIcon: wsConfig.get<boolean>("display.showIcon", false),
-        showType: wsConfig.get<boolean>("display.showType", true),
         showCommand: wsConfig.get<boolean>("display.showCommand", true),
         showGroup: wsConfig.get<boolean>("display.showGroup", true),
         hideIcon: wsConfig.get<string>("display.hideIcon", "eye-closed"),
@@ -544,8 +554,6 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       cspSource,
       nonce,
       codiconStyles: this.getCodiconStyles(),
-      showIcon: wsConfig.get<boolean>("display.showIcon", false),
-      showType: wsConfig.get<boolean>("display.showType", true),
       showCommand: wsConfig.get<boolean>("display.showCommand", true),
       showGroup: wsConfig.get<boolean>("display.showGroup", true),
       hideIcon: wsConfig.get<string>("display.hideIcon", "eye-closed"),
@@ -1056,13 +1064,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async saveSettings(settings: {
-    showIcon: boolean;
-    showType: boolean;
     showCommand: boolean;
     showGroup: boolean;
     hideIcon?: string;
-    useEmojiLoader?: boolean;
-    loaderEmoji?: string;
     actionToolbar?: string[];
   }) {
     console.log('[View Provider] saveSettings called, showingForm before:', this.showingForm);
@@ -1072,27 +1076,10 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     console.log('[ViewProvider] showingForm set to false');
 
     const cfg = vscode.workspace.getConfiguration("battlestation");
-    await cfg.update("display.showIcon", settings.showIcon, vscode.ConfigurationTarget.Workspace);
-    await cfg.update("display.showType", settings.showType, vscode.ConfigurationTarget.Workspace);
     await cfg.update("display.showCommand", settings.showCommand, vscode.ConfigurationTarget.Workspace);
     await cfg.update("display.showGroup", settings.showGroup, vscode.ConfigurationTarget.Workspace);
     if (settings.hideIcon) {
       await cfg.update("display.hideIcon", settings.hideIcon, vscode.ConfigurationTarget.Workspace);
-    }
-    if (typeof settings.useEmojiLoader === "boolean") {
-      await cfg.update(
-        "display.useEmojiLoader",
-        settings.useEmojiLoader,
-        vscode.ConfigurationTarget.Workspace
-      );
-    }
-    if (typeof settings.loaderEmoji === "string") {
-      const normalizedEmoji = settings.loaderEmoji.trim() || "🌯";
-      await cfg.update(
-        "display.loaderEmoji",
-        normalizedEmoji,
-        vscode.ConfigurationTarget.Workspace
-      );
     }
     if (Array.isArray(settings.actionToolbar)) {
       await cfg.update("display.actionToolbar", settings.actionToolbar, vscode.ConfigurationTarget.Workspace);
@@ -1209,17 +1196,26 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
   /* ─── generate / delete config handlers ─── */
 
-  private async handleDeleteConfig() {
+  private async handleDeleteConfig(deleteHistory = false) {
     try {
       if (this.view) {
         this.view.webview.postMessage({ type: "setLoading", value: true });
       }
       const result = await this.configService.deleteConfig();
       if (result.deleted) {
-        this.showingForm = false;
-        void this.refresh();
-        this.showToast(`Deleted ${result.location}`);
-        vscode.window.showInformationMessage(`Config file deleted: ${result.location}`);
+        if (deleteHistory) {
+          await this.configService.clearHistory();
+        }
+        const msg = deleteHistory ? `Deleted ${result.location} and history backups` : `Deleted ${result.location}`;
+        this.showToast(msg);
+        vscode.window.showInformationMessage(msg);
+        
+        if (deleteHistory) {
+          await this.handleShowGenerateConfig();
+        } else {
+          this.showingForm = false;
+          void this.refresh();
+        }
       } else {
         vscode.window.showWarningMessage(
           "Config file not found. It may have already been deleted."
@@ -1232,6 +1228,32 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     } catch (error) {
       vscode.window.showErrorMessage(
         `Failed to delete config: ${(error as Error).message}`
+      );
+      if (this.view) {
+        this.view.webview.postMessage({ type: "setLoading", value: false });
+      }
+    }
+  }
+
+  private async handleClearHistory() {
+    try {
+      if (this.view) {
+        this.view.webview.postMessage({ type: "setLoading", value: true });
+      }
+      const result = await this.configService.clearHistory();
+      if (result.deleted) {
+        this.showToast("Deleted config history backups");
+        vscode.window.showInformationMessage("Config history backups deleted successfully.");
+        await this.handleShowGenerateConfig();
+      } else {
+        vscode.window.showWarningMessage("No config history found to delete.");
+        if (this.view) {
+          this.view.webview.postMessage({ type: "setLoading", value: false });
+        }
+      }
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Failed to delete history: ${(error as Error).message}`
       );
       if (this.view) {
         this.view.webview.postMessage({ type: "setLoading", value: false });
@@ -1422,7 +1444,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     enableGrouping: boolean,
     _ignoredEnhancedSources: any, // Kept for backward compat if needed, but unused now
     detectionMethod: "file" | "command" | "hybrid",
-    enableColoring: boolean = false
+    enableColoring: boolean = false,
+    autoOpen: boolean = false,
+    deepScan: boolean = false
   ) {
     if (!vscode.workspace.workspaceFolders?.length) {
       vscode.window.showErrorMessage('Please open a folder before generating a config.');
@@ -1465,7 +1489,11 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           const basicSources = {
             npm: sources.npm === true,
             tasks: sources.tasks === true,
-            launch: sources.launch === true
+            launch: sources.launch === true,
+            docker: sources.docker === true,
+            make: sources.make === true,
+            rust: sources.rust === true,
+            go: sources.go === true
           };
 
           console.log('[Battlestation] Creating auto config with basic sources:', JSON.stringify(basicSources));
@@ -1475,7 +1503,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
             enableGrouping,
             BattlestationViewProvider.defaultIcons,
             enhancedActions,
-            enableColoring
+            enableColoring,
+            deepScan
           );
 
           const created = await this.configService.configExists();
@@ -1484,9 +1513,11 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
             throw new Error("Config generation completed but no config file was created.");
           }
 
-          progress.report({ increment: 30, message: "Opening config file..." });
-          // Open the config file for review
-          await this.configService.openConfigFile();
+          if (autoOpen) {
+            progress.report({ increment: 30, message: "Opening config file..." });
+            // Open the config file for review
+            await this.configService.openConfigFile();
+          }
 
           progress.report({ increment: 10, message: "Done" });
           const generatedConfig = await this.configService.readConfig();

@@ -603,6 +603,16 @@ export class ConfigService {
     }));
   }
 
+  async clearHistory(): Promise<{ deleted: boolean }> {
+    const historyUri = this.getHistoryUri();
+    if (historyUri && (await this.fileExists(historyUri))) {
+      await vscode.workspace.fs.delete(historyUri);
+      this.invalidateCache();
+      return { deleted: true };
+    }
+    return { deleted: false };
+  }
+
   async restoreConfigVersion(timestamp: number): Promise<void> {
     const history = await this.readHistory();
     const entry = history.find(e => e.timestamp === timestamp);
@@ -632,7 +642,7 @@ export class ConfigService {
 
   /* ─── Scanning helpers ─── */
 
-  async scanNpmScripts(): Promise<Action[]> {
+  async scanNpmScripts(deepScan: boolean = false): Promise<Action[]> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) return [];
 
@@ -657,7 +667,7 @@ export class ConfigService {
             if (!seenActions.has(key)) {
               seenActions.add(key);
               const action: Action = {
-                name: `npm: ${name}`,
+                name: name,
                 command: command,
                 type: "npm",
                 cwd: folder.uri.fsPath,
@@ -672,7 +682,9 @@ export class ConfigService {
       }
 
       // Recursively scan subdirectories for package.json files
-      await this.scanNpmScriptsRecursive(folder.uri, allActions, seenActions, workspaceName, isRootWorkspace);
+      if (deepScan) {
+        await this.scanNpmScriptsRecursive(folder.uri, allActions, seenActions, workspaceName, isRootWorkspace);
+      }
     }
 
     return allActions;
@@ -711,7 +723,9 @@ export class ConfigService {
               const scripts = pkg.scripts || {};
               const relativePath = vscode.workspace.asRelativePath(subDirUri, false);
 
-              const workspaceLabel = isRootWorkspace ? relativePath : `${workspaceName}/${relativePath}`;
+              // Better monorepo support: use package name if available instead of raw path
+              const workspaceNameOrPath = pkg.name || relativePath;
+              const workspaceLabel = isRootWorkspace ? workspaceNameOrPath : `${workspaceName}/${workspaceNameOrPath}`;
 
               Object.keys(scripts).forEach((scriptName) => {
                 // With cwd support, we don't need "cd ... &&" prefix anymore
@@ -723,7 +737,7 @@ export class ConfigService {
                 if (!seenActions.has(key)) {
                   seenActions.add(key);
                   const action: Action = {
-                    name: `npm: ${scriptName}`,
+                    name: scriptName,
                     command: command,
                     type: "npm",
                     cwd: subDirUri.fsPath,
@@ -748,6 +762,141 @@ export class ConfigService {
   }
 
 
+
+  private async findToolFiles(patterns: string[], deepScan: boolean): Promise<{ uri: vscode.Uri; isRoot: boolean; relativePath: string }[]> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) return [];
+
+    const results: { uri: vscode.Uri; isRoot: boolean; relativePath: string }[] = [];
+    
+    for (const folder of workspaceFolders) {
+      const isRootWorkspace = workspaceFolders.length === 1;
+
+      if (deepScan) {
+        try {
+          // Use relative pattern to search only within this workspace folder
+          const globPattern = `**/{${patterns.join(',')}}`;
+          const relativePattern = new vscode.RelativePattern(folder, globPattern);
+          const uris = await vscode.workspace.findFiles(relativePattern, '**/node_modules/**');
+          
+          for (const uri of uris) {
+            const relPath = vscode.workspace.asRelativePath(uri, false);
+            const folderPath = relPath.substring(0, relPath.lastIndexOf('/')) || '';
+            const workspaceLabel = isRootWorkspace 
+              ? folderPath 
+              : folderPath ? `${folder.name}/${folderPath}` : folder.name;
+              
+            results.push({
+              uri,
+              isRoot: folderPath === '',
+              relativePath: workspaceLabel
+            });
+          }
+        } catch {
+          // ignore
+        }
+      } else {
+        // Root only
+        for (const pattern of patterns) {
+          const uri = vscode.Uri.joinPath(folder.uri, pattern);
+          if (await this.fileExists(uri)) {
+            results.push({
+              uri,
+              isRoot: true,
+              relativePath: isRootWorkspace ? '' : folder.name
+            });
+          }
+        }
+      }
+    }
+    
+    // Deduplicate by path
+    const unique = new Map<string, any>();
+    for (const res of results) {
+      unique.set(res.uri.fsPath, res);
+    }
+    return Array.from(unique.values());
+  }
+
+  async scanMake(deepScan = false): Promise<Action[]> {
+    const files = await this.findToolFiles(['Makefile', 'makefile', 'GNUmakefile'], deepScan);
+    const actions: Action[] = [];
+    
+    for (const file of files) {
+      try {
+        const content = await this.readText(file.uri);
+        const lines = content.split('\n');
+        const cwd = vscode.Uri.joinPath(file.uri, '..').fsPath;
+        
+        let foundTargets = false;
+        for (const line of lines) {
+          const match = line.match(/^([a-zA-Z0-9_-]+):/);
+          if (match) {
+            const target = match[1];
+            if (!target.startsWith('.') && !target.startsWith('%')) {
+               foundTargets = true;
+               actions.push({
+                 name: `Make: ${target}`,
+                 command: `make ${target}`,
+                 type: "make",
+                 cwd,
+                 workspace: file.relativePath || undefined
+               });
+            }
+          }
+        }
+        
+        // Fallback default targets if regex fails to find any
+        if (!foundTargets) {
+           actions.push({ name: "Make: all", command: "make all", type: "make", cwd, workspace: file.relativePath || undefined });
+           actions.push({ name: "Make: clean", command: "make clean", type: "make", cwd, workspace: file.relativePath || undefined });
+        }
+      } catch {
+        // skip
+      }
+    }
+    return actions;
+  }
+
+  async scanDocker(deepScan = false): Promise<Action[]> {
+    const files = await this.findToolFiles(['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml'], deepScan);
+    const actions: Action[] = [];
+    
+    for (const file of files) {
+      const cwd = vscode.Uri.joinPath(file.uri, '..').fsPath;
+      actions.push({ name: "Docker Compose Up", command: "docker-compose up -d", type: "docker", cwd, workspace: file.relativePath || undefined });
+      actions.push({ name: "Docker Compose Down", command: "docker-compose down", type: "docker", cwd, workspace: file.relativePath || undefined });
+      actions.push({ name: "Docker Compose Logs", command: "docker-compose logs -f", type: "docker", cwd, workspace: file.relativePath || undefined });
+    }
+    return actions;
+  }
+
+  async scanRust(deepScan = false): Promise<Action[]> {
+    const files = await this.findToolFiles(['Cargo.toml'], deepScan);
+    const actions: Action[] = [];
+    
+    for (const file of files) {
+      const cwd = vscode.Uri.joinPath(file.uri, '..').fsPath;
+      // Could read Cargo.toml for workspace name, but using folder is fine for now
+      actions.push({ name: "Cargo Build", command: "cargo build", type: "rust", cwd, workspace: file.relativePath || undefined });
+      actions.push({ name: "Cargo Run", command: "cargo run", type: "rust", cwd, workspace: file.relativePath || undefined });
+      actions.push({ name: "Cargo Test", command: "cargo test", type: "rust", cwd, workspace: file.relativePath || undefined });
+    }
+    return actions;
+  }
+
+  async scanGo(deepScan = false): Promise<Action[]> {
+    const files = await this.findToolFiles(['go.mod'], deepScan);
+    const actions: Action[] = [];
+    
+    for (const file of files) {
+      const cwd = vscode.Uri.joinPath(file.uri, '..').fsPath;
+      actions.push({ name: "Go Run", command: "go run .", type: "go", cwd, workspace: file.relativePath || undefined });
+      actions.push({ name: "Go Test", command: "go test ./...", type: "go", cwd, workspace: file.relativePath || undefined });
+      actions.push({ name: "Go Mod Tidy", command: "go mod tidy", type: "go", cwd, workspace: file.relativePath || undefined });
+    }
+    return actions;
+  }
 
   async scanTasks(): Promise<Action[]> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -786,6 +935,11 @@ export class ConfigService {
               }
             }
 
+            // Task groups defined as "none" shouldn't become an actual group named "None"
+            if (secondaryGroup?.toLowerCase() === 'none') {
+              secondaryGroup = undefined;
+            }
+
             // Use workspace field for secondary grouping
             // If we have both a workspace folder and a task group, combine them
             let workspaceValue: string | undefined;
@@ -798,7 +952,7 @@ export class ConfigService {
             }
 
             const action: Action = {
-              name: `Task: ${label}`,
+              name: label,
               command: `workbench.action.tasks.runTask|${label}`,
               type: "task",
               workspace: workspaceValue,
@@ -838,7 +992,7 @@ export class ConfigService {
           )
           .forEach((c: any) => {
             const action: Action = {
-              name: `Launch: ${c.name.trim()}`,
+              name: c.name.trim(),
               command: `workbench.action.debug.start|${c.name.trim()}`,
               type: "launch",
               workspace: isRootWorkspace ? undefined : folder.name,
@@ -854,7 +1008,7 @@ export class ConfigService {
           )
           .forEach((c: any) => {
             const action: Action = {
-              name: `Launch: ${c.name.trim()}`,
+              name: c.name.trim(),
               command: `workbench.action.debug.start|${c.name.trim()}`,
               type: "launch",
               workspace: isRootWorkspace ? undefined : folder.name,
@@ -964,11 +1118,12 @@ export class ConfigService {
 
   /** Auto-generate config by scanning workspace sources. */
   async createAutoConfig(
-    sources: { npm?: boolean; tasks?: boolean; launch?: boolean },
+    sources: { npm?: boolean; tasks?: boolean; launch?: boolean; docker?: boolean; make?: boolean; rust?: boolean; go?: boolean },
     groupByType: boolean,
     defaultIcons: IconMapping[],
     enhancedActions?: Action[],
-    enableColoring: boolean = false
+    enableColoring: boolean = false,
+    deepScan: boolean = false
   ): Promise<void> {
     const actions: Action[] = [];
     const groups: Group[] = [];
@@ -991,7 +1146,19 @@ export class ConfigService {
 
     // 1. Gather actions from enabled sources
     if (sources.npm) {
-      actions.push(...(await this.scanNpmScripts()));
+      actions.push(...(await this.scanNpmScripts(deepScan)));
+    }
+    if (sources.make) {
+      actions.push(...(await this.scanMake(deepScan)));
+    }
+    if (sources.rust) {
+      actions.push(...(await this.scanRust(deepScan)));
+    }
+    if (sources.go) {
+      actions.push(...(await this.scanGo(deepScan)));
+    }
+    if (sources.docker) {
+      actions.push(...(await this.scanDocker(deepScan)));
     }
     if (sources.tasks) {
       actions.push(...(await this.scanTasks()));
@@ -1043,17 +1210,25 @@ export class ConfigService {
         npm: "NPM Scripts",
         task: "VS Code Tasks",
         launch: "Launch Configs",
+        docker: "Docker",
+        make: "Makefiles",
+        rust: "Rust",
+        go: "Go"
       };
 
       const typeGroupIcons: Record<string, string> = {
         npm: "package",
         task: "checklist",
         launch: "rocket",
+        docker: "server-environment",
+        make: "tools",
+        rust: "gear",
+        go: "terminal"
       };
 
       const sortedTypes = Array.from(typeGroups.keys()).sort((a, b) => {
-        // Sort order: npm, task, launch, others
-        const order = ['npm', 'task', 'launch'];
+        // Sort order: npm, docker, make, rust, go, task, launch, others
+        const order = ['npm', 'docker', 'make', 'rust', 'go', 'task', 'launch'];
         const idxA = order.indexOf(a);
         const idxB = order.indexOf(b);
         if (idxA !== -1 && idxB !== -1) return idxA - idxB;
@@ -1139,8 +1314,10 @@ export class ConfigService {
       try {
         const existingConfig = await this.readConfig();
         const autoGeneratedPrefixes = ["npm: ", "Task: ", "Launch: "];
+        const newKeys = new Set(actions.map(a => `${a.command}|${a.workspace || ''}`));
         const customActions = existingConfig.actions.filter(
-          (item) => !autoGeneratedPrefixes.some((prefix) => item.name.startsWith(prefix))
+          (item) => !autoGeneratedPrefixes.some((prefix) => item.name.startsWith(prefix)) &&
+                    !newKeys.has(`${item.command}|${item.workspace || ''}`)
         );
         finalActions = [...actions, ...customActions];
 

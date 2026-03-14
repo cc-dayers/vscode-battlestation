@@ -21,7 +21,7 @@ suite('ConfigService Test Suite', () => {
             const scripts = await configService.scanNpmScripts();
             console.log('Detected scripts:', scripts.length);
             assert.ok(scripts.length > 0, 'Should find npm scripts');
-            const watchScript = scripts.find(s => s.name === 'npm: watch');
+            const watchScript = scripts.find(s => s.name === 'watch');
             assert.ok(watchScript, 'Should find "watch" script');
             assert.ok(watchScript.cwd, 'Should have cwd set');
         } catch (e) {
@@ -41,7 +41,7 @@ suite('ConfigService Test Suite', () => {
         // We expect at least one task if tasks.json exists and has tasks
         // In this project it does (watch)
         assert.ok(tasks.length > 0, 'Should find VS Code tasks');
-        const watchTask = tasks.find(t => t.name === 'Task: watch');
+        const watchTask = tasks.find(t => t.name === 'watch');
         assert.ok(watchTask, 'Should find "watch" task');
     });
 
@@ -55,7 +55,7 @@ suite('ConfigService Test Suite', () => {
         const tasks = await configService.scanTasks();
         
         // The watch task has group: { kind: "build", isDefault: true }
-        const watchTask = tasks.find(t => t.name === 'Task: watch');
+        const watchTask = tasks.find(t => t.name === 'watch');
         assert.ok(watchTask, 'Should find "watch" task');
         // Group from tasks.json should be in workspace field (secondary grouping)
         assert.strictEqual(watchTask.workspace, 'Build', 'Watch task should have Build in workspace field (secondary grouping)');
@@ -85,7 +85,7 @@ suite('ConfigService Test Suite', () => {
         }
 
         // This workspace defines "Run Extension" in .vscode/launch.json
-        const runExtension = configs.find(c => c.name === 'Launch: Run Extension');
+        const runExtension = configs.find(c => c.name === 'Run Extension');
         assert.ok(runExtension, 'Should detect "Run Extension" from launch.json');
     });
 

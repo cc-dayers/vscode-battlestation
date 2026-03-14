@@ -5,8 +5,6 @@ export interface SettingsViewContext {
   cspSource: string;
   nonce: string;
   codiconStyles: string;
-  showIcon: boolean;
-  showType: boolean;
   showCommand: boolean;
   showGroup: boolean;
   hideIcon: string;
@@ -21,8 +19,6 @@ export interface SettingsViewContext {
 
 export function renderSettingsView(ctx: SettingsViewContext): string {
   const initialState = {
-    showIcon: ctx.showIcon,
-    showType: ctx.showType,
     showCommand: ctx.showCommand,
     showGroup: ctx.showGroup,
     hideIcon: ctx.hideIcon,

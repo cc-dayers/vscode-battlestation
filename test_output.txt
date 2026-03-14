@@ -1,0 +1,102 @@
+
+> battlestation@0.1.7 test:unit
+> vscode-test --grep -v "Manual"
+
+- Resolving version...
+Γ£ö Validated version: 1.111.0
+Γ£ö Found existing install in C:\Users\Don\Documents\Projects\vscode-battlestation\.vscode-test\vscode-win32-x64-archive-1.111.0
+(node:20860) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+[main 2026-03-12T15:51:26.829Z] Error: Error mutex already exists
+    at ls.installMutex (file:///C:/Users/Don/Documents/Projects/vscode-battlestation/.vscode-test/vscode-win32-x64-archive-1.111.0/ce099c1ed2/resources/app/out/main.js:550:23404)
+[main 2026-03-12T15:51:26.841Z] update#setState disabled
+[main 2026-03-12T15:51:26.841Z] update#ctor - updates are disabled by the environment
+Started local extension host with pid 35508.
+Loading development extension at c:\Users\Don\Documents\Projects\vscode-battlestation
+MCP Registry configured: https://api.mcp.github.com
+Settings Sync: Account status changed from uninitialized to unavailable
+[computeSkillDiscoveryInfo] Skipping duplicate agent skill name: find-skills at file:///c%3A/Users/Don/.claude/skills/find-skills/SKILL.md
+
+  Config Lifecycle Test Suite
+    Γ£ö Should handle delete -> generate config lifecycle (159ms)
+    Γ£ö Should create minimal config when none exists (38ms)
+    Γ£ö Should detect config file location
+    Γ£ö Should preserve custom actions when regenerating (134ms)
+    Γ£ö Should handle config history (172ms)
+    Γ£ö Should immediately report valid status with generated actions after auto-generate (118ms)
+    Γ£ö Should preserve task groups from tasks.json during auto-config generation
+    Γ£ö Should not overwrite existing task groups when groupByType is enabled (73ms)
+    Γ£ö Should allow opening config file immediately after generation (141ms)
+  Generate Config UI Test Suite
+    Γ£ö Should render core generation checkboxes checked by default
+    Γ£ö Should not ignore enhanced sources when generating
+    Γ£ö Should render correctly without enhanced mode context
+    Γ£ö Should include generation loading lifecycle hooks
+  ConfigService Test Suite
+Detected scripts: 40
+    Γ£ö scanNpmScripts should detect scripts from package.json (202ms)
+    Γ£ö scanTasks should detect tasks from tasks.json
+    Γ£ö scanTasks should respect task group field from tasks.json
+    Γ£ö scanLaunchConfigs should return valid launch actions without throwing
+    Γ£ö openConfigFile should return false when config is missing
+  Welcome View / Config Generation Flow
+    Γ£ö getConfigStatus reports exists:false when no config present
+    Γ£ö configExists returns false when no config present
+    Γ£ö createAutoConfig produces a file on disk with valid JSON and actions (61ms)
+    Γ£ö createAutoConfig with grouping produces groups that match actions (90ms)
+    Γ£ö createMinimalConfig produces a file with valid structure
+    Γ£ö openConfigFile returns true after successful generation (84ms)
+    Γ£ö delete ΓåÆ generate ΓåÆ status cycle works without errors (110ms)
+  UI Renderer Test Suite
+    Γ£ö renderMainView injects initialData
+    Γ£ö renderMainView respects searchVisible
+  Settings Panel Integration Test Suite
+    Γ£ö battlestation.open and battlestation.openSettings execute without error (1067ms)
+    Γ£ö display.showCommand setting round-trips through Configuration API (831ms)
+    Γ£ö changing settings does not mutate battle.json config (370ms)
+  Settings Panel Integration Test Suite
+    Γ£ö Should save and retrieve display settings (335ms)
+    Γ£ö Multiple rapid config updates should not cause data loss (410ms)
+    Γ£ö Hide icon options should be valid (460ms)
+    Γ£ö Config file operations should work with settings changes (262ms)
+    Γ£ö Settings changes should not affect config history (436ms)
+  Settings View Test Suite
+    Γ£ö renderSettingsView generates correct initial structure
+    Γ£ö renderSettingsView handles missing optional props
+  Flyout Menu Architecture Test Suite
+    Γ£ö Webview uses shared flyout render and keyboard handlers
+    Γ£ö Webview uses normalized lp-menu-* class names
+    Γ£ö Styles define normalized lp-menu-* classes
+  Action Ordering & Group Persistence
+    Γ£ö Action order is preserved through write/read
+    Γ£ö Reordered actions persist correctly
+    Γ£ö Groups persist through write/read with all properties
+    Γ£ö Adding a group to an existing config preserves actions
+  Action Integration Test Suite
+    Γ£ö writeConfig persists all actions with correct fields
+    Γ£ö hidden flag is preserved through write/read round-trip
+    Γ£ö deleting an action persists correctly (67ms)
+    Γ£ö adding an action persists correctly (51ms)
+    Γ£ö battlestation.open command executes without error (502ms)
+  Feature 1: Config Validation Error State
+    Γ£ö renderErrorView returns valid HTML with error message
+    Γ£ö renderErrorView truncates messages longer than 300 chars
+    Γ£ö renderErrorView escapes HTML special chars in error message
+    Γ£ö renderErrorView includes openConfig and refresh buttons
+    Γ£ö error view and main view are structurally distinct HTML shells (state machine recovery)
+    Γ£ö ConfigService.getConfigStatus returns error for invalid JSON (47ms)
+  Feature 2: Parametric Commands
+    Γ£ö Action type accepts params field
+    Γ£ö params round-trip through config write/read (41ms)
+    Γ£ö Action without params field is unaffected
+    Γ£ö renderAddActionForm HTML includes params section (50ms)
+    Γ£ö renderEditActionForm HTML includes params section and pre-populates existing params
+  Feature 3: Last-Run Status Indicator
+    Γ£ö renderMainView serializes empty runStatus into __INITIAL_DATA__
+    Γ£ö renderMainView serializes runStatus entries into __INITIAL_DATA__
+    Γ£ö renderMainView with nonzero exitCode serializes correctly
+    Γ£ö mainView.js bundle includes status-dot CSS classes
+  64 passing (7s)
+[main 2026-03-12T15:51:36.048Z] Extension host with pid 35508 exited with code: 0, signal: unknown.
+Exit code:   0

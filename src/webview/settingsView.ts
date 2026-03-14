@@ -2,8 +2,6 @@ import { html, render } from "lit";
 import { classMap } from "lit/directives/class-map.js";
 
 type SettingsState = {
-  showIcon: boolean;
-  showType: boolean;
   showCommand: boolean;
   showGroup: boolean;
   hideIcon: string;
@@ -49,8 +47,6 @@ const vscode = window.acquireVsCodeApi();
 const root = document.getElementById("root");
 
 const state: SettingsState = window.__SETTINGS__ || {
-  showIcon: true,
-  showType: true,
   showCommand: true,
   showGroup: true,
   hideIcon: "eye-closed",
@@ -62,6 +58,7 @@ const state: SettingsState = window.__SETTINGS__ || {
 };
 
 let showDeleteConfirm = false;
+let showDeleteHistoryConfirm = false;
 let showAdvanced = false;
 let toolbarDragSrc: string | null = null;
 
@@ -80,14 +77,22 @@ const hideDeleteConfirm = () => {
   renderView();
 };
 
+const toggleDeleteHistoryConfirm = () => {
+  showDeleteHistoryConfirm = !showDeleteHistoryConfirm;
+  renderView();
+};
+
+const hideDeleteHistoryConfirm = () => {
+  showDeleteHistoryConfirm = false;
+  renderView();
+};
+
 const onSave = () => {
   try {
     console.log('[SettingsView] Saving settings...');
     vscode.postMessage({
       command: "saveSettings",
       settings: {
-        showIcon: state.showIcon,
-        showType: state.showType,
         showCommand: state.showCommand,
         showGroup: state.showGroup,
         hideIcon: state.hideIcon,
@@ -203,8 +208,8 @@ const renderView = () => {
       title: state.configExists ? "Regenerate config from scanned sources" : "Generate new config file",
       ariaLabel: state.configExists ? "Regenerate config" : "Generate config",
     })}
-                ${state.backupCount > 0 ? configBtn("history", "Undo", "restoreConfig", {
-      disabled: !state.configExists,
+                ${state.backupCount > 0 ? configBtn("history", "Restore", "restoreConfig", {
+      disabled: false,
       title: `Restore a previous config (${state.backupCount})`,
       ariaLabel: "Restore previous config",
     }) : null}
@@ -214,21 +219,55 @@ const renderView = () => {
       ariaLabel: "Delete config file",
       onClick: () => toggleDeleteConfirm(),
     }) : null}
+                ${!state.configExists && state.backupCount > 0 ? configBtn("trash", "Delete History", "clearHistory", {
+      danger: true,
+      title: "Delete history backups",
+      ariaLabel: "Delete history backups",
+      onClick: () => toggleDeleteHistoryConfirm(),
+    }) : null}
               </div>
             </div>
             ${state.configExists && showDeleteConfirm ? html`
               <div class="lp-config-confirm">
                 <div class="lp-config-confirm-text">
-                  <span>Delete battle.json?</span><br> You can recover any you have generated previously on this machine later.
+                  <span>Delete battle.json?</span><br> This cannot be undone.<br><br>
+                  ${state.backupCount > 0 ? html`<label class="lp-checkbox-label" style="display:flex;align-items:center;">
+                    <input type="checkbox" id="deleteHistoryAlso" class="lp-checkbox">
+                    <span style="margin-left:8px;font-size:12px;opacity:0.9;">Also delete ${state.backupCount} history backup${state.backupCount !== 1 ? 's' : ''}</span>
+                  </label>` : null}
                 </div>
                 <div class="lp-config-confirm-actions">
                   ${configBtn("trash", "Delete", "deleteConfig", {
       danger: true,
-      ariaLabel: "Confirm delete config file"
+      ariaLabel: "Confirm delete config file",
+      onClick: () => {
+        const delHistory = (document.getElementById('deleteHistoryAlso') as HTMLInputElement)?.checked;
+        vscode.postMessage({ command: "deleteConfig", deleteHistory: delHistory });
+      }
     })}
                   ${configBtn("close", "Cancel", "", {
       onClick: () => hideDeleteConfirm(),
       ariaLabel: "Cancel delete config"
+    })}
+                </div>
+              </div>
+            ` : null}
+            ${!state.configExists && state.backupCount > 0 && showDeleteHistoryConfirm ? html`
+              <div class="lp-config-confirm">
+                <div class="lp-config-confirm-text">
+                  <span>Delete ${state.backupCount} history backup${state.backupCount !== 1 ? 's' : ''}?</span><br> This cannot be undone.<br><br>
+                </div>
+                <div class="lp-config-confirm-actions">
+                  ${configBtn("trash", "Delete History", "clearHistory", {
+      danger: true,
+      ariaLabel: "Confirm delete history",
+      onClick: () => {
+        vscode.postMessage({ command: "clearHistory" });
+      }
+    })}
+                  ${configBtn("close", "Cancel", "", {
+      onClick: () => hideDeleteHistoryConfirm(),
+      ariaLabel: "Cancel delete history"
     })}
                 </div>
               </div>
@@ -288,36 +327,6 @@ const renderView = () => {
 
         <div class="lp-setting-group">
           <div class="lp-setting-group-title">🎨 Display</div>
-          <div class="lp-setting-row">
-          <div class="lp-setting-label">
-            <div class="lp-setting-name">Show Icons</div>
-            <div class="lp-setting-desc">Display codicons next to button names</div>
-          </div>
-          <label class="lp-setting-toggle">
-            <input
-              type="checkbox"
-              .checked=${state.showIcon}
-              @change=${(e: Event) =>
-        setState({ showIcon: (e.target as HTMLInputElement).checked })}
-            />
-            <span class="lp-toggle-slider"></span>
-          </label>
-        </div>
-          <div class="lp-setting-row">
-          <div class="lp-setting-label">
-            <div class="lp-setting-name">Show Type</div>
-            <div class="lp-setting-desc">Display command type (npm, shell, vscode, etc.)</div>
-          </div>
-          <label class="lp-setting-toggle">
-            <input
-              type="checkbox"
-              .checked=${state.showType}
-              @change=${(e: Event) =>
-        setState({ showType: (e.target as HTMLInputElement).checked })}
-            />
-            <span class="lp-toggle-slider"></span>
-          </label>
-        </div>
           <div class="lp-setting-row">
           <div class="lp-setting-label">
             <div class="lp-setting-name">Show Command</div>
@@ -427,7 +436,7 @@ const renderView = () => {
               <a
                 href="https://microsoft.github.io/vscode-codicons/dist/codicon.html"
                 target="_blank"
-                >codicons</a
+                >codicons</a>
               are supported—just add them to your config and refresh.
               </div>
             </div>

@@ -12,6 +12,21 @@
         "${workspaceFolder}/dist/**/*.js"
       ],
       "preLaunchTask": "npm: watch"
+    },
+    {
+      "name": "Run Extension (First Timer)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js"
+      ],
+      "env": {
+        "BATTLESTATION_FORCE_FIRST_TIMER": "true" 
+      },
+      "preLaunchTask": "npm: watch"
     }
   ]
 }

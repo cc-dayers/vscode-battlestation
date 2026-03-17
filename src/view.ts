@@ -38,6 +38,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     hasNpm: boolean;
     hasTasks: boolean;
     hasLaunch: boolean;
+    showOptions?: boolean;
   };
 
   private readonly disposables: vscode.Disposable[] = [];
@@ -259,8 +260,10 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         void this.handleImportConfig();
         break;
       case "showGenerateConfig":
-      case "showAdvancedOptions":
         void this.handleShowGenerateConfig();
+        break;
+      case "showAdvancedOptions":
+        void this.handleShowGenerateConfig(true);
         break;
       case "createBlankConfig":
         void this.handleCreateBlankConfig();
@@ -390,6 +393,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           hasNpm: false,
           hasTasks: false,
           hasLaunch: false,
+          showOptions: false,
         };
         this.view.webview.html = renderGenerateConfigView({
           cspSource,
@@ -416,7 +420,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         const history = await this.configService.listConfigVersions();
         const hasHistory = history.length > 0;
 
-        const isFirstTimer = !hasHistory;
+        // Allow forcing the first-timer welcome screen via environment variable for debugging
+        const isFirstTimer = !hasHistory || process.env.BATTLESTATION_FORCE_FIRST_TIMER === 'true';
 
         this.view.webview.html = renderGenerateConfigView({
           cspSource,
@@ -1303,7 +1308,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async handleShowGenerateConfig() {
+  private async handleShowGenerateConfig(showOptions = false) {
     await vscode.window.withProgress(
       {
         location: { viewId: "battlestation.view" },
@@ -1323,6 +1328,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           hasNpm,
           hasTasks,
           hasLaunch,
+          showOptions,
         };
 
         progress.report({ increment: 10, message: "Done" });

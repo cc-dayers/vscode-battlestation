@@ -84,7 +84,7 @@
         {
           "type": "webview",
           "id": "battlestation.view",
-          "name": "BattleStation",
+          "name": "Battlestation",
           "icon": "media/icon.svg",
           "contextualTitle": "Battlestation"
         }

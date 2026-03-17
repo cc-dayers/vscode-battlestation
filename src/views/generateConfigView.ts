@@ -26,6 +26,7 @@ export interface GenerateConfigContext {
   enhancedMode?: EnhancedModeContext;
   hasWorkspace?: boolean;
   isFirstTimer?: boolean;
+  showOptions?: boolean;
 }
 
 export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
@@ -585,7 +586,7 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
       
       <label class="lp-option-card" id="showOptionsLabel" for="showOptionsCheck">
         <div class="lp-option-header">
-          <input type="checkbox" id="showOptionsCheck" class="lp-show-options-check">
+          <input type="checkbox" id="showOptionsCheck" class="lp-show-options-check" ${ctx.showOptions ? 'checked' : ''}>
           <span class="lp-option-title">Show generation options</span>
         </div>
         <div class="lp-option-desc">

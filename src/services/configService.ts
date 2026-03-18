@@ -1285,6 +1285,17 @@ export class ConfigService {
       }
     });
 
+    if (enableColoring) {
+      actions.forEach(a => {
+        if (a.workspace && !a.workspaceColor) {
+           const color = assignDistinctSecondaryColor(a.workspace);
+           if (color) {
+             a.workspaceColor = color;
+           }
+        }
+      });
+    }
+
     // Final sorting of actions by group
     const sortedActions: Action[] = [];
     const groupOrder = new Map(groups.map((g, i) => [g.name, i]));

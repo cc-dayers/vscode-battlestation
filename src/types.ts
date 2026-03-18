@@ -15,6 +15,7 @@ export interface Action {
   group?: string;
   hidden?: boolean;
   workspace?: string; // Can be used as secondary grouping key
+  workspaceColor?: string; // Color for the workspace badge
   params?: ActionParam[]; // Runtime input variables interpolated into command
   backgroundColor?: string;
   rowBackgroundColor?: string;

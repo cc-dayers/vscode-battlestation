@@ -927,7 +927,11 @@ const renderButton = (item: Action) => {
 
     let topLabel = null;
     if (item.workspace) {
-        topLabel = html`<span class="lp-workspace-label">${item.workspace}</span>`;
+        let styleStr = '';
+        if (item.workspaceColor) {
+            styleStr = `background-color: ${item.workspaceColor}; color: var(--vscode-editor-background); border: 1px solid color-mix(in srgb, var(--vscode-foreground) 20%, transparent); opacity: 0.9;`;
+        }
+        topLabel = html`<span class="lp-workspace-label" style="${styleStr}">${item.workspace}</span>`;
     }
 
     if (display.showCommand) {

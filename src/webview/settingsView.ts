@@ -233,7 +233,7 @@ const renderView = () => {
                   <span>Delete battle.json?</span><br> This cannot be undone.<br><br>
                   ${state.backupCount > 0 ? html`<label class="lp-checkbox-label" style="display:flex;align-items:center;">
                     <input type="checkbox" id="deleteHistoryAlso" class="lp-checkbox">
-                    <span style="margin-left:8px;font-size:12px;opacity:0.9;">Also delete ${state.backupCount} history backup${state.backupCount !== 1 ? 's' : ''}</span>
+                    <span style="margin-left:8px;font-size:12px;opacity:0.9;">Also history</span>
                   </label>` : null}
                 </div>
                 <div class="lp-config-confirm-actions">

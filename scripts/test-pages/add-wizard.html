@@ -7,37 +7,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
   
-  <title>Edit Action</title>
+  <title>Add Action Wizard</title>
   <style>
       body {
         font-family: var(--vscode-font-family);
         color: var(--vscode-foreground);
         background: transparent;
-        padding: 12px;
+        padding: 12px 8px;
         margin: 0;
       }
-      .lp-form-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 20px;
-        padding-bottom: 12px;
-        border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
-      }
-      .lp-form-header h2 { margin: 0; font-size: 16px; }
-      .lp-close-btn {
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: var(--vscode-foreground);
-        opacity: 0.6;
-        padding: 2px 4px;
-        border-radius: 3px;
-        display: flex;
-        align-items: center;
-        line-height: 1;
-      }
-      .lp-close-btn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
+      h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; }
       
   .lp-form-group {
     margin-bottom: 12px;
@@ -77,20 +56,6 @@
     margin-top: 2px;
   }
 
-      .lp-form-group input[type="text"],
-      .lp-form-group select {
-        width: 100%;
-        padding: 6px 8px;
-        font-size: 12px;
-        font-family: inherit;
-        background: var(--vscode-input-background);
-        color: var(--vscode-input-foreground);
-        border: 1px solid var(--vscode-input-border, transparent);
-        border-radius: 3px;
-        box-sizing: border-box;
-      }
-      .lp-form-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 12px; }
-      .lp-hint { font-size: 11px; opacity: 0.7; margin-top: 4px; }
       
   .lp-icon-picker {
     padding: 8px;
@@ -131,7 +96,12 @@
     border-color: var(--vscode-focusBorder);
   }
 
-      .lp-form-actions { display: flex; gap: 8px; margin-top: 20px; }
+      .lp-icon-option .codicon { font-size: 16px; }
+      .lp-icon-option { opacity: 0.7; transition: all 0.2s; }
+      .lp-icon-option:hover { opacity: 1; }
+      .lp-icon-option.selected { opacity: 1; }
+      .lp-icon-grid { max-height: 150px; }
+      #customIconInput { margin-top: 8px; font-family: var(--vscode-editor-font-family); }
       
   .lp-color-picker-container {
     padding: 10px;
@@ -269,10 +239,6 @@
     cursor: pointer;
   }
 
-      .param-row { display:grid; grid-template-columns:1fr 1fr 1fr 1fr auto; gap:4px; margin-bottom:4px; align-items:center; }
-      .param-row input { width:100%; padding:4px 6px; font-size:11px; font-family:inherit; background:var(--vscode-input-background); color:var(--vscode-input-foreground); border:1px solid var(--vscode-input-border,transparent); border-radius:2px; box-sizing:border-box; }
-      .param-row button { padding:2px 6px; font-size:11px; cursor:pointer; background:var(--vscode-button-secondaryBackground); color:var(--vscode-button-secondaryForeground); border:none; border-radius:2px; }
-      .param-header { display:grid; grid-template-columns:1fr 1fr 1fr 1fr auto; gap:4px; margin-bottom:2px; font-size:10px; opacity:.6; }
       
   .lp-btn {
     flex: 1;
@@ -298,6 +264,26 @@
     background: var(--vscode-button-secondaryHoverBackground);
   }
 
+      
+      .param-row { display:grid; grid-template-columns:1fr 1fr 1fr 1fr auto; gap:4px; margin-bottom:4px; align-items:center; }
+      .param-row input { width:100%; padding:4px 6px; font-size:11px; font-family:inherit; background:var(--vscode-input-background); color:var(--vscode-input-foreground); border:1px solid var(--vscode-input-border,transparent); border-radius:2px; box-sizing:border-box; }
+      .param-row button { padding:2px 6px; font-size:11px; cursor:pointer; background:var(--vscode-button-secondaryBackground); color:var(--vscode-button-secondaryForeground); border:none; border-radius:2px; }
+      .param-header { display:grid; grid-template-columns:1fr 1fr 1fr 1fr auto; gap:4px; margin-bottom:2px; font-size:10px; opacity:.6; }
+      
+      .wizard-step { display: none; }
+      .wizard-step.active { display: block; }
+      #step1.wizard-step.active {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: calc(100vh - 40px);
+      }
+      
+      #jsonError { color: var(--vscode-errorForeground); font-size: 11px; margin-top: 4px; display: none; }
+      textarea#jsonImport { font-family: var(--vscode-editor-font-family); font-size: 11px; min-height: 100px; resize: vertical; }
+      
+      .divider { margin: 16px 0; border-top: 1px solid var(--vscode-panel-border, transparent); position: relative; text-align: center; }
+      .divider span { background: var(--vscode-editor-background); padding: 0 8px; color: var(--vscode-descriptionForeground); font-size: 11px; position: relative; top: -7px; }
     </style>
 
 <script nonce="test-nonce-12345">
@@ -319,59 +305,76 @@
 </head>
 <body>
 
-      <div class="lp-form-header">
-        <h2>✏️ Edit Action</h2>
-        <button type="button" class="lp-close-btn" id="closeBtn" title="Cancel">
-          <span class="codicon codicon-close"></span>
-        </button>
-      </div>
-      <form id="editActionForm">
-        <div class="lp-form-group">
-          <label for="name">Name *</label>
-          <input type="text" id="name" value="Deploy to env" required>
-          <div class="lp-hint">Display name for this action</div>
-        </div>
-        <div class="lp-form-group">
-          <label for="type">Type *</label>
-          <select id="type" required>
-            <option value="shell" >shell</option>
-<option value="npm" selected>npm</option>
-<option value="vscode" >vscode</option>
-            <option value="custom" >✏️ Custom type...</option>
-          </select>
-          <input type="text" id="customType" placeholder="Enter custom type" value="" style="display: none; margin-top: 4px;">
-          <div class="lp-hint" id="typeHint">Select a type or create a custom one</div>
-        </div>
-        <div class="lp-form-group" id="customTypeSection" style="display: none;">
-          <label>Custom Type Icon</label>
-          <div class="lp-icon-picker">
-            <div class="lp-icon-picker-title">Choose a codicon (or enter a custom name below):</div>
-            <div class="lp-icon-grid" id="iconGrid">
-              <div class="lp-icon-option " data-icon="terminal" title="terminal"><span class="codicon codicon-terminal"></span></div><div class="lp-icon-option selected" data-icon="package" title="package"><span class="codicon codicon-package"></span></div><div class="lp-icon-option " data-icon="rocket" title="rocket"><span class="codicon codicon-rocket"></span></div><div class="lp-icon-option " data-icon="play" title="play"><span class="codicon codicon-play"></span></div><div class="lp-icon-option " data-icon="debug-alt" title="debug-alt"><span class="codicon codicon-debug-alt"></span></div><div class="lp-icon-option " data-icon="beaker" title="beaker"><span class="codicon codicon-beaker"></span></div><div class="lp-icon-option " data-icon="tools" title="tools"><span class="codicon codicon-tools"></span></div><div class="lp-icon-option " data-icon="gear" title="gear"><span class="codicon codicon-gear"></span></div><div class="lp-icon-option " data-icon="cloud" title="cloud"><span class="codicon codicon-cloud"></span></div><div class="lp-icon-option " data-icon="cloud-upload" title="cloud-upload"><span class="codicon codicon-cloud-upload"></span></div><div class="lp-icon-option " data-icon="cloud-download" title="cloud-download"><span class="codicon codicon-cloud-download"></span></div><div class="lp-icon-option " data-icon="database" title="database"><span class="codicon codicon-database"></span></div><div class="lp-icon-option " data-icon="server" title="server"><span class="codicon codicon-server"></span></div><div class="lp-icon-option " data-icon="file-code" title="file-code"><span class="codicon codicon-file-code"></span></div><div class="lp-icon-option " data-icon="code" title="code"><span class="codicon codicon-code"></span></div><div class="lp-icon-option " data-icon="git-merge" title="git-merge"><span class="codicon codicon-git-merge"></span></div><div class="lp-icon-option " data-icon="git-pull-request" title="git-pull-request"><span class="codicon codicon-git-pull-request"></span></div><div class="lp-icon-option " data-icon="source-control" title="source-control"><span class="codicon codicon-source-control"></span></div><div class="lp-icon-option " data-icon="check" title="check"><span class="codicon codicon-check"></span></div><div class="lp-icon-option " data-icon="verified" title="verified"><span class="codicon codicon-verified"></span></div><div class="lp-icon-option " data-icon="testing-passed" title="testing-passed"><span class="codicon codicon-testing-passed"></span></div><div class="lp-icon-option " data-icon="error" title="error"><span class="codicon codicon-error"></span></div><div class="lp-icon-option " data-icon="warning" title="warning"><span class="codicon codicon-warning"></span></div><div class="lp-icon-option " data-icon="info" title="info"><span class="codicon codicon-info"></span></div><div class="lp-icon-option " data-icon="folder" title="folder"><span class="codicon codicon-folder"></span></div><div class="lp-icon-option " data-icon="file" title="file"><span class="codicon codicon-file"></span></div><div class="lp-icon-option " data-icon="files" title="files"><span class="codicon codicon-files"></span></div><div class="lp-icon-option " data-icon="save" title="save"><span class="codicon codicon-save"></span></div><div class="lp-icon-option " data-icon="refresh" title="refresh"><span class="codicon codicon-refresh"></span></div><div class="lp-icon-option " data-icon="sync" title="sync"><span class="codicon codicon-sync"></span></div><div class="lp-icon-option " data-icon="search" title="search"><span class="codicon codicon-search"></span></div><div class="lp-icon-option " data-icon="filter" title="filter"><span class="codicon codicon-filter"></span></div><div class="lp-icon-option " data-icon="list-tree" title="list-tree"><span class="codicon codicon-list-tree"></span></div><div class="lp-icon-option " data-icon="symbol-method" title="symbol-method"><span class="codicon codicon-symbol-method"></span></div><div class="lp-icon-option " data-icon="json" title="json"><span class="codicon codicon-json"></span></div><div class="lp-icon-option " data-icon="archive" title="archive"><span class="codicon codicon-archive"></span></div><div class="lp-icon-option " data-icon="bookmark" title="bookmark"><span class="codicon codicon-bookmark"></span></div><div class="lp-icon-option " data-icon="bug" title="bug"><span class="codicon codicon-bug"></span></div><div class="lp-icon-option " data-icon="megaphone" title="megaphone"><span class="codicon codicon-megaphone"></span></div><div class="lp-icon-option " data-icon="organization" title="organization"><span class="codicon codicon-organization"></span></div><div class="lp-icon-option " data-icon="pulse" title="pulse"><span class="codicon codicon-pulse"></span></div><div class="lp-icon-option " data-icon="eye" title="eye"><span class="codicon codicon-eye"></span></div><div class="lp-icon-option " data-icon="flame" title="flame"><span class="codicon codicon-flame"></span></div><div class="lp-icon-option " data-icon="star" title="star"><span class="codicon codicon-star"></span></div><div class="lp-icon-option " data-icon="edit" title="edit"><span class="codicon codicon-edit"></span></div>
-            </div>
-            <input type="text" id="customIconInput" placeholder="Or enter codicon name (e.g., rocket)" value="package">
-            <div class="lp-hint">Browse all codicons at <a href="https://microsoft.github.io/vscode-codicons/dist/codicon.html" style="color: var(--vscode-textLink-foreground);">microsoft.github.io/vscode-codicons</a></div>
+      <form id="addWizardForm">
+        
+        <!-- STEP 1: Name or JSON Import -->
+        <div id="step1" class="wizard-step active">
+          <h3>Step 1: Create or Import</h3>
+          <p class="lp-hint" style="margin-bottom: 12px;">Enter a name to create a single action, or paste JSON to import multiple.</p>
+          
+          <div class="lp-form-group">
+            <label for="wizardName">Action Name</label>
+            <input type="text" id="wizardName" placeholder="e.g., Build Project">
+          </div>
+          
+          <div class="lp-form-group" style="margin-top: 16px; display: flex; align-items: center; gap: 6px;">
+            <input type="checkbox" id="toggleRawJson">
+            <label for="toggleRawJson" style="margin: 0; opacity: 0.9;">Add as raw JSON</label>
+          </div>
+          
+          <div class="lp-form-group" id="jsonImportGroup" style="display: none;">
+            <textarea id="jsonImport" placeholder='[
+  {
+    "name": "My Action",
+    "type": "npm",
+    "command": "npm run start"
+  }
+]'></textarea>
+            <div id="jsonError"></div>
+            <div class="lp-hint">Paste an Action object or an array of Actions.</div>
+          </div>
+          
+          <div class="lp-form-actions" style="margin-top: 16px;">
+            <button type="button" class="lp-btn lp-btn-secondary" id="cancelBtn1">Cancel</button>
+            <button type="button" class="lp-btn lp-btn-primary" id="nextBtn">Next</button>
           </div>
         </div>
-        
 
-        
-        <div class="lp-form-group">
-          <label for="command">Command *</label>
-          <input type="text" id="command" value="npm run deploy -- --env=${ENV} --tag=${TAG}" required>
-          <div class="lp-hint" id="commandHint">Use <code>${VAR}</code> for runtime inputs (see Parameters below)</div>
-        </div>
-        <div class="lp-form-group">
-          <label>Parameters <span style="font-weight:400;opacity:.7">(optional)</span></label>
-          <div id="paramsContainer"></div>
-          <button type="button" class="lp-btn lp-btn-secondary" id="addParamBtn" style="margin-top:6px;font-size:11px;padding:3px 8px">+ Add Parameter</button>
-          <div class="lp-hint">Each parameter prompts the user for input at run time and replaces <code>${NAME}</code> in the command.</div>
-        </div>
-        <div class="lp-form-group">
-          <label>Button Background Color</label>
-          
+        <!-- STEP 2: Configure Details -->
+        <div id="step2" class="wizard-step">
+          <h3>Step 2: Configure Action</h3>
+          <div class="lp-form-group" style="margin-bottom: 12px;">
+            <strong>Name:</strong> <span id="displayWizardName"></span>
+          </div>
+
+          <div class="lp-form-group">
+            <label for="type">Type *</label>
+            <select id="type" required>
+              
+    <option value="shell" selected>shell</option>
+    <option value="npm">npm</option>
+    <option value="vscode">vscode</option>
+  
+              <option value="custom">✏️ Custom type...</option>
+            </select>
+            <input type="text" id="customType" placeholder="Enter custom type" style="display: none; margin-top: 4px;">
+            <div class="lp-hint" id="typeHint">Select a type or create a custom one</div>
+          </div>
+          <div class="lp-form-group" id="customTypeSection" style="display: none;">
+            <label>Custom Type Icon</label>
+            <div class="lp-icon-picker">
+              <div class="lp-icon-picker-title">Choose a codicon (or enter a custom name below):</div>
+              <div class="lp-icon-grid" id="iconGrid">
+                <div class="lp-icon-option" data-icon="terminal" title="terminal"><span class="codicon codicon-terminal"></span></div><div class="lp-icon-option" data-icon="package" title="package"><span class="codicon codicon-package"></span></div><div class="lp-icon-option" data-icon="rocket" title="rocket"><span class="codicon codicon-rocket"></span></div><div class="lp-icon-option" data-icon="play" title="play"><span class="codicon codicon-play"></span></div><div class="lp-icon-option" data-icon="debug-alt" title="debug-alt"><span class="codicon codicon-debug-alt"></span></div><div class="lp-icon-option" data-icon="beaker" title="beaker"><span class="codicon codicon-beaker"></span></div><div class="lp-icon-option" data-icon="tools" title="tools"><span class="codicon codicon-tools"></span></div><div class="lp-icon-option" data-icon="gear" title="gear"><span class="codicon codicon-gear"></span></div><div class="lp-icon-option" data-icon="cloud" title="cloud"><span class="codicon codicon-cloud"></span></div><div class="lp-icon-option" data-icon="cloud-upload" title="cloud-upload"><span class="codicon codicon-cloud-upload"></span></div><div class="lp-icon-option" data-icon="cloud-download" title="cloud-download"><span class="codicon codicon-cloud-download"></span></div><div class="lp-icon-option" data-icon="database" title="database"><span class="codicon codicon-database"></span></div><div class="lp-icon-option" data-icon="server" title="server"><span class="codicon codicon-server"></span></div><div class="lp-icon-option" data-icon="file-code" title="file-code"><span class="codicon codicon-file-code"></span></div><div class="lp-icon-option" data-icon="code" title="code"><span class="codicon codicon-code"></span></div><div class="lp-icon-option" data-icon="git-merge" title="git-merge"><span class="codicon codicon-git-merge"></span></div><div class="lp-icon-option" data-icon="git-pull-request" title="git-pull-request"><span class="codicon codicon-git-pull-request"></span></div><div class="lp-icon-option" data-icon="source-control" title="source-control"><span class="codicon codicon-source-control"></span></div><div class="lp-icon-option" data-icon="check" title="check"><span class="codicon codicon-check"></span></div><div class="lp-icon-option" data-icon="verified" title="verified"><span class="codicon codicon-verified"></span></div><div class="lp-icon-option" data-icon="testing-passed" title="testing-passed"><span class="codicon codicon-testing-passed"></span></div><div class="lp-icon-option" data-icon="error" title="error"><span class="codicon codicon-error"></span></div><div class="lp-icon-option" data-icon="warning" title="warning"><span class="codicon codicon-warning"></span></div><div class="lp-icon-option" data-icon="info" title="info"><span class="codicon codicon-info"></span></div><div class="lp-icon-option" data-icon="folder" title="folder"><span class="codicon codicon-folder"></span></div><div class="lp-icon-option" data-icon="file" title="file"><span class="codicon codicon-file"></span></div><div class="lp-icon-option" data-icon="files" title="files"><span class="codicon codicon-files"></span></div><div class="lp-icon-option" data-icon="save" title="save"><span class="codicon codicon-save"></span></div><div class="lp-icon-option" data-icon="refresh" title="refresh"><span class="codicon codicon-refresh"></span></div><div class="lp-icon-option" data-icon="sync" title="sync"><span class="codicon codicon-sync"></span></div><div class="lp-icon-option" data-icon="search" title="search"><span class="codicon codicon-search"></span></div><div class="lp-icon-option" data-icon="filter" title="filter"><span class="codicon codicon-filter"></span></div><div class="lp-icon-option" data-icon="list-tree" title="list-tree"><span class="codicon codicon-list-tree"></span></div><div class="lp-icon-option" data-icon="symbol-method" title="symbol-method"><span class="codicon codicon-symbol-method"></span></div><div class="lp-icon-option" data-icon="json" title="json"><span class="codicon codicon-json"></span></div><div class="lp-icon-option" data-icon="archive" title="archive"><span class="codicon codicon-archive"></span></div><div class="lp-icon-option" data-icon="bookmark" title="bookmark"><span class="codicon codicon-bookmark"></span></div><div class="lp-icon-option" data-icon="bug" title="bug"><span class="codicon codicon-bug"></span></div><div class="lp-icon-option" data-icon="megaphone" title="megaphone"><span class="codicon codicon-megaphone"></span></div><div class="lp-icon-option" data-icon="organization" title="organization"><span class="codicon codicon-organization"></span></div><div class="lp-icon-option" data-icon="pulse" title="pulse"><span class="codicon codicon-pulse"></span></div><div class="lp-icon-option" data-icon="eye" title="eye"><span class="codicon codicon-eye"></span></div><div class="lp-icon-option" data-icon="flame" title="flame"><span class="codicon codicon-flame"></span></div><div class="lp-icon-option" data-icon="star" title="star"><span class="codicon codicon-star"></span></div>
+              </div>
+              <input type="text" id="customIconInput" placeholder="Or enter codicon name (e.g., rocket)">
+              <div class="lp-hint">Browse all codicons at <a href="https://microsoft.github.io/vscode-codicons/dist/codicon.html" style="color: var(--vscode-textLink-foreground);">microsoft.github.io/vscode-codicons</a></div>
+            </div>
+          </div>
+          <div class="lp-form-group">
+            
     <div class="lp-color-picker-container" id="customBgColor-container">
-      
+      <label class="lp-picker-label">Button Background Color</label>
       
       <div class="lp-color-sections">
         <div class="lp-color-section">
@@ -451,7 +454,17 @@
               <span>Add</span>
             </button>
           </div>
-          <div class="lp-no-custom-colors">No saved colors yet</div>
+          <div class="lp-color-grid" id="customBgColor-custom-grid"><div class="lp-color-option " 
+                data-color="#ff0000" 
+                style="background: #ff0000;" 
+                title="#ff0000"
+                role="button"
+                tabindex="0"></div><div class="lp-color-option " 
+                data-color="#00ff00" 
+                style="background: #00ff00;" 
+                title="#00ff00"
+                role="button"
+                tabindex="0"></div></div>
         </div>
       </div>
 
@@ -459,7 +472,7 @@
         <div class="lp-color-preview" id="customBgColor-preview" style="background: transparent;"></div>
         <input type="text" id="customBgColor" 
                class="lp-color-text-input"
-               placeholder="e.g. #ff0000 or var(--color)" 
+               placeholder="e.g. #ff0000, rgba(...), or var(--color)" 
                value="">
         <div class="lp-native-picker-wrapper">
            <input type="color" id="customBgColor-native" value="#000000" title="Pick from color wheel">
@@ -469,121 +482,25 @@
       <!-- <div class="lp-hint">Use theme colors for best dark/light mode support.</div> -->
     </div>
   
-          <div class="lp-hint">Background color for the action button</div>
-        </div>
-        <div class="lp-form-group">
-          <label for="workspace">Secondary Label <span style="font-weight:400;opacity:.7">(optional)</span></label>
-          <input type="text" id="workspace" value="" placeholder="e.g. packages/my-app">
-          <div class="lp-hint">Shown as a small badge above the action name (e.g. yarn workspace name or task group)</div>
-        </div>
-        <div class="lp-form-group" id="workspaceColorGroup" style="display: none">
-          <label>Secondary Label Color</label>
-          
-    <div class="lp-color-picker-container" id="workspaceColor-container">
-      
-      
-      <div class="lp-color-sections">
-        <div class="lp-color-section">
-          <div class="lp-color-section-header">
-            <span>Template Colors</span>
+            <div class="lp-hint">Background color for the action button</div>
           </div>
-          <div class="lp-color-grid" id="workspaceColor-theme-grid">
-            <div class="lp-color-option " 
-            data-color="var(--vscode-charts-red)" 
-            style="background: var(--vscode-charts-red);" 
-            title="Red"
-            role="button"
-            tabindex="0"></div><div class="lp-color-option " 
-            data-color="var(--vscode-charts-orange)" 
-            style="background: var(--vscode-charts-orange);" 
-            title="Orange"
-            role="button"
-            tabindex="0"></div><div class="lp-color-option " 
-            data-color="var(--vscode-charts-yellow)" 
-            style="background: var(--vscode-charts-yellow);" 
-            title="Yellow"
-            role="button"
-            tabindex="0"></div><div class="lp-color-option " 
-            data-color="var(--vscode-charts-green)" 
-            style="background: var(--vscode-charts-green);" 
-            title="Green"
-            role="button"
-            tabindex="0"></div><div class="lp-color-option " 
-            data-color="var(--vscode-charts-blue)" 
-            style="background: var(--vscode-charts-blue);" 
-            title="Blue"
-            role="button"
-            tabindex="0"></div><div class="lp-color-option " 
-            data-color="var(--vscode-charts-purple)" 
-            style="background: var(--vscode-charts-purple);" 
-            title="Purple"
-            role="button"
-            tabindex="0"></div><div class="lp-color-option " 
-            data-color="var(--vscode-charts-pink)" 
-            style="background: var(--vscode-charts-pink);" 
-            title="Pink"
-            role="button"
-            tabindex="0"></div><div class="lp-color-option " 
-            data-color="var(--vscode-foreground)" 
-            style="background: var(--vscode-foreground);" 
-            title="Foreground"
-            role="button"
-            tabindex="0"></div><div class="lp-color-option " 
-            data-color="var(--vscode-errorForeground)" 
-            style="background: var(--vscode-errorForeground);" 
-            title="Error"
-            role="button"
-            tabindex="0"></div><div class="lp-color-option " 
-            data-color="var(--vscode-editorWarning-foreground)" 
-            style="background: var(--vscode-editorWarning-foreground);" 
-            title="Warning"
-            role="button"
-            tabindex="0"></div><div class="lp-color-option " 
-            data-color="var(--vscode-editorInfo-foreground)" 
-            style="background: var(--vscode-editorInfo-foreground);" 
-            title="Info"
-            role="button"
-            tabindex="0"></div><div class="lp-color-option " 
-            data-color="var(--vscode-testing-iconPassed)" 
-            style="background: var(--vscode-testing-iconPassed);" 
-            title="Success"
-            role="button"
-            tabindex="0"></div>
+          <div class="lp-form-group">
+            <label for="command">Command *</label>
+            <input type="text" id="command" placeholder="e.g., npm run build">
+            <div class="lp-hint" id="commandHint">Use <code>${VAR}</code> for runtime inputs (see Parameters below)</div>
+          </div>
+          <div class="lp-form-group">
+            <label>Parameters <span style="font-weight:400;opacity:.7">(optional)</span></label>
+            <div id="paramsContainer"></div>
+            <button type="button" class="lp-btn lp-btn-secondary" id="addParamBtn" style="margin-top:6px;font-size:11px;padding:3px 8px">+ Add Parameter</button>
+            <div class="lp-hint">Each parameter prompts the user for input at run time and replaces <code>${NAME}</code> in the command.</div>
+          </div>
+          <div class="lp-form-actions" style="margin-top: 16px;">
+            <button type="button" class="lp-btn lp-btn-secondary" id="backBtn">Back</button>
+            <button type="submit" class="lp-btn lp-btn-primary" id="submitBtn">Add</button>
           </div>
         </div>
 
-        <div class="lp-color-section">
-          <div class="lp-color-section-header">
-            <span>Saved Colors</span>
-            <button type="button" class="lp-add-color-btn" id="workspaceColor-toggle-btn" title="Add custom color" aria-label="Add custom color">
-              <span class="codicon codicon-add"></span>
-              <span>Add</span>
-            </button>
-          </div>
-          <div class="lp-no-custom-colors">No saved colors yet</div>
-        </div>
-      </div>
-
-      <div class="lp-color-input-row" id="workspaceColor-input-row" style="display: none;">
-        <div class="lp-color-preview" id="workspaceColor-preview" style="background: transparent;"></div>
-        <input type="text" id="workspaceColor" 
-               class="lp-color-text-input"
-               placeholder="e.g. #ff0000 or var(--color)" 
-               value="">
-        <div class="lp-native-picker-wrapper">
-           <input type="color" id="workspaceColor-native" value="#000000" title="Pick from color wheel">
-           <span class="codicon codicon-color-mode"></span>
-        </div>
-      </div>
-      <!-- <div class="lp-hint">Use theme colors for best dark/light mode support.</div> -->
-    </div>
-  
-          <div class="lp-hint">Background color for the secondary label badge</div>
-        </div>
-        <div class="lp-form-actions">
-          <button type="button" class="lp-btn lp-btn-secondary" id="cancelBtn">Cancel</button>
-          <button type="submit" class="lp-btn lp-btn-primary">Update</button>
-        </div>
       </form>
     
 <script nonce="test-nonce-12345">
@@ -703,13 +620,111 @@
 
       (function () {
         const vscode = acquireVsCodeApi();
-        const oldItem = {"name":"Deploy to env","command":"npm run deploy -- --env=${ENV} --tag=${TAG}","type":"npm","params":[{"name":"ENV","prompt":"Target environment","options":["staging","production"]},{"name":"TAG","prompt":"Docker image tag","default":"latest"}]};
+        
+        // Step Management
+        const step1 = document.getElementById('step1');
+        const step2 = document.getElementById('step2');
+        const nextBtn = document.getElementById('nextBtn');
+        const backBtn = document.getElementById('backBtn');
+        const cancelBtn1 = document.getElementById('cancelBtn1');
+        const wizardName = document.getElementById('wizardName');
+        const displayWizardName = document.getElementById('displayWizardName');
+        const jsonImport = document.getElementById('jsonImport');
+        const jsonImportGroup = document.getElementById('jsonImportGroup');
+        const jsonError = document.getElementById('jsonError');
+        const toggleRawJson = document.getElementById('toggleRawJson');
+        
+        cancelBtn1.addEventListener('click', () => {
+          vscode.postMessage({ command: 'cancelForm' });
+        });
+        
+        toggleRawJson.addEventListener('change', (e) => {
+          if (e.target.checked) {
+            jsonImportGroup.style.display = 'block';
+            jsonImport.focus();
+            wizardName.value = '';
+            nextBtn.textContent = jsonImport.value.trim().length > 0 ? "Import JSON" : "Next";
+          } else {
+            jsonImportGroup.style.display = 'none';
+            jsonImport.value = '';
+            jsonError.style.display = 'none';
+            nextBtn.textContent = "Next";
+          }
+        });
+
+        jsonImport.addEventListener('input', () => {
+          jsonError.style.display = 'none';
+          if (jsonImport.value.trim().length > 0) {
+            nextBtn.textContent = "Import JSON";
+            wizardName.value = ''; // Clear name if they start typing JSON
+          } else {
+            nextBtn.textContent = "Next";
+          }
+        });
+        
+        wizardName.addEventListener('input', () => {
+          if (wizardName.value.trim().length > 0) {
+            jsonImport.value = ''; // Clear json if they type name
+            toggleRawJson.checked = false;
+            jsonImportGroup.style.display = 'none';
+            nextBtn.textContent = "Next";
+            jsonError.style.display = 'none';
+          }
+        });
+
+        nextBtn.addEventListener('click', () => {
+          const jsonVal = jsonImport.value.trim();
+          const nameVal = wizardName.value.trim();
+          
+          if (jsonVal) {
+            try {
+              const parsed = JSON.parse(jsonVal);
+              let items = Array.isArray(parsed) ? parsed : [parsed];
+              
+              // Basic validation
+              for (const item of items) {
+                if (!item.name || !item.command) {
+                  throw new Error("Each imported action must have at least a 'name' and 'command'.");
+                }
+              }
+              
+              // Pass the parsed objects back to the extension
+              vscode.postMessage({ command: 'submitBulkActions', items: items });
+            } catch (err) {
+              jsonError.textContent = "Invalid JSON: " + err.message;
+              jsonError.style.display = 'block';
+            }
+          } else if (nameVal) {
+            displayWizardName.textContent = nameVal;
+            step1.classList.remove('active');
+            step2.classList.add('active');
+            // Remove required constraint on JSON, since we are moving forward with manual entry
+            document.getElementById('command').required = true;
+          } else {
+            jsonError.textContent = "Please enter an Action Name or paste JSON to import.";
+            jsonError.style.display = 'block';
+          }
+        });
+        
+        backBtn.addEventListener('click', () => {
+          step2.classList.remove('active');
+          step1.classList.add('active');
+          document.getElementById('command').required = false;
+        });
+
+        // ── Details Step Handling (from original addItemForm) ──
         const typeSelect = document.getElementById('type');
         const customTypeInput = document.getElementById('customType');
         const customTypeSection = document.getElementById('customTypeSection');
         const iconGrid = document.getElementById('iconGrid');
         const customIconInput = document.getElementById('customIconInput');
-        let selectedIcon = 'package';
+        const commandInput = document.getElementById('command');
+        const typeHint = document.getElementById('typeHint');
+        const commandHint = document.getElementById('commandHint');
+        let selectedIcon = null;
+
+        // Initialize shared color picker
+        window.initColorPicker('customBgColor');
 
         iconGrid.addEventListener('click', (e) => {
           const option = e.target.closest('.lp-icon-option');
@@ -718,6 +733,14 @@
           option.classList.add('selected');
           selectedIcon = option.dataset.icon;
           customIconInput.value = selectedIcon;
+        });
+
+        // Save new custom colors for reuse
+        document.getElementById('customBgColor').addEventListener('change', (e) => {
+          const val = e.target.value?.trim();
+          if (val && !val.startsWith('var(')) {
+            vscode.postMessage({ command: 'saveCustomColor', color: val });
+          }
         });
 
         customIconInput.addEventListener('input', () => {
@@ -730,18 +753,26 @@
             customTypeInput.style.display = 'block';
             customTypeInput.required = true;
             customTypeSection.style.display = 'block';
+            typeHint.textContent = 'Enter a custom type name';
           } else {
             customTypeInput.style.display = 'none';
             customTypeInput.required = false;
             customTypeSection.style.display = 'none';
+            customTypeInput.value = '';
+            if (typeSelect.value === 'vscode') {
+              typeHint.textContent = 'Executes a VS Code command';
+              commandHint.textContent = 'e.g., workbench.action.terminal.new';
+              commandInput.placeholder = 'e.g., workbench.action.terminal.new';
+            } else if (typeSelect.value.includes('npm') || typeSelect.value.includes('shell')) {
+              typeHint.textContent = 'Runs the command in a terminal';
+              commandHint.textContent = 'Shell command to execute';
+              commandInput.placeholder = 'e.g., npm run build';
+            } else {
+              typeHint.textContent = 'Command type: ' + typeSelect.value;
+              commandHint.textContent = 'Enter the command to execute';
+              commandInput.placeholder = 'e.g., your-command here';
+            }
           }
-        });
-
-        document.getElementById('cancelBtn').addEventListener('click', () => {
-          vscode.postMessage({ command: 'cancelForm' });
-        });
-        document.getElementById('closeBtn').addEventListener('click', () => {
-          vscode.postMessage({ command: 'cancelForm' });
         });
 
         // ── Params ──
@@ -761,7 +792,6 @@
           row.querySelector('button').addEventListener('click', () => row.remove());
           paramsContainer.appendChild(row);
         }
-        (oldItem.params || []).forEach(p => addParamRow(p));
         document.getElementById('addParamBtn').addEventListener('click', () => addParamRow(null));
 
         function collectParams() {
@@ -777,36 +807,33 @@
           }).filter(p => p.name && p.prompt);
         }
 
-        // Show/hide workspaceColor section based on whether workspace has a value
-        const workspaceInput = document.getElementById('workspace');
-        const workspaceColorGroup = document.getElementById('workspaceColorGroup');
-        workspaceInput.addEventListener('input', () => {
-          workspaceColorGroup.style.display = workspaceInput.value.trim() ? 'block' : 'none';
-        });
-
-        document.getElementById('editActionForm').addEventListener('submit', (e) => {
+        document.getElementById('addWizardForm').addEventListener('submit', (e) => {
           e.preventDefault();
-          const name = document.getElementById('name').value.trim();
-          const type = typeSelect.value === 'custom' ? customTypeInput.value.trim() : typeSelect.value;
-          const command = document.getElementById('command').value.trim();
-
-          if (!name || !type || !command) return;
+          // Normal manual action submission
+          let itemType = typeSelect.value;
+          if (itemType === 'custom') {
+            itemType = customTypeInput.value.trim();
+            if (!itemType) return;
+          }
           const params = collectParams();
-          const backgroundColor = document.getElementById('customBgColor').value.trim() || undefined;
-          const workspace = workspaceInput.value.trim() || undefined;
-          const workspaceColor = workspace ? (document.getElementById('workspaceColor').value.trim() || undefined) : undefined;
-          const item = { name, type, command, backgroundColor, workspace, workspaceColor, params: params.length ? params : undefined };
-          if (typeSelect.value === 'custom' && selectedIcon) {
-            vscode.postMessage({ command: 'submitEditAction', oldItem, newItem: item, customIcon: selectedIcon });
-          } else {
-            vscode.postMessage({ command: 'submitEditAction', oldItem, newItem: item });
+          const item = {
+            name: wizardName.value.trim(),
+            type: itemType,
+            command: document.getElementById('command').value.trim(),
+            backgroundColor: document.getElementById('customBgColor').value.trim() || undefined,
+            params: params.length ? params : undefined
+          };
+          
+          if (item.name && item.command) {
+            const customIconValue = customIconInput ? customIconInput.value.trim() : null;
+            if (customIconValue) {
+              vscode.postMessage({ command: 'submitNewActionWithIcon', item, customIcon: customIconValue });
+            } else {
+              vscode.postMessage({ command: 'submitNewAction', item });
+            }
           }
         });
       })();
-      if (typeof initColorPicker === 'function') {
-        initColorPicker('customBgColor');
-        initColorPicker('workspaceColor');
-      }
     
 </script>
 

@@ -10,6 +10,15 @@ export const baseStyles = `
     margin: 0;
     overflow-x: hidden;
   }
+  
+  @keyframes lp-highlight-pulse {
+    0% { background-color: var(--vscode-editor-selectionBackground); box-shadow: 0 0 0 2px var(--vscode-focusBorder); transform: scale(1.02); z-index: 10; }
+    30% { background-color: var(--vscode-editor-selectionBackground); box-shadow: 0 0 0 2px var(--vscode-focusBorder); transform: scale(1.02); z-index: 10; }
+    100% { background-color: transparent; box-shadow: 0 0 0 0 transparent; transform: scale(1); z-index: 1; }
+  }
+  .lp-highlight-new {
+    animation: lp-highlight-pulse 2s ease-out;
+  }
 `;
 
 export const buttonStyles = `

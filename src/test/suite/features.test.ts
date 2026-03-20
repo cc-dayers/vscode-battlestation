@@ -266,3 +266,147 @@ suite('Feature 3: Last-Run Status Indicator', () => {
     assert.ok(compiled.includes('lp-status-fail'), 'Should include status-fail class');
   });
 });
+
+// ────────────────────────────────────────────────────────────
+// Feature: Secondary Label (workspace) editing
+// ────────────────────────────────────────────────────────────
+suite('Feature: Secondary Label (workspace) round-trip', () => {
+
+  const mockCtx = {
+    globalState: { get: () => undefined, update: () => Promise.resolve() },
+    workspaceState: { get: () => undefined, update: () => Promise.resolve() },
+    extensionUri: vscode.Uri.file(__dirname),
+    subscriptions: [],
+    extensionPath: __dirname,
+  } as any;
+
+  test('workspace and workspaceColor round-trip through config write/read', async function () {
+    this.timeout(10000);
+    const cs = new ConfigService(mockCtx);
+
+    const actionWithWorkspace: Action = {
+      name: 'workspace-round-trip',
+      command: 'yarn workspace my-pkg build',
+      type: 'npm',
+      workspace: 'my-pkg',
+      workspaceColor: '#00bcd4',
+    };
+
+    const config = await cs.readConfig();
+    const originalLength = config.actions.length;
+    config.actions.push(actionWithWorkspace);
+    await cs.writeConfig(config);
+    cs.invalidateCache();
+
+    const updated = await cs.readConfig();
+    const saved = updated.actions.find(a => a.name === 'workspace-round-trip');
+    assert.ok(saved, 'Action should be persisted');
+    assert.strictEqual(saved!.workspace, 'my-pkg', 'workspace should survive round-trip');
+    assert.strictEqual(saved!.workspaceColor, '#00bcd4', 'workspaceColor should survive round-trip');
+
+    // Cleanup
+    const cleanup = await cs.readConfig();
+    cleanup.actions = cleanup.actions.filter(a => a.name !== 'workspace-round-trip');
+    assert.strictEqual(cleanup.actions.length, originalLength);
+    await cs.writeConfig(cleanup);
+  });
+
+  test('clearing workspace removes both workspace and workspaceColor from saved action', async function () {
+    this.timeout(10000);
+    const cs = new ConfigService(mockCtx);
+
+    // Setup: add an action with workspace, then simulate updateAction clearing it
+    const original: Action = {
+      name: 'ws-clear-test',
+      command: 'yarn workspace pkg test',
+      type: 'npm',
+      workspace: 'pkg',
+      workspaceColor: '#ff5722',
+    };
+
+    const config = await cs.readConfig();
+    config.actions.push(original);
+    await cs.writeConfig(config);
+    cs.invalidateCache();
+
+    // Simulate the merged-action logic from updateAction when workspace is cleared
+    const updated = await cs.readConfig();
+    const target = updated.actions.find(a => a.name === 'ws-clear-test');
+    assert.ok(target, 'action should exist before clear');
+
+    // Simulate newItem from form with workspace cleared (undefined)
+    const newItem: Action = { name: 'ws-clear-test', command: 'yarn workspace pkg test', type: 'npm', workspace: undefined, workspaceColor: undefined };
+    const merged: Action = { ...target!, ...newItem };
+    if ('workspace' in newItem) {
+      if (newItem.workspace) {
+        merged.workspace = newItem.workspace;
+        merged.workspaceColor = newItem.workspaceColor;
+      } else {
+        delete merged.workspace;
+        delete merged.workspaceColor;
+      }
+    }
+
+    // Write back
+    const idx = updated.actions.findIndex(a => a.name === 'ws-clear-test');
+    updated.actions[idx] = merged;
+    await cs.writeConfig(updated);
+    cs.invalidateCache();
+
+    const final = await cs.readConfig();
+    const cleared = final.actions.find(a => a.name === 'ws-clear-test');
+    assert.ok(cleared, 'action should still exist');
+    assert.strictEqual(cleared!.workspace, undefined, 'workspace should be cleared');
+    assert.strictEqual(cleared!.workspaceColor, undefined, 'workspaceColor should be cleared');
+
+    // Cleanup
+    const cleanup = await cs.readConfig();
+    cleanup.actions = cleanup.actions.filter(a => a.name !== 'ws-clear-test');
+    await cs.writeConfig(cleanup);
+  });
+
+  test('renderEditActionForm renders workspace field pre-populated', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { renderEditActionForm } = require('../../views/editItemForm');
+    const item: Action = {
+      name: 'My Action',
+      command: 'yarn build',
+      type: 'npm',
+      workspace: 'packages/my-lib',
+      workspaceColor: '#4caf50',
+    };
+    const html = renderEditActionForm({
+      cspSource: 'none',
+      nonce: 'test-nonce',
+      codiconStyles: '',
+      item,
+      iconMap: new Map([['npm', 'package']]),
+      customColors: [],
+    });
+    assert.ok(html.includes('id="workspace"'), 'Edit form should include workspace input');
+    assert.ok(html.includes('packages/my-lib'), 'Edit form should pre-fill workspace value');
+    assert.ok(html.includes('workspaceColorGroup'), 'Edit form should include workspaceColor group');
+    assert.ok(html.includes('Secondary Label'), 'Edit form should label the field "Secondary Label"');
+  });
+
+  test('renderEditActionForm hides workspaceColorGroup when workspace is empty', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { renderEditActionForm } = require('../../views/editItemForm');
+    const item: Action = {
+      name: 'No Workspace Action',
+      command: 'echo hi',
+      type: 'shell',
+    };
+    const html = renderEditActionForm({
+      cspSource: 'none',
+      nonce: 'test-nonce',
+      codiconStyles: '',
+      item,
+      iconMap: new Map([['shell', 'terminal']]),
+      customColors: [],
+    });
+    assert.ok(html.includes('id="workspace"'), 'Workspace input should always render');
+    assert.ok(html.includes('display: none'), 'workspaceColorGroup should be display:none when workspace is empty');
+  });
+});
+

@@ -13,6 +13,7 @@ import {
   renderEditGroupForm,
   renderEditActionForm,
   renderAddActionForm,
+  renderAddActionWizard,
 } from "./views";
 import { THEME_COLOR_OPTIONS } from "./utils/themeColors";
 // Import codicon CSS as a string at build time via esbuild plugin
@@ -25,7 +26,8 @@ type FormState =
   | "settings"
   | "editGroup"
   | "editAction"
-  | "generateConfig";
+  | "generateConfig"
+  | "addActionWizard";
 
 export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
@@ -178,6 +180,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       case "submitNewActionWithIcon":
         void this.addNewActionWithIcon(message.item, message.customIcon);
         break;
+      case "submitBulkActions":
+        void this.addBulkActions(message.items);
+        break;
       case "submitNewGroup":
         void this.addNewGroup(message.group);
         break;
@@ -249,6 +254,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         break;
       case "openFolder":
         void vscode.commands.executeCommand('vscode.openFolder');
+        break;
+      case "webviewResized":
+        void vscode.commands.executeCommand('setContext', 'battlestation.isSmall', message.width < 280);
         break;
       case "changeConfigLocation":
         void this.handleChangeConfigLocation();
@@ -330,7 +338,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     if (!(await this.configService.configExists())) {
       await this.configService.createMinimalConfig(BattlestationViewProvider.defaultIcons);
     }
-    this.showingForm = true;
+    const wsConfig = vscode.workspace.getConfiguration("battlestation");
+    const useWizard = wsConfig.get<boolean>("experimental.addWizard", false);
+    this.showingForm = useWizard ? "addActionWizard" : true;
     void this.refresh();
   }
 
@@ -356,7 +366,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
   private refreshTimeout?: NodeJS.Timeout;
 
-  public async refresh() {
+  public async refresh(newActionNames?: string[]) {
     // Debounce the refresh to prevent excessive CPU usage
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
@@ -467,6 +477,12 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      if (this.showingForm === "addActionWizard") {
+        this._currentViewMode = "addActionWizard";
+        this.view.webview.html = await this.renderAddActionWizardForm(cspSource, nonce);
+        return;
+      }
+
       if (this.showingForm === true) {
         this._currentViewMode = "addAction";
         this.view.webview.html = await this.renderAddAction(cspSource, nonce);
@@ -475,23 +491,26 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
       // Main view — only use the fast-path postMessage when we were actually in main view last render
       const config = configStatus.config || (await this.configService.readConfig());
+      const enrichedConfig = this.getEnrichedConfig(config);
 
-      if (isMainView && wasMainView && this.view.visible) {
-        // Already in main view: send targeted data update instead of replacing HTML
-        this._currentViewMode = "main";
-        const enrichedConfig = this.getEnrichedConfig(config);
+      if (isMainView && wasMainView) {
         this.view.webview.postMessage({
           type: "update",
           data: {
             ...enrichedConfig,
-            showHidden: this.showHidden
-          }
+            showHidden: this.showHidden,
+            searchVisible: this.searchVisible,
+            runStatus: Object.fromEntries(this.runStatus),
+            ...(newActionNames && newActionNames.length > 0 ? { newActionNames } : {}),
+          },
         });
-        return;
-      }
+      } else {
+        this._currentViewMode = "main";
+        this.view.webview.html = this.renderMain(config, cspSource, nonce, newActionNames);
 
-      this._currentViewMode = "main";
-      this.view.webview.html = this.renderMain(config, cspSource, nonce);
+        // Finish loading phase
+        vscode.commands.executeCommand("setContext", "battlestation.isLoaded", true);
+      }
     }, 100);
   }
 
@@ -524,18 +543,23 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     };
   }
 
-  private renderMain(config: Config, cspSource: string, nonce: string): string {
+  private renderMain(config: Config, cspSource: string, nonce: string, newActionNames?: string[]): string {
     const enrichedConfig = this.getEnrichedConfig(config);
     const scriptUri = this.view?.webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, "media", "mainView.js")
     ).toString();
+
+    const initialData = { ...enrichedConfig, runStatus: Object.fromEntries(this.runStatus) };
+    if (newActionNames && newActionNames.length > 0) {
+      (initialData as any).newActionNames = newActionNames;
+    }
 
     return renderMainView({
       cspSource,
       nonce,
       codiconStyles: this.getCodiconStyles(),
       config: enrichedConfig,
-      initialData: { ...enrichedConfig, runStatus: Object.fromEntries(this.runStatus) },
+      initialData,
       showHidden: this.showHidden,
       searchVisible: this.searchVisible,
       scriptUri,
@@ -639,6 +663,21 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       .map(([type]) => `<option value="${type}">${type}</option>`)
       .join("\n");
     return renderAddActionForm({
+      cspSource,
+      nonce,
+      codiconStyles: this.getCodiconStyles(),
+      typeOptions,
+      customColors: config.customColors || [],
+    });
+  }
+
+  private async renderAddActionWizardForm(cspSource: string, nonce: string): Promise<string> {
+    const config = await this.configService.readConfig();
+    const iconMap = this.buildIconMap(config);
+    const typeOptions = Array.from(iconMap.entries())
+      .map(([type]) => `<option value="${type}">${type}</option>`)
+      .join("\n");
+    return renderAddActionWizard({
       cspSource,
       nonce,
       codiconStyles: this.getCodiconStyles(),
@@ -882,8 +921,17 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     config.actions.push(item);
     await this.configService.writeConfig(config);
     this.showingForm = false;
-    void this.refresh();
+    void this.refresh([item.name]);
     this.showToast(`\ud83d\udc4d Added: ${item.name}`);
+  }
+
+  private async addBulkActions(items: Action[]) {
+    const config = await this.configService.readConfig();
+    config.actions.push(...items);
+    await this.configService.writeConfig(config);
+    this.showingForm = false;
+    void this.refresh(items.map(a => a.name));
+    this.showToast(`\ud83d\udc4d Added ${items.length} action(s)`);
   }
 
   private async addNewActionWithIcon(item: Action, customIcon: string) {
@@ -900,15 +948,28 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       vscode.window.showErrorMessage("Could not find action to update");
       return;
     }
-    config.actions[index] = {
-      // Spread oldItem first so all original fields are preserved (workspace, backgroundColor, etc.),
-      // then spread newItem to apply edits. Explicit fallbacks handle optional fields the edit form omits.
+    // Build the merged action. Spread oldItem first to preserve all original fields,
+    // then spread newItem to apply edits. Fields that are now user-editable need
+    // explicit handling so that clearing them (undefined) actually removes them.
+    const merged: Action = {
       ...oldItem,
       ...newItem,
       group: newItem.group !== undefined ? newItem.group : oldItem.group,
       hidden: newItem.hidden !== undefined ? newItem.hidden : oldItem.hidden,
       backgroundColor: newItem.backgroundColor !== undefined ? newItem.backgroundColor : oldItem.backgroundColor,
     };
+    // workspace is now user-editable: if newItem provides it (even as undefined), honour that.
+    // "workspace" key present in newItem means the user explicitly set or cleared it.
+    if ('workspace' in newItem) {
+      if (newItem.workspace) {
+        merged.workspace = newItem.workspace;
+        merged.workspaceColor = newItem.workspaceColor; // may be undefined (clear it)
+      } else {
+        delete merged.workspace;
+        delete merged.workspaceColor;
+      }
+    }
+    config.actions[index] = merged;
     if (customIcon) {
       await this.saveCustomIconMapping(newItem.type, customIcon);
     }

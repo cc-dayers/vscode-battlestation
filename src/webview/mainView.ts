@@ -26,6 +26,7 @@ interface MainViewState {
     openActionMenuFor: Action | null;
     // Session-only run status (never persisted to disk)
     runStatus: Record<string, { exitCode: number; timestamp: number }>;
+    newActionNames?: string[];
 }
 
 // Global Types
@@ -65,6 +66,14 @@ const batchStateUpdates = (updater: () => void) => {
         }
     }
 };
+
+window.addEventListener("resize", () => {
+    vscode.postMessage({ command: "webviewResized", width: window.innerWidth });
+});
+// Initial check
+setTimeout(() => {
+    vscode.postMessage({ command: "webviewResized", width: window.innerWidth });
+}, 100);
 
 // Initial State
 const startState: MainViewState = {
@@ -610,7 +619,7 @@ const renderGroupColorPickerPopout = (group: Group) => {
                     @change=${onTextChange}>
                 <label class="lp-cp-native-wrap" title="Open color wheel">
                     <input type="color" value=${currentColor.startsWith('#') ? currentColor : '#000000'}
-                        @input=${onNativeInput}>
+                        @change=${onNativeInput}>
                     <span class="codicon codicon-color-mode"></span>
                 </label>
             </div>
@@ -867,7 +876,7 @@ const renderColorPickerPopout = (item: Action) => {
                     @change=${onTextChange}>
                 <label class="lp-cp-native-wrap" title="Open color wheel">
                     <input type="color" value=${currentColor.startsWith('#') ? currentColor : '#000000'}
-                        @input=${onNativeInput}>
+                        @change=${onNativeInput}>
                     <span class="codicon codicon-color-mode"></span>
                 </label>
             </div>
@@ -935,7 +944,12 @@ const renderButton = (item: Action) => {
     }
 
     if (display.showCommand) {
-        metaParts.push(formatCommandMeta(item));
+        const cmdMeta = formatCommandMeta(item);
+        const nameLower = item.name.trim().toLowerCase();
+        if (cmdMeta.trim().toLowerCase() !== nameLower &&
+            item.command.trim().toLowerCase() !== nameLower) {
+            metaParts.push(cmdMeta);
+        }
     }
 
     const isInGroup = !!item.group;
@@ -982,6 +996,7 @@ const renderButton = (item: Action) => {
 
     return html`
     <div class=${wrapperClass}
+        data-action-name=${item.name}
         style=${item.rowBackgroundColor ? `--lp-row-bg:${item.rowBackgroundColor}` : ''}
         @dragover=${(e: DragEvent) => handleDragOver(e, item)}
         @dragleave=${(e: DragEvent) => handleDragLeave(e, item)}
@@ -1093,7 +1108,7 @@ const renderButton = (item: Action) => {
 };
 
 const renderGroup = (group: Group, actions: Action[]) => {
-    const isOpen = !state.collapsedGroups.includes(group.name);
+    const isOpen = !!state.searchQuery || !state.collapsedGroups.includes(group.name);
     const isHiddenGroup = !!group.hidden;
 
     // Group styles
@@ -1125,8 +1140,8 @@ const renderGroup = (group: Group, actions: Action[]) => {
 
     return html`
     <details class="lp-group ${isDraggingGroup ? 'lp-dragging-group' : ''} ${isDragOverGroupTop ? 'lp-drag-over-top-group' : ''} ${isDragOverGroupBottom ? 'lp-drag-over-bottom-group' : ''}" ?open=${isOpen} @toggle=${(e: Event) => {
-            // Prevent default toggle behavior to manage state manually if needed,
-            // but <details> handles open/close natively. We just need to sync state.
+            // Prevent mutating user preference when search automatically expands the group
+            if (state.searchQuery) return;
             const d = e.target as HTMLDetailsElement;
             if (d.open && state.collapsedGroups.includes(group.name)) {
                 toggleGroup(group.name);
@@ -1304,6 +1319,34 @@ const renderView = () => {
         ${content}
     </div>
   `, root);
+
+    // After render, check if there are new actions to highlight
+    if (state.newActionNames && state.newActionNames.length > 0) {
+        const namesToHighlight = [...state.newActionNames];
+        // Clear state immediately to avoid re-triggering highlight on next render
+        state.newActionNames = [];
+        
+        requestAnimationFrame(() => {
+            let firstScrolled = false;
+            for (const name of namesToHighlight) {
+                // Find element using exact match on data-action-name 
+                // Using CSS.escape or careful selector to handle quotes/spaces
+                const escapedName = name.replace(/"/g, '\\"');
+                const el = document.querySelector(`[data-action-name="${escapedName}"]`);
+                if (el) {
+                    if (!firstScrolled) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        firstScrolled = true;
+                    }
+                    el.classList.add('lp-highlight-new');
+                    // Remove class after animation finishes (2s + buffer)
+                    setTimeout(() => {
+                        el.classList.remove('lp-highlight-new');
+                    }, 2200);
+                }
+            }
+        });
+    }
 
     // Flip any open menu panels that would overflow the viewport bottom
     requestAnimationFrame(() => {

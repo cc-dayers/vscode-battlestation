@@ -153,6 +153,16 @@ export function renderEditActionForm(ctx: EditActionContext): string {
           ${renderColorPicker({ id: 'customBgColor', value: item.backgroundColor || '', customColors })}
           <div class="lp-hint">Background color for the action button</div>
         </div>
+        <div class="lp-form-group">
+          <label for="workspace">Secondary Label <span style="font-weight:400;opacity:.7">(optional)</span></label>
+          <input type="text" id="workspace" value="${esc(item.workspace || '')}" placeholder="e.g. packages/my-app">
+          <div class="lp-hint">Shown as a small badge above the action name (e.g. yarn workspace name or task group)</div>
+        </div>
+        <div class="lp-form-group" id="workspaceColorGroup" style="display: ${item.workspace ? 'block' : 'none'}">
+          <label>Secondary Label Color</label>
+          ${renderColorPicker({ id: 'workspaceColor', value: item.workspaceColor || '', customColors })}
+          <div class="lp-hint">Background color for the secondary label badge</div>
+        </div>
         <div class="lp-form-actions">
           <button type="button" class="lp-btn lp-btn-secondary" id="cancelBtn">Cancel</button>
           <button type="submit" class="lp-btn lp-btn-primary">Update</button>
@@ -237,6 +247,13 @@ export function renderEditActionForm(ctx: EditActionContext): string {
           }).filter(p => p.name && p.prompt);
         }
 
+        // Show/hide workspaceColor section based on whether workspace has a value
+        const workspaceInput = document.getElementById('workspace');
+        const workspaceColorGroup = document.getElementById('workspaceColorGroup');
+        workspaceInput.addEventListener('input', () => {
+          workspaceColorGroup.style.display = workspaceInput.value.trim() ? 'block' : 'none';
+        });
+
         document.getElementById('editActionForm').addEventListener('submit', (e) => {
           e.preventDefault();
           const name = document.getElementById('name').value.trim();
@@ -246,7 +263,9 @@ export function renderEditActionForm(ctx: EditActionContext): string {
           if (!name || !type || !command) return;
           const params = collectParams();
           const backgroundColor = document.getElementById('customBgColor').value.trim() || undefined;
-          const item = { name, type, command, backgroundColor, params: params.length ? params : undefined };
+          const workspace = workspaceInput.value.trim() || undefined;
+          const workspaceColor = workspace ? (document.getElementById('workspaceColor').value.trim() || undefined) : undefined;
+          const item = { name, type, command, backgroundColor, workspace, workspaceColor, params: params.length ? params : undefined };
           if (typeSelect.value === 'custom' && selectedIcon) {
             vscode.postMessage({ command: 'submitEditAction', oldItem, newItem: item, customIcon: selectedIcon });
           } else {
@@ -254,7 +273,10 @@ export function renderEditActionForm(ctx: EditActionContext): string {
           }
         });
       })();
-      if (typeof initColorPicker === 'function') initColorPicker('customBgColor');
+      if (typeof initColorPicker === 'function') {
+        initColorPicker('customBgColor');
+        initColorPicker('workspaceColor');
+      }
     `,
   });
 }

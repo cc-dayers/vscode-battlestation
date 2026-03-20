@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { renderErrorView } from '../src/views/errorView';
 import { renderAddActionForm } from '../src/views/addItemForm';
+import { renderAddActionWizard } from '../src/views/addActionWizard';
 import { renderEditActionForm } from '../src/views/editItemForm';
 import type { Action } from '../src/types';
 
@@ -22,11 +23,14 @@ const NONCE = 'test-nonce-12345';
 const CSP = "'unsafe-inline'";
 const CODICON = '';
 
-// Injected before the nonce script so acquireVsCodeApi is available
+// Injected before the nonce script so acquireVsCodeApi is available.
+// Also sets window.__lastCommand so Playwright tests can assert on submitted messages.
 const mockVscodeApi = `
 <script nonce="${NONCE}">
+  window.__lastCommand = null;
   window.acquireVsCodeApi = () => ({
     postMessage: (msg) => {
+      window.__lastCommand = msg;
       const t = document.getElementById('vsc-toast') || document.createElement('div');
       t.id = 'vsc-toast';
       t.style = 'position:fixed;bottom:10px;right:10px;background:#0e639c;color:#fff;padding:8px 16px;border-radius:4px;z-index:9999;font-family:sans-serif;font-size:13px';
@@ -48,7 +52,6 @@ const errorHtml = renderErrorView(
 fs.writeFileSync(path.join(outDir, 'error.html'), errorHtml);
 console.log('✓ error.html');
 
-// ── Add Action Form ─────────────────────────────────────────
 const addHtml = renderAddActionForm({
   cspSource: CSP,
   nonce: NONCE,
@@ -62,6 +65,21 @@ const addHtml = renderAddActionForm({
 }).replace('</head>', mockVscodeApi + '</head>');
 fs.writeFileSync(path.join(outDir, 'add-action.html'), addHtml);
 console.log('✓ add-action.html');
+
+// ── Add Action Wizard ───────────────────────────────────────
+const wizardHtml = renderAddActionWizard({
+  cspSource: CSP,
+  nonce: NONCE,
+  codiconStyles: CODICON,
+  typeOptions: `
+    <option value="shell" selected>shell</option>
+    <option value="npm">npm</option>
+    <option value="vscode">vscode</option>
+  `,
+  customColors: ['#ff0000', '#00ff00'],
+}).replace('</head>', mockVscodeApi + '</head>');
+fs.writeFileSync(path.join(outDir, 'add-wizard.html'), wizardHtml);
+console.log('✓ add-wizard.html');
 
 // ── Edit Action Form (with existing params) ─────────────────
 const itemWithParams: Action = {
@@ -83,5 +101,24 @@ const editHtml = renderEditActionForm({
 }).replace('</head>', mockVscodeApi + '</head>');
 fs.writeFileSync(path.join(outDir, 'edit-action.html'), editHtml);
 console.log('✓ edit-action.html');
+
+// ── Edit Action Form (with workspace / secondary label) ──────
+const itemWithWorkspace: Action = {
+  name: 'workspace-app:build',
+  command: 'yarn workspace my-app build',
+  type: 'npm',
+  workspace: 'my-app',
+  workspaceColor: '#2e7d32',
+};
+const editWorkspaceHtml = renderEditActionForm({
+  cspSource: CSP,
+  nonce: NONCE,
+  codiconStyles: CODICON,
+  item: itemWithWorkspace,
+  iconMap: new Map([['shell', 'terminal'], ['npm', 'package']]),
+  customColors: [],
+}).replace('</head>', mockVscodeApi + '</head>');
+fs.writeFileSync(path.join(outDir, 'edit-action-workspace.html'), editWorkspaceHtml);
+console.log('✓ edit-action-workspace.html');
 
 console.log('\nTest pages written to scripts/test-pages/');

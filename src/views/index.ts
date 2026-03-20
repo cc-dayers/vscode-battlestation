@@ -12,6 +12,8 @@ export { renderEditActionForm } from "./editItemForm";
 export type { EditActionContext } from "./editItemForm";
 export { renderAddActionForm } from "./addItemForm";
 export type { AddActionContext } from "./addItemForm";
+export { renderAddActionWizard } from "./addActionWizard";
+export type { AddActionWizardContext } from "./addActionWizard";
 export { renderMainView } from "./mainView";
 export type { MainViewContext } from "./mainView";
 export { esc, renderCheckbox, renderToggleSetting } from "./helpers";

@@ -21,51 +21,61 @@
       {
         "command": "battlestation.open",
         "title": "Battlestation: Open Panel",
+        "shortTitle": "$(rocket) Open Panel",
         "icon": "$(rocket)"
       },
       {
         "command": "battlestation.refresh",
         "title": "Battlestation: Refresh",
+        "shortTitle": "$(refresh) Refresh",
         "icon": "$(refresh)"
       },
       {
         "command": "battlestation.openSettings",
         "title": "Battlestation: Settings",
+        "shortTitle": "$(gear) Settings",
         "icon": "$(gear)"
       },
       {
         "command": "battlestation.addItem",
         "title": "Battlestation: Add Action",
+        "shortTitle": "$(add) Add Action",
         "icon": "$(add)"
       },
       {
         "command": "battlestation.addGroup",
         "title": "Battlestation: Add Group",
+        "shortTitle": "$(new-folder) Add Group",
         "icon": "$(new-folder)"
       },
       {
         "command": "battlestation.toggleSearch",
         "title": "Battlestation: Toggle Search",
+        "shortTitle": "$(search) Toggle Search",
         "icon": "$(search)"
       },
       {
         "command": "battlestation.toggleHidden",
         "title": "Battlestation: Show Hidden Items",
+        "shortTitle": "$(eye) Show Hidden Items",
         "icon": "$(eye)"
       },
       {
         "command": "battlestation.hideHidden",
         "title": "Battlestation: Hide Hidden Items",
+        "shortTitle": "$(eye-closed) Hide Hidden Items",
         "icon": "$(eye-closed)"
       },
       {
         "command": "battlestation.collapseAllGroups",
         "title": "Battlestation: Collapse All Groups",
+        "shortTitle": "$(collapse-all) Collapse All Groups",
         "icon": "$(collapse-all)"
       },
       {
         "command": "battlestation.expandAllGroups",
         "title": "Battlestation: Expand All Groups",
+        "shortTitle": "$(expand-all) Expand All Groups",
         "icon": "$(expand-all)"
       }
     ],
@@ -93,48 +103,79 @@
     "menus": {
       "view/title": [
         {
+          "command": "battlestation.loading",
+          "title": "Loading...",
+          "when": "view == battlestation.view && !battlestation.isLoaded",
+          "group": "navigation@1"
+        },
+        {
           "command": "battlestation.toggleSearch",
-          "when": "view == battlestation.view",
+          "when": "view == battlestation.view && battlestation.isLoaded",
           "group": "navigation@1"
         },
         {
           "command": "battlestation.addItem",
-          "when": "view == battlestation.view",
+          "when": "view == battlestation.view && battlestation.isLoaded",
           "group": "navigation@2"
         },
         {
           "command": "battlestation.addGroup",
-          "when": "view == battlestation.view && battlestation.hasConfig",
+          "when": "view == battlestation.view && battlestation.hasConfig && battlestation.isLoaded",
           "group": "navigation@3"
         },
         {
           "command": "battlestation.collapseAllGroups",
-          "when": "view == battlestation.view && battlestation.hasConfig && !battlestation.allGroupsCollapsed",
+          "when": "view == battlestation.view && battlestation.hasConfig && !battlestation.allGroupsCollapsed && !battlestation.isSmall && battlestation.isLoaded",
+          "group": "navigation@4"
+        },
+        {
+          "command": "battlestation.collapseAllGroups",
+          "when": "view == battlestation.view && battlestation.hasConfig && !battlestation.allGroupsCollapsed && battlestation.isSmall && battlestation.isLoaded",
+          "group": "1_display@1"
+        },
+        {
+          "command": "battlestation.expandAllGroups",
+          "when": "view == battlestation.view && battlestation.hasConfig && battlestation.allGroupsCollapsed && !battlestation.isSmall && battlestation.isLoaded",
           "group": "navigation@4"
         },
         {
           "command": "battlestation.expandAllGroups",
-          "when": "view == battlestation.view && battlestation.hasConfig && battlestation.allGroupsCollapsed",
-          "group": "navigation@4"
+          "when": "view == battlestation.view && battlestation.hasConfig && battlestation.allGroupsCollapsed && battlestation.isSmall && battlestation.isLoaded",
+          "group": "1_display@1"
         },
         {
           "command": "battlestation.toggleHidden",
-          "when": "view == battlestation.view && !battlestation.showHidden",
+          "when": "view == battlestation.view && !battlestation.showHidden && !battlestation.isSmall && battlestation.isLoaded",
+          "group": "navigation@5"
+        },
+        {
+          "command": "battlestation.toggleHidden",
+          "when": "view == battlestation.view && !battlestation.showHidden && battlestation.isSmall && battlestation.isLoaded",
+          "group": "1_display@2"
+        },
+        {
+          "command": "battlestation.hideHidden",
+          "when": "view == battlestation.view && battlestation.showHidden && !battlestation.isSmall && battlestation.isLoaded",
           "group": "navigation@5"
         },
         {
           "command": "battlestation.hideHidden",
-          "when": "view == battlestation.view && battlestation.showHidden",
-          "group": "navigation@5"
+          "when": "view == battlestation.view && battlestation.showHidden && battlestation.isSmall && battlestation.isLoaded",
+          "group": "1_display@2"
         },
         {
           "command": "battlestation.refresh",
-          "when": "view == battlestation.view",
+          "when": "view == battlestation.view && !battlestation.isSmall && battlestation.isLoaded",
           "group": "navigation@6"
         },
         {
+          "command": "battlestation.refresh",
+          "when": "view == battlestation.view && battlestation.isSmall && battlestation.isLoaded",
+          "group": "2_actions@1"
+        },
+        {
           "command": "battlestation.openSettings",
-          "when": "view == battlestation.view",
+          "when": "view == battlestation.view && battlestation.isLoaded",
           "group": "navigation@7"
         }
       ]
@@ -201,6 +242,11 @@
             "delete"
           ],
           "description": "Which action buttons appear inline on each action card. Drag to reorder in the Settings panel. Buttons not listed fall back to the ellipsis menu."
+        },
+        "battlestation.experimental.addWizard": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable experimental multi-step wizard for adding new actions or importing JSON."
         }
       }
     }

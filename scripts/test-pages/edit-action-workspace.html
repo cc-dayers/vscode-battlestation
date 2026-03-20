@@ -328,7 +328,7 @@
       <form id="editActionForm">
         <div class="lp-form-group">
           <label for="name">Name *</label>
-          <input type="text" id="name" value="Deploy to env" required>
+          <input type="text" id="name" value="workspace-app:build" required>
           <div class="lp-hint">Display name for this action</div>
         </div>
         <div class="lp-form-group">
@@ -336,7 +336,6 @@
           <select id="type" required>
             <option value="shell" >shell</option>
 <option value="npm" selected>npm</option>
-<option value="vscode" >vscode</option>
             <option value="custom" >✏️ Custom type...</option>
           </select>
           <input type="text" id="customType" placeholder="Enter custom type" value="" style="display: none; margin-top: 4px;">
@@ -358,7 +357,7 @@
         
         <div class="lp-form-group">
           <label for="command">Command *</label>
-          <input type="text" id="command" value="npm run deploy -- --env=${ENV} --tag=${TAG}" required>
+          <input type="text" id="command" value="yarn workspace my-app build" required>
           <div class="lp-hint" id="commandHint">Use <code>${VAR}</code> for runtime inputs (see Parameters below)</div>
         </div>
         <div class="lp-form-group">
@@ -473,10 +472,10 @@
         </div>
         <div class="lp-form-group">
           <label for="workspace">Secondary Label <span style="font-weight:400;opacity:.7">(optional)</span></label>
-          <input type="text" id="workspace" value="" placeholder="e.g. packages/my-app">
+          <input type="text" id="workspace" value="my-app" placeholder="e.g. packages/my-app">
           <div class="lp-hint">Shown as a small badge above the action name (e.g. yarn workspace name or task group)</div>
         </div>
-        <div class="lp-form-group" id="workspaceColorGroup" style="display: none">
+        <div class="lp-form-group" id="workspaceColorGroup" style="display: block">
           <label>Secondary Label Color</label>
           
     <div class="lp-color-picker-container" id="workspaceColor-container">
@@ -565,13 +564,13 @@
       </div>
 
       <div class="lp-color-input-row" id="workspaceColor-input-row" style="display: none;">
-        <div class="lp-color-preview" id="workspaceColor-preview" style="background: transparent;"></div>
+        <div class="lp-color-preview" id="workspaceColor-preview" style="background: #2e7d32;"></div>
         <input type="text" id="workspaceColor" 
                class="lp-color-text-input"
                placeholder="e.g. #ff0000 or var(--color)" 
-               value="">
+               value="#2e7d32">
         <div class="lp-native-picker-wrapper">
-           <input type="color" id="workspaceColor-native" value="#000000" title="Pick from color wheel">
+           <input type="color" id="workspaceColor-native" value="#2e7d32" title="Pick from color wheel">
            <span class="codicon codicon-color-mode"></span>
         </div>
       </div>
@@ -703,7 +702,7 @@
 
       (function () {
         const vscode = acquireVsCodeApi();
-        const oldItem = {"name":"Deploy to env","command":"npm run deploy -- --env=${ENV} --tag=${TAG}","type":"npm","params":[{"name":"ENV","prompt":"Target environment","options":["staging","production"]},{"name":"TAG","prompt":"Docker image tag","default":"latest"}]};
+        const oldItem = {"name":"workspace-app:build","command":"yarn workspace my-app build","type":"npm","workspace":"my-app","workspaceColor":"#2e7d32"};
         const typeSelect = document.getElementById('type');
         const customTypeInput = document.getElementById('customType');
         const customTypeSection = document.getElementById('customTypeSection');

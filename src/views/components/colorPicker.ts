@@ -142,7 +142,7 @@ export const colorPickerScript = `
       });
 
       // Handle native picker
-      nativeInput.addEventListener('input', (e) => {
+      nativeInput.addEventListener('change', (e) => {
         const val = e.target.value;
         updateUI(val);
         input.dispatchEvent(new Event('input', { bubbles: true }));

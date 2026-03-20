@@ -208,6 +208,28 @@ test.describe('Main View', () => {
     await expect(page.locator('.lp-btn-wrapper')).toHaveCount(6);
   });
 
+  test('searching automatically expands collapsed groups', async ({ page }) => {
+    // Manually collapse the "Build" group first
+    await page.locator('summary.lp-group-header', { hasText: 'Build' }).click();
+    await page.waitForTimeout(100);
+
+    // Verify it is collapsed (actions are hidden)
+    await expect(page.locator('.lp-btn-wrapper').filter({ hasText: 'Build Tool' })).not.toBeVisible();
+
+    // Now search for an item in the collapsed group
+    await openSearch(page);
+    await page.fill('.lp-search-box', 'build tool');
+    await page.waitForTimeout(50);
+
+    // The group should automatically expand and the item should be visible
+    await expect(page.locator('.lp-btn-wrapper').filter({ hasText: 'Build Tool' })).toBeVisible();
+
+    // Clearing the search should return the group to its previously collapsed state
+    await page.fill('.lp-search-box', '');
+    await page.waitForTimeout(50);
+    await expect(page.locator('.lp-btn-wrapper').filter({ hasText: 'Build Tool' })).not.toBeVisible();
+  });
+
   // ─────────────────────────────────────────────────────────────
   // Group collapse / expand
   // ─────────────────────────────────────────────────────────────

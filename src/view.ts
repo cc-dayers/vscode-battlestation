@@ -224,6 +224,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       case "assignGroup":
         void this.assignActionToGroup(message.item, message.groupName);
         break;
+      case "bulkAssignGroup":
+        void this.bulkAssignActionsToGroup(message.items, message.groupName);
+        break;
       case "hideGroup":
         void this.toggleGroupHidden(message.group);
         break;
@@ -1046,6 +1049,28 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       await this.configService.writeConfig(config);
       void this.refresh();
     }
+  }
+
+  private async bulkAssignActionsToGroup(items: Action[], groupName: string) {
+    const config = await this.configService.readConfig();
+    items.forEach((item) => {
+      const t = config.actions.find((i) => i.name === item.name && i.command === item.command);
+      if (!t) return;
+      if (groupName === "__none__") {
+        delete t.group;
+      } else {
+        t.group = groupName;
+      }
+    });
+    if (groupName !== "__none__") {
+      if (!config.groups) { config.groups = []; }
+      if (!config.groups.find((g) => g.name === groupName)) {
+        config.groups.push({ name: groupName });
+      }
+    }
+    await this.configService.writeConfig(config);
+    void this.refresh();
+    this.showToast(`\ud83d\udcc2 Assigned ${items.length} action(s) to "${groupName}"`);
   }
 
   private async bulkHideActions(items: Action[]) {

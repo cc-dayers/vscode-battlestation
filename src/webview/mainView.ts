@@ -153,6 +153,9 @@ let groupColorPickerApplyToBorder = false;
 // Reorder mode (transient UI state — not persisted)
 let reorderMode = false;
 
+// Search group-assign picker
+let searchGroupPickerOpen = false;
+
 const enterReorderMode = () => {
     closeActionMenu();
     colorPickerOpenFor = null;
@@ -409,6 +412,12 @@ const deleteAction = (item: Action) => {
 
 const assignGroup = (item: Action, groupName: string) => {
     vscode.postMessage({ command: "assignGroup", item, groupName });
+};
+
+const bulkAssignToGroup = (items: Action[], groupName: string) => {
+    vscode.postMessage({ command: "bulkAssignGroup", items, groupName });
+    searchGroupPickerOpen = false;
+    renderView();
 };
 
 const getActionMenuId = (item: Action): string => {
@@ -1198,17 +1207,47 @@ const renderGroup = (group: Group, actions: Action[]) => {
     `;
 };
 
-const renderSearch = () => {
+const renderSearch = (visibleActions: Action[]) => {
     if (!state.showSearch && !state.searchQuery) return null;
+
+    const hasGroupsAndResults = state.groups.length > 0 && !!state.searchQuery && visibleActions.length > 0;
 
     return html`
     <div id="searchContainer" class="lp-search-container">
-        <input type="text" class="lp-search-box" 
-            placeholder="🔍 Search actions..." 
-            .value=${state.searchQuery}
-            @input=${(e: Event) => { state.searchQuery = (e.target as HTMLInputElement).value; }}
-        >
-        <!-- Additional search buttons (Select Multiple, etc) could go here -->
+        <div class="lp-search-row">
+            <input type="text" class="lp-search-box" 
+                placeholder="🔍 Search actions..." 
+                .value=${state.searchQuery}
+                @input=${(e: Event) => { state.searchQuery = (e.target as HTMLInputElement).value; searchGroupPickerOpen = false; }}
+            >
+            ${hasGroupsAndResults ? html`
+                <div class="lp-search-assign-wrap">
+                    <button class="lp-search-assign-btn ${searchGroupPickerOpen ? 'lp-search-assign-btn--open' : ''}"
+                        title="Assign all ${visibleActions.length} result(s) to a group"
+                        aria-label="Assign all search results to a group"
+                        id="searchAssignBtn"
+                        @click=${(e: Event) => {
+                            e.stopPropagation();
+                            searchGroupPickerOpen = !searchGroupPickerOpen;
+                            renderView();
+                        }}>
+                        <span class="codicon codicon-folder-moved"></span>
+                    </button>
+                    ${searchGroupPickerOpen ? html`
+                        <div class="lp-search-assign-picker" @click=${(e: Event) => e.stopPropagation()}>
+                            <div class="lp-search-assign-picker-label">Assign ${visibleActions.length} result(s) to:</div>
+                            ${state.groups.map(g => html`
+                                <button class="lp-search-assign-picker-item"
+                                    @click=${() => bulkAssignToGroup(visibleActions, g.name)}>
+                                    ${g.icon ? html`<span class="codicon codicon-${g.icon}"></span>` : html`<span class="codicon codicon-folder"></span>`}
+                                    ${g.name}
+                                </button>
+                            `)}
+                        </div>
+                    ` : null}
+                </div>
+            ` : null}
+        </div>
     </div>
     `;
 };
@@ -1303,7 +1342,7 @@ const renderView = () => {
     ${state.loading
             ? html`<div class="lp-loading-overlay"><span class="codicon codicon-loading codicon-modifier-spin"></span></div>`
             : null}
-    ${renderSearch()}
+    ${renderSearch(visibleActions)}
     ${reorderMode ? html`
     <div class="lp-reorder-banner">
         <span class="lp-reorder-banner-label">
@@ -1407,11 +1446,19 @@ document.addEventListener('click', (e: MouseEvent) => {
         if (groupColorPickerOpenFor !== null) { groupColorPickerOpenFor = null; changed = true; }
         if (changed) renderView();
     }
+    if (!target?.closest('.lp-search-assign-wrap') && searchGroupPickerOpen) {
+        searchGroupPickerOpen = false;
+        renderView();
+    }
 });
 
 document.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
         closeActionMenu();
+        if (searchGroupPickerOpen) {
+            searchGroupPickerOpen = false;
+            renderView();
+        }
     }
 });
 

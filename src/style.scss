@@ -2338,8 +2338,15 @@ form {
   z-index: 10;
 }
 
+.lp-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .lp-search-box {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 6px 8px;
   font-size: 13px;
   background: var(--vscode-input-background);
@@ -2375,6 +2382,86 @@ form {
 
 .lp-search-btn:hover {
   background: var(--vscode-button-secondaryHoverBackground);
+}
+
+/* Search: Assign-all-to-group button + picker */
+.lp-search-assign-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.lp-search-assign-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 3px;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  .codicon { font-size: 14px; }
+}
+
+.lp-search-assign-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+  border-color: var(--vscode-focusBorder);
+}
+
+.lp-search-assign-btn--open {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-color: var(--vscode-button-background);
+}
+
+.lp-search-assign-picker {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 160px;
+  background: var(--vscode-menu-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.lp-search-assign-picker-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  padding: 7px 10px 5px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.2));
+}
+
+.lp-search-assign-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+
+  .codicon { font-size: 13px; opacity: 0.8; }
+}
+
+.lp-search-assign-picker-item:hover {
+  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+  color: var(--vscode-menu-selectionForeground, var(--vscode-foreground));
 }
 
 @keyframes codicon-spin {

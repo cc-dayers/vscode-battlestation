@@ -378,4 +378,101 @@ test.describe('Main View', () => {
       page.locator('.lp-btn-wrapper').filter({ hasText: 'Hidden Action' })
     ).toHaveCount(1);
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // Search: bulk assign results to group
+  // ─────────────────────────────────────────────────────────────
+
+  test('assign-to-group button is hidden when no search query is active', async ({ page }) => {
+    await openSearch(page);
+    // No query typed yet — button should not exist
+    await expect(page.locator('#searchAssignBtn')).toHaveCount(0);
+  });
+
+  test('assign-to-group button is hidden when search has no results', async ({ page }) => {
+    await openSearch(page);
+    await page.fill('.lp-search-box', 'xyzzy_no_match_123');
+    await page.waitForTimeout(50);
+    // Zero results: button should not appear
+    await expect(page.locator('#searchAssignBtn')).toHaveCount(0);
+  });
+
+  test('assign-to-group button appears when search returns results and groups exist', async ({ page }) => {
+    await openSearch(page);
+    await page.fill('.lp-search-box', 'build');
+    await page.waitForTimeout(50);
+    // Results found and groups exist in initial data => button should be visible
+    await expect(page.locator('#searchAssignBtn')).toBeVisible();
+  });
+
+  test('clicking assign-to-group button opens group picker dropdown', async ({ page }) => {
+    await openSearch(page);
+    await page.fill('.lp-search-box', 'build');
+    await page.waitForTimeout(50);
+
+    await page.locator('#searchAssignBtn').click();
+    await page.waitForTimeout(50);
+
+    // Picker should appear
+    await expect(page.locator('.lp-search-assign-picker')).toBeVisible();
+    // Should list the groups from initial data: Build, Launch
+    await expect(page.locator('.lp-search-assign-picker-item')).toHaveCount(2);
+    await expect(page.locator('.lp-search-assign-picker-item').first()).toContainText('Build');
+    await expect(page.locator('.lp-search-assign-picker-item').last()).toContainText('Launch');
+  });
+
+  test('clicking a group in picker dispatches bulkAssignGroup with visible actions', async ({ page }) => {
+    await page.evaluate(() => { (window as any).__lastCommand = null; });
+
+    await openSearch(page);
+    await page.fill('.lp-search-box', 'script');
+    await page.waitForTimeout(50);
+
+    // "Deploy Script" should be the only result
+    await expect(page.locator('.lp-btn-wrapper')).toHaveCount(1);
+
+    await page.locator('#searchAssignBtn').click();
+    await page.waitForTimeout(50);
+
+    // Click "Launch" group in picker
+    await page.locator('.lp-search-assign-picker-item', { hasText: 'Launch' }).click();
+    await page.waitForTimeout(50);
+
+    const cmd = await page.evaluate(() => (window as any).__lastCommand);
+    expect(cmd?.command).toBe('bulkAssignGroup');
+    expect(cmd?.groupName).toBe('Launch');
+    expect(cmd?.items).toHaveLength(1);
+    expect(cmd?.items[0].name).toBe('Deploy Script');
+  });
+
+  test('picker closes after assigning to a group', async ({ page }) => {
+    await openSearch(page);
+    await page.fill('.lp-search-box', 'script');
+    await page.waitForTimeout(50);
+
+    await page.locator('#searchAssignBtn').click();
+    await page.waitForTimeout(50);
+    await expect(page.locator('.lp-search-assign-picker')).toBeVisible();
+
+    await page.locator('.lp-search-assign-picker-item').first().click();
+    await page.waitForTimeout(50);
+    // Picker should close
+    await expect(page.locator('.lp-search-assign-picker')).toHaveCount(0);
+  });
+
+  test('picker closes when clicking outside', async ({ page }) => {
+    await openSearch(page);
+    await page.fill('.lp-search-box', 'build');
+    await page.waitForTimeout(50);
+
+    await page.locator('#searchAssignBtn').click();
+    await page.waitForTimeout(50);
+    await expect(page.locator('.lp-search-assign-picker')).toBeVisible();
+
+    // Click somewhere outside the picker
+    await page.locator('.lp-grid').click({ position: { x: 10, y: 10 } });
+    await page.waitForTimeout(50);
+    await expect(page.locator('.lp-search-assign-picker')).toHaveCount(0);
+  });
 });
+

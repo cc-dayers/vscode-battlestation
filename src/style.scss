@@ -135,7 +135,7 @@ body {
 .lp-group-header:hover .lp-menu-trigger--group,
 .lp-group-menu-trigger[aria-expanded="true"],
 .lp-menu-trigger--group[aria-expanded="true"] {
-  opacity: 0.6;
+  opacity: 1;
   background: var(--vscode-toolbar-hoverBackground);
 }
 
@@ -629,12 +629,12 @@ body {
 }
 
 .lp-btn-wrapper:hover .lp-inline-action-btn {
-  opacity: 0.65;
+  opacity: 1;
   border-color: rgba(128, 128, 128, 0.5);
 }
 
 .lp-group-header:hover .lp-inline-action-btn {
-  opacity: 0.65;
+  opacity: 1;
   border-color: rgba(128, 128, 128, 0.5);
 }
 

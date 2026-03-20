@@ -1231,7 +1231,7 @@ const renderSearch = (visibleActions: Action[]) => {
                             searchGroupPickerOpen = !searchGroupPickerOpen;
                             renderView();
                         }}>
-                        <span class="codicon codicon-folder-moved"></span>
+                        <span class="codicon codicon-folder-opened"></span>
                     </button>
                     ${searchGroupPickerOpen ? html`
                         <div class="lp-search-assign-picker" @click=${(e: Event) => e.stopPropagation()}>

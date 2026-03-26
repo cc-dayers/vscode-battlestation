@@ -94,6 +94,7 @@ export function renderAddGroupForm(ctx: AddGroupContext): string {
           <label>Secondary Grouping (Optional)</label>
           <select id="secondaryGroupBy" style="width: 100%; padding: 6px; margin-top: 4px; background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border);">
             <option value="workspace" selected>Group by Workspace / Portal</option>
+            <option value="type">Group by Type (build, test, etc.)</option>
             <option value="none">None</option>
           </select>
           <div class="lp-hint">Use this to organize commands into sub-folders for monorepos.</div>
@@ -172,7 +173,7 @@ export function renderAddGroupForm(ctx: AddGroupContext): string {
                 color: color || undefined,
                 backgroundColor: backgroundColor || undefined,
                 borderColor: borderColor || undefined,
-                secondaryGroupBy: secondaryGroupBy === 'workspace' ? 'workspace' : undefined
+                secondaryGroupBy: (secondaryGroupBy === 'workspace' || secondaryGroupBy === 'type') ? secondaryGroupBy : undefined
               } 
             });
           }

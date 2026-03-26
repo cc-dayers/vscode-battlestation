@@ -244,7 +244,7 @@ body {
 }
 
 .lp-subgroup--bordered {
-  border: 1px solid var(--vscode-widget-border);
+  border: 1px solid var(--lp-subgroup-border-color, var(--vscode-widget-border));
   border-radius: 6px;
   padding: 4px 6px;
   margin-top: 6px;

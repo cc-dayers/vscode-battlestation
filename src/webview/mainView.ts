@@ -1208,27 +1208,32 @@ const renderButton = (item: Action, hideWorkspaceBadge: boolean = false) => {
     `;
 };
 
-const renderSecondaryGroups = (group: Group, actions: Action[]) => {
+const renderSecondaryGroups = (group: Group, actions: Action[], groupByField: string = 'workspace') => {
     const subGroupsMap = new Map<string, Action[]>();
-    const workspacesOrder: string[] = [];
-    
-    // Group by workspace name, falling back to 'Default' or ''
+    const subGroupOrder: string[] = [];
+    const subGroupColors = new Map<string, string | undefined>();
+
+    // Group by the chosen field, falling back to a sensible default label
     actions.forEach(a => {
-        const w = a.workspace || "Default";
-        if (!subGroupsMap.has(w)) {
-            subGroupsMap.set(w, []);
-            workspacesOrder.push(w);
+        const fieldVal = ((a as unknown as Record<string, string>)[groupByField]) || (groupByField === 'type' ? 'Other' : 'Default');
+        if (!subGroupsMap.has(fieldVal)) {
+            subGroupsMap.set(fieldVal, []);
+            subGroupOrder.push(fieldVal);
         }
-        subGroupsMap.get(w)!.push(a);
+        subGroupsMap.get(fieldVal)!.push(a);
+        // workspace color is only meaningful for workspace grouping
+        if (groupByField === 'workspace' && !subGroupColors.has(fieldVal)) {
+            subGroupColors.set(fieldVal, a.workspaceColor);
+        }
     });
 
-    return workspacesOrder.map(w => {
-        const subActs = subGroupsMap.get(w)!;
-        const color = subActs[0]?.workspaceColor;
+    return subGroupOrder.map(label => {
+        const subActs = subGroupsMap.get(label)!;
+        const color = subGroupColors.get(label);
         
-        const isDraggingThis = dragSrcSubgroup?.group === group.name && dragSrcSubgroup?.workspace === w;
-        const isDragOverTop = dragOverSubgroup?.group === group.name && dragOverSubgroup?.workspace === w && dragOverSubgroupTop;
-        const isDragOverBottom = dragOverSubgroup?.group === group.name && dragOverSubgroup?.workspace === w && !dragOverSubgroupTop;
+        const isDraggingThis = dragSrcSubgroup?.group === group.name && dragSrcSubgroup?.workspace === label;
+        const isDragOverTop = dragOverSubgroup?.group === group.name && dragOverSubgroup?.workspace === label && dragOverSubgroupTop;
+        const isDragOverBottom = dragOverSubgroup?.group === group.name && dragOverSubgroup?.workspace === label && !dragOverSubgroupTop;
         
         const isBordered = state.display.secondaryGroupStyle === "border";
         const dragClasses = [
@@ -1240,32 +1245,30 @@ const renderSecondaryGroups = (group: Group, actions: Action[]) => {
         ].filter(Boolean).join(" ");
 
         let badgeStyle = color ? `color:${color};` : '';
-        let wrapperStyle = '';
+        // Use a CSS variable so the SCSS border picks it up correctly
+        const wrapperStyle = isBordered && color
+            ? `--lp-subgroup-border-color: ${color}99;`
+            : '';
         if (isBordered) {
              badgeStyle += `background-color:transparent; border-color:transparent;`; 
         } else {
              badgeStyle += color ? `background-color:${color}22; border-color:${color}55;` : '';
         }
 
-        if (isBordered && color) {
-            // Apply border to wrapper if bordered mode is enabled
-            wrapperStyle = `border-color:${color}66;`;
-        }
-
         return html`
         <div class=${dragClasses} style=${wrapperStyle}
-            @dragover=${(e: DragEvent) => handleDragOverSubgroupHeader(e, group, w)}
-            @dragleave=${(e: DragEvent) => handleDragLeaveSubgroupHeader(e, group, w)}
-            @drop=${(e: DragEvent) => handleDropOnSubgroupHeader(e, group, w)}>
+            @dragover=${(e: DragEvent) => handleDragOverSubgroupHeader(e, group, label)}
+            @dragleave=${(e: DragEvent) => handleDragLeaveSubgroupHeader(e, group, label)}
+            @drop=${(e: DragEvent) => handleDropOnSubgroupHeader(e, group, label)}>
             <div class="lp-subgroup-header" draggable="true"
-                @dragstart=${(e: DragEvent) => handleSubgroupDragStart(e, group, w)}
+                @dragstart=${(e: DragEvent) => handleSubgroupDragStart(e, group, label)}
                 @dragend=${handleSubgroupDragEnd}>
-                <button class="lp-group-drag-handle" title="Drag to reorder workspace group" @click=${(e:Event) => { e.preventDefault(); e.stopPropagation(); }}>
+                <button class="lp-group-drag-handle" title="Drag to reorder group" @click=${(e:Event) => { e.preventDefault(); e.stopPropagation(); }}>
                     <span class="codicon codicon-gripper"></span>
                 </button>
                 <div class="lp-subgroup-badge" style=${badgeStyle}>
                    ${isBordered ? '' : html`<span class="codicon codicon-briefcase lp-subgroup-icon"></span>`}
-                   <span class="lp-subgroup-label-text">${w}</span>
+                   <span class="lp-subgroup-label-text">${label}</span>
                 </div>
             </div>
             <div class="lp-subgroup-items">
@@ -1361,8 +1364,8 @@ const renderGroup = (group: Group, actions: Action[]) => {
             ${groupColorPickerOpenFor === groupMenuId ? renderGroupColorPickerPopout(group) : null}
         </summary>
         <div class="lp-group-items" style="${itemsStyles.join(';')}">
-            ${group.secondaryGroupBy === 'workspace' 
-                ? renderSecondaryGroups(group, actions) 
+            ${(group.secondaryGroupBy === 'workspace' || group.secondaryGroupBy === 'type')
+                ? renderSecondaryGroups(group, actions, group.secondaryGroupBy) 
                 : actions.map((a) => renderButton(a))}
         </div>
     </details>

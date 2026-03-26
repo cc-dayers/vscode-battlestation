@@ -84,8 +84,9 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
         <div class="lp-form-group">
           <label>Secondary Grouping (Optional)</label>
           <select id="secondaryGroupBy" style="width: 100%; padding: 6px; margin-top: 4px; background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border);">
-            <option value="none" ${group.secondaryGroupBy !== 'workspace' ? 'selected' : ''}>None</option>
+            <option value="none" ${group.secondaryGroupBy !== 'workspace' && group.secondaryGroupBy !== 'type' ? 'selected' : ''}>None</option>
             <option value="workspace" ${group.secondaryGroupBy === 'workspace' ? 'selected' : ''}>Group by Workspace / Portal</option>
+            <option value="type" ${group.secondaryGroupBy === 'type' ? 'selected' : ''}>Group by Type (build, test, etc.)</option>
           </select>
           <div class="lp-hint">Use this to organize commands into sub-folders for monorepos.</div>
         </div>
@@ -139,7 +140,7 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
           const newGroup = {
             name: groupName,
             icon: icon || undefined,
-            secondaryGroupBy: secondaryGroupBy === 'workspace' ? 'workspace' : undefined,
+            secondaryGroupBy: (secondaryGroupBy === 'workspace' || secondaryGroupBy === 'type') ? secondaryGroupBy : undefined,
           };
           vscode.postMessage({ command: 'submitEditGroup', oldGroup, newGroup });
         });

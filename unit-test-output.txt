@@ -1,0 +1,45 @@
+
+> battlestation@0.4.1 test:unit
+> vscode-test --grep -v "Manual"
+
+- Resolving version...
+Γ£ö Validated version: 1.113.0
+Γ£ö Found existing install in C:\Users\Don\Documents\Projects\vscode-battlestation\.vscode-test\vscode-win32-x64-archive-1.113.0
+(node:66300) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+[main 2026-03-26T21:10:28.664Z] update#setState disabled
+[main 2026-03-26T21:10:28.664Z] update#ctor - updates are disabled by the environment
+Started local extension host with pid 64824.
+Loading development extension at c:\Users\Don\Documents\Projects\vscode-battlestation
+Settings Sync: Account status changed from uninitialized to unavailable
+TSError: Γ¿» Unable to compile TypeScript:
+../../src/test/suite/settings.test.ts(6,15): error TS2741: Property 'secondaryGroupStyle' is missing in type '{ cspSource: string; nonce: string; codiconStyles: string; showCommand: true; showGroup: true; hideIcon: string; backupCount: number; configExists: true; usedIcons: string[]; settingsScriptUri: string; cssUri: string; actionToolbar: string[]; }' but required in type 'SettingsViewContext'.
+../../src/test/suite/settings.test.ts(36,15): error TS2741: Property 'secondaryGroupStyle' is missing in type '{ cspSource: string; nonce: string; codiconStyles: string; showCommand: false; showGroup: false; hideIcon: string; backupCount: number; configExists: false; usedIcons: never[]; settingsScriptUri: string; actionToolbar: string[]; }' but required in type 'SettingsViewContext'.
+
+    at createTSError (c:\Users\Don\Documents\Projects\vscode-battlestation\node_modules\ts-node\src\index.ts:859:12)
+    at reportTSError (c:\Users\Don\Documents\Projects\vscode-battlestation\node_modules\ts-node\src\index.ts:863:19)
+    at getOutput (c:\Users\Don\Documents\Projects\vscode-battlestation\node_modules\ts-node\src\index.ts:1077:36)
+    at Object.compile (c:\Users\Don\Documents\Projects\vscode-battlestation\node_modules\ts-node\src\index.ts:1433:41)
+    at Module.m._compile (c:\Users\Don\Documents\Projects\vscode-battlestation\node_modules\ts-node\src\index.ts:1617:30)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1847:10)
+    at Object.require.extensions.<computed> [as .ts] (c:\Users\Don\Documents\Projects\vscode-battlestation\node_modules\ts-node\src\index.ts:1621:12)
+    at Module.load (node:internal/modules/cjs/loader:1448:32)
+    at Module._load (node:internal/modules/cjs/loader:1270:12)
+    at Module.c._load (node:electron/js2c/node_init:2:18041)
+    at Module.r._load (file:///c:/Users/Don/Documents/Projects/vscode-battlestation/.vscode-test/vscode-win32-x64-archive-1.113.0/cfbea10c5f/resources/app/out/vs/workbench/api/node/extensionHostProcess.js:801:6589)
+    at Module.e._load (file:///c:/Users/Don/Documents/Projects/vscode-battlestation/.vscode-test/vscode-win32-x64-archive-1.113.0/cfbea10c5f/resources/app/out/vs/workbench/api/node/extensionHostProcess.js:619:28611)
+    at Module.n._load (file:///c:/Users/Don/Documents/Projects/vscode-battlestation/.vscode-test/vscode-win32-x64-archive-1.113.0/cfbea10c5f/resources/app/out/vs/workbench/api/node/extensionHostProcess.js:611:27731)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:244:24)
+    at Module.require (node:internal/modules/cjs/loader:1470:12)
+    at require (node:internal/modules/helpers:147:16)
+    at c:\Users\Don\Documents\Projects\vscode-battlestation\node_modules\mocha\lib\mocha.js:396:36
+    at Array.forEach (<anonymous>)
+    at Mocha.loadFiles (c:\Users\Don\Documents\Projects\vscode-battlestation\node_modules\mocha\lib\mocha.js:393:14)
+    at Mocha.run (c:\Users\Don\Documents\Projects\vscode-battlestation\node_modules\mocha\lib\mocha.js:960:10)
+    at mochaGlobalTeardown.mochaGlobalTeardown (c:\Users\Don\Documents\Projects\vscode-battlestation\node_modules\@vscode\test-cli\out\runner.cjs:33:50)
+    at new Promise (<anonymous>)
+    at Object.run (c:\Users\Don\Documents\Projects\vscode-battlestation\node_modules\@vscode\test-cli\out\runner.cjs:33:11)
+[main 2026-03-26T21:10:30.430Z] Extension host with pid 64824 exited with code: 0, signal: unknown.
+Exit code:   1

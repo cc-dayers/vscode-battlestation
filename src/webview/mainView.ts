@@ -89,7 +89,7 @@ const startState: MainViewState = {
         hideIcon: "eye-closed",
         playButtonBg: "transparent",
         actionToolbar: ["hide", "setColor", "edit", "delete"],
-        secondaryGroupStyle: "badge",
+        secondaryGroupStyle: "border",
     },
     iconMap: {},
     collapsedGroups: [],
@@ -1240,18 +1240,20 @@ const renderSecondaryGroups = (group: Group, actions: Action[]) => {
         ].filter(Boolean).join(" ");
 
         let badgeStyle = color ? `color:${color};` : '';
+        let wrapperStyle = '';
         if (isBordered) {
-             badgeStyle += color ? `background-color:transparent;` : ''; 
+             badgeStyle += `background-color:transparent; border-color:transparent;`; 
         } else {
              badgeStyle += color ? `background-color:${color}22; border-color:${color}55;` : '';
         }
+
         if (isBordered && color) {
             // Apply border to wrapper if bordered mode is enabled
-            badgeStyle = `color:${color};`;
+            wrapperStyle = `border-color:${color}66;`;
         }
 
         return html`
-        <div class=${dragClasses}
+        <div class=${dragClasses} style=${wrapperStyle}
             @dragover=${(e: DragEvent) => handleDragOverSubgroupHeader(e, group, w)}
             @dragleave=${(e: DragEvent) => handleDragLeaveSubgroupHeader(e, group, w)}
             @drop=${(e: DragEvent) => handleDropOnSubgroupHeader(e, group, w)}>
@@ -1262,8 +1264,8 @@ const renderSecondaryGroups = (group: Group, actions: Action[]) => {
                     <span class="codicon codicon-gripper"></span>
                 </button>
                 <div class="lp-subgroup-badge" style=${badgeStyle}>
-                   <span class="codicon codicon-briefcase lp-subgroup-icon"></span>
-                   ${w}
+                   ${isBordered ? '' : html`<span class="codicon codicon-briefcase lp-subgroup-icon"></span>`}
+                   <span class="lp-subgroup-label-text">${w}</span>
                 </div>
             </div>
             <div class="lp-subgroup-items">

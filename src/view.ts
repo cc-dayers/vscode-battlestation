@@ -359,7 +359,11 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   }
 
   public async showSettingsForm() {
-    this.showingForm = "settings";
+    if (this.showingForm === "settings") {
+      this.showingForm = false;
+    } else {
+      this.showingForm = "settings";
+    }
     await vscode.commands.executeCommand("battlestation.view.focus");
     this.view?.show?.(true);
     void this.refresh();

@@ -12,6 +12,7 @@ jspm_packages/
 media/codicon.css
 media/codicon.ttf
 media/output.css
+media/*.js
 
 # Source maps
 **/*.map

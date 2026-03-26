@@ -93,8 +93,8 @@ export function renderAddGroupForm(ctx: AddGroupContext): string {
         <div class="lp-form-group">
           <label>Secondary Grouping (Optional)</label>
           <select id="secondaryGroupBy" style="width: 100%; padding: 6px; margin-top: 4px; background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border);">
-            <option value="none" selected>None</option>
-            <option value="workspace">Group by Workspace / Portal</option>
+            <option value="workspace" selected>Group by Workspace / Portal</option>
+            <option value="none">None</option>
           </select>
           <div class="lp-hint">Use this to organize commands into sub-folders for monorepos.</div>
         </div>

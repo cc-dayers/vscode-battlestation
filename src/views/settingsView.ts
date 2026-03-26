@@ -15,6 +15,7 @@ export interface SettingsViewContext {
   cssUri?: string;
   customConfigPath?: string;
   actionToolbar: string[];
+  secondaryGroupStyle: string;
 }
 
 export function renderSettingsView(ctx: SettingsViewContext): string {
@@ -27,6 +28,7 @@ export function renderSettingsView(ctx: SettingsViewContext): string {
     usedIcons: ctx.usedIcons,
     customConfigPath: ctx.customConfigPath ?? null,
     actionToolbar: ctx.actionToolbar,
+    secondaryGroupStyle: ctx.secondaryGroupStyle,
   };
 
   return htmlShell({

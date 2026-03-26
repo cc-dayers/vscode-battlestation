@@ -10,6 +10,7 @@ type SettingsState = {
   usedIcons: string[];
   customConfigPath: string | null;
   actionToolbar: string[];
+  secondaryGroupStyle: string;
 };
 
 type HideIconOption = {
@@ -55,6 +56,7 @@ const state: SettingsState = window.__SETTINGS__ || {
   usedIcons: [],
   customConfigPath: null,
   actionToolbar: ["hide", "setColor", "edit", "delete"],
+  secondaryGroupStyle: "border",
 };
 
 let showDeleteConfirm = false;
@@ -97,6 +99,7 @@ const onSave = () => {
         showGroup: state.showGroup,
         hideIcon: state.hideIcon,
         actionToolbar: state.actionToolbar,
+        secondaryGroupStyle: state.secondaryGroupStyle,
       },
     });
     console.log('[SettingsView] Save message sent');
@@ -374,6 +377,21 @@ const renderView = () => {
           (opt) => html`<option value=${opt.value}>${opt.label}</option>`
         )}
           </select>
+          </div>
+          <div class="lp-setting-row">
+            <div class="lp-setting-label">
+              <div class="lp-setting-name">Secondary Group Style</div>
+              <div class="lp-setting-desc">How to style secondary widget groupings (e.g. by workspace)</div>
+            </div>
+            <select
+              id="secondaryGroupStyle"
+              class="lp-hide-icon-select"
+              .value=${state.secondaryGroupStyle}
+              @change=${(e: Event) => setState({ secondaryGroupStyle: (e.target as HTMLSelectElement).value })}
+            >
+              <option value="badge">Badge</option>
+              <option value="border">Border</option>
+            </select>
           </div>
         </div>
 

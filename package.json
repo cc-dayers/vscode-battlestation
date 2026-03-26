@@ -248,7 +248,7 @@
             "badge",
             "border"
           ],
-          "default": "badge",
+          "default": "border",
           "description": "How to style secondary widget groupings (e.g. by workspace)."
         }
       }

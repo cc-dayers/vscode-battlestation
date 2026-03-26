@@ -614,6 +614,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       showGroup: wsConfig.get<boolean>("display.showGroup", true),
       hideIcon: wsConfig.get<string>("display.hideIcon", "eye-closed"),
       actionToolbar: wsConfig.get<string[]>("display.actionToolbar", ["edit", "setColor", "hide"]),
+      secondaryGroupStyle: wsConfig.get<string>("display.secondaryGroupStyle", "border"),
       backupCount: backups.length,
       configExists,
       usedIcons,
@@ -1183,6 +1184,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     showGroup: boolean;
     hideIcon?: string;
     actionToolbar?: string[];
+    secondaryGroupStyle?: string;
   }) {
     console.log('[View Provider] saveSettings called, showingForm before:', this.showingForm);
     // IMPORTANT: Set showingForm to false BEFORE updating config
@@ -1198,6 +1200,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     }
     if (Array.isArray(settings.actionToolbar)) {
       await cfg.update("display.actionToolbar", settings.actionToolbar, vscode.ConfigurationTarget.Workspace);
+    }
+    if (settings.secondaryGroupStyle) {
+      await cfg.update("display.secondaryGroupStyle", settings.secondaryGroupStyle, vscode.ConfigurationTarget.Workspace);
     }
     console.log('[ViewProvider] All settings updated, calling refresh');
     void this.refresh();

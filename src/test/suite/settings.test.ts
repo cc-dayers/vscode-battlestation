@@ -15,7 +15,8 @@ suite('Settings View Test Suite', () => {
             usedIcons: ['check', 'play'],
             settingsScriptUri: 'settingsView.js',
             cssUri: 'style.css',
-            actionToolbar: ["edit", "setColor", "hide"]
+            actionToolbar: ["edit", "setColor", "hide"],
+            secondaryGroupStyle: "border"
         };
 
         const html = renderSettingsView(ctx);
@@ -44,7 +45,8 @@ suite('Settings View Test Suite', () => {
             configExists: false,
             usedIcons: [],
             settingsScriptUri: 'settingsView.js',
-            actionToolbar: ["edit", "setColor", "hide"]
+            actionToolbar: ["edit", "setColor", "hide"],
+            secondaryGroupStyle: "badge"
             // cssUri missing
         };
 

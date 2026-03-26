@@ -15,6 +15,7 @@ interface MainViewState {
         hideIcon: string;
         playButtonBg: string;
         actionToolbar: string[];
+        secondaryGroupStyle: string;
     };
     iconMap: Record<string, string>;
     collapsedGroups: string[];
@@ -88,6 +89,7 @@ const startState: MainViewState = {
         hideIcon: "eye-closed",
         playButtonBg: "transparent",
         actionToolbar: ["hide", "setColor", "edit", "delete"],
+        secondaryGroupStyle: "badge",
     },
     iconMap: {},
     collapsedGroups: [],
@@ -1228,12 +1230,25 @@ const renderSecondaryGroups = (group: Group, actions: Action[]) => {
         const isDragOverTop = dragOverSubgroup?.group === group.name && dragOverSubgroup?.workspace === w && dragOverSubgroupTop;
         const isDragOverBottom = dragOverSubgroup?.group === group.name && dragOverSubgroup?.workspace === w && !dragOverSubgroupTop;
         
+        const isBordered = state.display.secondaryGroupStyle === "border";
         const dragClasses = [
             "lp-subgroup",
+            isBordered ? "lp-subgroup--bordered" : "",
             isDraggingThis ? "lp-dragging-group" : "",
             isDragOverTop ? "lp-drag-over-top-group" : "",
             isDragOverBottom ? "lp-drag-over-bottom-group" : "",
         ].filter(Boolean).join(" ");
+
+        let badgeStyle = color ? `color:${color};` : '';
+        if (isBordered) {
+             badgeStyle += color ? `background-color:transparent;` : ''; 
+        } else {
+             badgeStyle += color ? `background-color:${color}22; border-color:${color}55;` : '';
+        }
+        if (isBordered && color) {
+            // Apply border to wrapper if bordered mode is enabled
+            badgeStyle = `color:${color};`;
+        }
 
         return html`
         <div class=${dragClasses}
@@ -1246,7 +1261,7 @@ const renderSecondaryGroups = (group: Group, actions: Action[]) => {
                 <button class="lp-group-drag-handle" title="Drag to reorder workspace group" @click=${(e:Event) => { e.preventDefault(); e.stopPropagation(); }}>
                     <span class="codicon codicon-gripper"></span>
                 </button>
-                <div class="lp-subgroup-badge" style=${color ? `background-color:${color}22; color:${color};border-color:${color}55` : ''}>
+                <div class="lp-subgroup-badge" style=${badgeStyle}>
                    <span class="codicon codicon-briefcase lp-subgroup-icon"></span>
                    ${w}
                 </div>

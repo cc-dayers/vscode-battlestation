@@ -565,6 +565,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         hideIcon: wsConfig.get<string>("display.hideIcon", "eye-closed"),
         playButtonBg: wsConfig.get<string>("display.playButtonBackgroundColor", "transparent"),
         actionToolbar: wsConfig.get<string[]>("display.actionToolbar", ["hide", "setColor", "edit", "delete"]),
+        secondaryGroupStyle: wsConfig.get<string>("display.secondaryGroupStyle", "badge"),
       },
     };
   }

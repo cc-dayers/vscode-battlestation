@@ -243,6 +243,18 @@ body {
   margin-top: 4px;
 }
 
+.lp-subgroup--bordered {
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  margin-top: 6px;
+  background: var(--vscode-editor-background);
+
+  .lp-subgroup-header {
+    margin-bottom: 4px;
+  }
+}
+
 .lp-subgroup-header {
   display: flex;
   align-items: center;
@@ -415,7 +427,8 @@ body {
 
 // Row/header hover: gripper emerges in the margin space
 .lp-btn-wrapper:hover .lp-drag-handle .codicon,
-.lp-group-header:hover .lp-group-drag-handle .codicon {
+.lp-group-header:hover .lp-group-drag-handle .codicon,
+.lp-subgroup-header:hover .lp-group-drag-handle .codicon {
   opacity: 0.45;
   transform: scale(1);
 }
@@ -450,7 +463,8 @@ body {
   }
 }
 
-.lp-group-header:has(.lp-group-drag-handle:hover) {
+.lp-group-header:has(.lp-group-drag-handle:hover),
+.lp-subgroup-header:has(.lp-group-drag-handle:hover) {
   outline: 1px solid color-mix(in srgb, var(--vscode-focusBorder) 40%, transparent);
   outline-offset: -1px;
   border-bottom-color: transparent;

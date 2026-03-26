@@ -241,6 +241,15 @@
           "type": "boolean",
           "default": false,
           "description": "Enable experimental multi-step wizard for adding new actions or importing JSON."
+        },
+        "battlestation.display.secondaryGroupStyle": {
+          "type": "string",
+          "enum": [
+            "badge",
+            "border"
+          ],
+          "default": "badge",
+          "description": "How to style secondary widget groupings (e.g. by workspace)."
         }
       }
     }

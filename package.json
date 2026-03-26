@@ -103,12 +103,6 @@
     "menus": {
       "view/title": [
         {
-          "command": "battlestation.loading",
-          "title": "Loading...",
-          "when": "view == battlestation.view && !battlestation.isLoaded",
-          "group": "navigation@1"
-        },
-        {
           "command": "battlestation.toggleSearch",
           "when": "view == battlestation.view && battlestation.isLoaded",
           "group": "navigation@1"

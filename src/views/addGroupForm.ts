@@ -90,6 +90,15 @@ export function renderAddGroupForm(ctx: AddGroupContext): string {
     })}
         </div>
 
+        <div class="lp-form-group">
+          <label>Secondary Grouping (Optional)</label>
+          <select id="secondaryGroupBy" style="width: 100%; padding: 6px; margin-top: 4px; background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border);">
+            <option value="none" selected>None</option>
+            <option value="workspace">Group by Workspace / Portal</option>
+          </select>
+          <div class="lp-hint">Use this to organize commands into sub-folders for monorepos.</div>
+        </div>
+
         <div class="lp-form-actions">
           <button type="button" class="lp-btn lp-btn-secondary" id="cancelBtn">Cancel</button>
           <button type="submit" class="lp-btn lp-btn-primary">Add Group</button>
@@ -152,6 +161,7 @@ export function renderAddGroupForm(ctx: AddGroupContext): string {
           const color = document.getElementById('customColor').value.trim();
           const backgroundColor = document.getElementById('customBgColor').value.trim();
           const borderColor = document.getElementById('customBorderColor').value.trim();
+          const secondaryGroupBy = document.getElementById('secondaryGroupBy').value;
           
           if (name) {
             vscode.postMessage({ 
@@ -161,7 +171,8 @@ export function renderAddGroupForm(ctx: AddGroupContext): string {
                 icon: icon || undefined, 
                 color: color || undefined,
                 backgroundColor: backgroundColor || undefined,
-                borderColor: borderColor || undefined
+                borderColor: borderColor || undefined,
+                secondaryGroupBy: secondaryGroupBy === 'workspace' ? 'workspace' : undefined
               } 
             });
           }

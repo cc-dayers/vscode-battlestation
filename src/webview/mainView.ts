@@ -137,6 +137,11 @@ let dragSrcGroup: Group | null = null;
 let dragOverGroup: Group | null = null;
 let dragOverGroupTop = true; // true = insert before target, false = insert after
 
+// Subgroup drag-and-drop reorder state
+let dragSrcSubgroup: { group: string, workspace: string } | null = null;
+let dragOverSubgroup: { group: string, workspace: string } | null = null;
+let dragOverSubgroupTop = true;
+
 // Color picker popout state
 let colorPickerOpenFor: string | null = null; // actionMenuId of the open picker
 
@@ -259,6 +264,8 @@ const handleDragEnd = () => {
     dragOverGroupName = null;
     dragSrcGroup = null;
     dragOverGroup = null;
+    dragSrcSubgroup = null;
+    dragOverSubgroup = null;
     requestRender();
 };
 
@@ -373,6 +380,89 @@ const handleDropOnGroupHeader = (e: DragEvent, group: Group) => {
     dragOverGroupName = null;
     state.actions = newActions;
     vscode.postMessage({ command: 'reorderActions', actions: newActions });
+};
+
+const handleSubgroupDragStart = (e: DragEvent, group: Group, workspace: string) => {
+    dragSrcSubgroup = { group: group.name, workspace };
+    e.dataTransfer!.effectAllowed = 'move';
+    const header = (e.currentTarget as HTMLElement).closest('.lp-subgroup-header') as HTMLElement;
+    if (header) {
+        const rect = header.getBoundingClientRect();
+        e.dataTransfer!.setDragImage(header, e.clientX - rect.left, e.clientY - rect.top);
+    }
+    setTimeout(() => requestRender(), 0);
+};
+
+const handleSubgroupDragEnd = () => {
+    dragSrcSubgroup = null;
+    dragOverSubgroup = null;
+    requestRender();
+};
+
+const handleDragOverSubgroupHeader = (e: DragEvent, group: Group, workspace: string) => {
+    if (dragSrcSubgroup) {
+        if (dragSrcSubgroup.group === group.name && dragSrcSubgroup.workspace === workspace) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer!.dropEffect = 'move';
+        const target = e.currentTarget as HTMLElement;
+        const rect = target.getBoundingClientRect();
+        const top = e.clientY < rect.top + rect.height / 2;
+        if (dragOverSubgroup?.workspace !== workspace || dragOverSubgroupTop !== top) {
+            dragOverSubgroup = { group: group.name, workspace };
+            dragOverSubgroupTop = top;
+            requestRender();
+        }
+    }
+};
+
+const handleDragLeaveSubgroupHeader = (e: DragEvent, group: Group, workspace: string) => {
+    if (dragSrcSubgroup) {
+        const related = e.relatedTarget as HTMLElement | null;
+        const wrapper = e.currentTarget as HTMLElement;
+        if (!wrapper.contains(related) && dragOverSubgroup?.workspace === workspace) {
+            dragOverSubgroup = null;
+            requestRender();
+        }
+    }
+};
+
+const handleDropOnSubgroupHeader = (e: DragEvent, group: Group, workspace: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragSrcSubgroup) {
+        if (dragSrcSubgroup.group === group.name && dragSrcSubgroup.workspace === workspace) return;
+        const srcWksp = dragSrcSubgroup.workspace;
+        const srcGroup = dragSrcSubgroup.group;
+        const tgtWksp = workspace;
+        const tgtGroup = group.name;
+
+        const movingItems = state.actions.filter(a => (a.workspace || "Default") === srcWksp && a.group === srcGroup);
+        movingItems.forEach(a => { a.group = tgtGroup; });
+        
+        let newActions = state.actions.filter(a => !((a.workspace || "Default") === srcWksp && a.group === srcGroup));
+        
+        const targetSubGroupItems = newActions.filter(a => (a.workspace || "Default") === tgtWksp && a.group === tgtGroup);
+        if (targetSubGroupItems.length > 0) {
+            const firstTgtIdx = newActions.indexOf(targetSubGroupItems[0]);
+            const lastTgtIdx = newActions.indexOf(targetSubGroupItems[targetSubGroupItems.length - 1]);
+            const insertIdx = dragOverSubgroupTop ? firstTgtIdx : lastTgtIdx + 1;
+            newActions.splice(insertIdx, 0, ...movingItems);
+        } else {
+            const groupItems = newActions.filter(a => a.group === tgtGroup);
+            if (groupItems.length > 0) {
+                newActions.splice(newActions.indexOf(groupItems[groupItems.length - 1]) + 1, 0, ...movingItems);
+            } else {
+                newActions.push(...movingItems);
+            }
+        }
+
+        state.actions = newActions;
+        vscode.postMessage({ command: 'reorderActions', actions: newActions });
+        dragSrcSubgroup = null;
+        dragOverSubgroup = null;
+        return;
+    }
 };
 
 const toggleGroup = (groupName: string) => {
@@ -936,7 +1026,7 @@ const renderColorPickerPopout = (item: Action) => {
     `;
 };
 
-const renderButton = (item: Action) => {
+const renderButton = (item: Action, hideWorkspaceBadge: boolean = false) => {
     const isHidden = item.hidden;
     const { display } = state;
 
@@ -944,7 +1034,7 @@ const renderButton = (item: Action) => {
     const metaParts = [];
 
     let topLabel = null;
-    if (item.workspace) {
+    if (item.workspace && !hideWorkspaceBadge) {
         let styleStr = '';
         if (item.workspaceColor) {
             styleStr = `background-color: ${item.workspaceColor}; color: var(--vscode-editor-background); border: 1px solid color-mix(in srgb, var(--vscode-foreground) 20%, transparent); opacity: 0.9;`;
@@ -1116,6 +1206,59 @@ const renderButton = (item: Action) => {
     `;
 };
 
+const renderSecondaryGroups = (group: Group, actions: Action[]) => {
+    const subGroupsMap = new Map<string, Action[]>();
+    const workspacesOrder: string[] = [];
+    
+    // Group by workspace name, falling back to 'Default' or ''
+    actions.forEach(a => {
+        const w = a.workspace || "Default";
+        if (!subGroupsMap.has(w)) {
+            subGroupsMap.set(w, []);
+            workspacesOrder.push(w);
+        }
+        subGroupsMap.get(w)!.push(a);
+    });
+
+    return workspacesOrder.map(w => {
+        const subActs = subGroupsMap.get(w)!;
+        const color = subActs[0]?.workspaceColor;
+        
+        const isDraggingThis = dragSrcSubgroup?.group === group.name && dragSrcSubgroup?.workspace === w;
+        const isDragOverTop = dragOverSubgroup?.group === group.name && dragOverSubgroup?.workspace === w && dragOverSubgroupTop;
+        const isDragOverBottom = dragOverSubgroup?.group === group.name && dragOverSubgroup?.workspace === w && !dragOverSubgroupTop;
+        
+        const dragClasses = [
+            "lp-subgroup",
+            isDraggingThis ? "lp-dragging-group" : "",
+            isDragOverTop ? "lp-drag-over-top-group" : "",
+            isDragOverBottom ? "lp-drag-over-bottom-group" : "",
+        ].filter(Boolean).join(" ");
+
+        return html`
+        <div class=${dragClasses}
+            @dragover=${(e: DragEvent) => handleDragOverSubgroupHeader(e, group, w)}
+            @dragleave=${(e: DragEvent) => handleDragLeaveSubgroupHeader(e, group, w)}
+            @drop=${(e: DragEvent) => handleDropOnSubgroupHeader(e, group, w)}>
+            <div class="lp-subgroup-header" draggable="true"
+                @dragstart=${(e: DragEvent) => handleSubgroupDragStart(e, group, w)}
+                @dragend=${handleSubgroupDragEnd}>
+                <button class="lp-group-drag-handle" title="Drag to reorder workspace group" @click=${(e:Event) => { e.preventDefault(); e.stopPropagation(); }}>
+                    <span class="codicon codicon-gripper"></span>
+                </button>
+                <div class="lp-subgroup-badge" style=${color ? `background-color:${color}22; color:${color};border-color:${color}55` : ''}>
+                   <span class="codicon codicon-briefcase lp-subgroup-icon"></span>
+                   ${w}
+                </div>
+            </div>
+            <div class="lp-subgroup-items">
+                ${subActs.map(a => renderButton(a, true))}
+            </div>
+        </div>
+        `;
+    });
+};
+
 const renderGroup = (group: Group, actions: Action[]) => {
     const isOpen = !!state.searchQuery || !state.collapsedGroups.includes(group.name);
     const isHiddenGroup = !!group.hidden;
@@ -1201,7 +1344,9 @@ const renderGroup = (group: Group, actions: Action[]) => {
             ${groupColorPickerOpenFor === groupMenuId ? renderGroupColorPickerPopout(group) : null}
         </summary>
         <div class="lp-group-items" style="${itemsStyles.join(';')}">
-            ${actions.map((a) => renderButton(a))}
+            ${group.secondaryGroupBy === 'workspace' 
+                ? renderSecondaryGroups(group, actions) 
+                : actions.map((a) => renderButton(a))}
         </div>
     </details>
     `;

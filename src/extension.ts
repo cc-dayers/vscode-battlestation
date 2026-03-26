@@ -19,7 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("battlestation.refresh", () => {
-      provider.refresh();
+      provider.syncAndRefresh();
     })
   );
 

@@ -142,7 +142,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   private handleMessage(message: any) {
     switch (message.command) {
       case "refresh":
-        void this.refresh();
+        void this.syncAndRefresh();
         break;
       case "redetectTools":
         void this.handleRedetectTools();
@@ -369,6 +369,27 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
   private refreshTimeout?: NodeJS.Timeout;
 
+  public async syncAndRefresh() {
+    await vscode.window.withProgress(
+      {
+        location: { viewId: "battlestation.view" },
+        title: "Syncing Configuration...",
+        cancellable: false,
+      },
+      async (progress) => {
+        if (this.view) {
+          this.view.webview.postMessage({ type: "setLoading", value: true });
+        }
+        await this.configService.syncConfig();
+        progress.report({ increment: 100, message: "Done" });
+        await this.refresh();
+        if (this.view) {
+          this.view.webview.postMessage({ type: "setLoading", value: false });
+        }
+      }
+    );
+  }
+
   public async refresh(newActionNames?: string[]) {
     // Debounce the refresh to prevent excessive CPU usage
     if (this.refreshTimeout) {
@@ -384,6 +405,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       const exists = configStatus.exists;
       const valid = configStatus.valid;
       vscode.commands.executeCommand("setContext", "battlestation.hasConfig", valid);
+      vscode.commands.executeCommand("setContext", "battlestation.isLoaded", true);
 
       const cspSource = this.view.webview.cspSource;
       const nonce = getNonce();
@@ -510,9 +532,6 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       } else {
         this._currentViewMode = "main";
         this.view.webview.html = this.renderMain(config, cspSource, nonce, newActionNames);
-
-        // Finish loading phase
-        vscode.commands.executeCommand("setContext", "battlestation.isLoaded", true);
       }
     }, 100);
   }
@@ -1097,7 +1116,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     const config = await this.configService.readConfig();
     if (!config.groups) { config.groups = []; }
     if (config.groups.find((g) => g.name === group.name)) {
-      vscode.window.showWarningMessage(`Group "${group.name}" already exists.`);
+      this.showToast(`Group "${group.name}" already exists.`, 'warning');
       return;
     }
     config.groups.push(group);
@@ -1113,11 +1132,11 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       (g) => g.name === oldGroup.name && g.icon === oldGroup.icon
     );
     if (idx === -1) {
-      vscode.window.showErrorMessage(`Group "${oldGroup.name}" not found.`);
+      this.showToast(`Group "${oldGroup.name}" not found.`, 'error');
       return;
     }
     if (oldGroup.name !== newGroup.name && config.groups.find((g) => g.name === newGroup.name)) {
-      vscode.window.showWarningMessage(`Group "${newGroup.name}" already exists.`);
+      this.showToast(`Group "${newGroup.name}" already exists.`, 'warning');
       return;
     }
     config.groups[idx] = {
@@ -1144,7 +1163,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
     const target = config.groups.find((g) => g.name === group.name);
     if (!target) {
-      vscode.window.showErrorMessage(`Group "${group.name}" not found.`);
+      this.showToast(`Group "${group.name}" not found.`, 'error');
       return;
     }
 
@@ -1233,7 +1252,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       this.showToast('\u2705 Config imported');
       void this.refresh();
     } catch (err) {
-      vscode.window.showErrorMessage(`Failed to import config: ${(err as Error).message}`);
+      this.showToast(`Failed to import config: ${(err as Error).message}`, 'error');
     }
   }
 
@@ -1308,18 +1327,14 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           void this.refresh();
         }
       } else {
-        vscode.window.showWarningMessage(
-          "Config file not found. It may have already been deleted."
-        );
+        this.showToast("Config file not found. It may have already been deleted.", 'warning');
         // Reset loading if we didn't refresh
         if (this.view) {
           this.view.webview.postMessage({ type: "setLoading", value: false });
         }
       }
     } catch (error) {
-      vscode.window.showErrorMessage(
-        `Failed to delete config: ${(error as Error).message}`
-      );
+      this.showToast(`Failed to delete config: ${(error as Error).message}`, 'error');
       if (this.view) {
         this.view.webview.postMessage({ type: "setLoading", value: false });
       }
@@ -1343,9 +1358,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         }
       }
     } catch (error) {
-      vscode.window.showErrorMessage(
-        `Failed to delete history: ${(error as Error).message}`
-      );
+      this.showToast(`Failed to delete history: ${(error as Error).message}`, 'error');
       if (this.view) {
         this.view.webview.postMessage({ type: "setLoading", value: false });
       }
@@ -1382,7 +1395,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         void this.refresh();
         this.showToast("Config restored");
       } catch (error) {
-        vscode.window.showErrorMessage(`Failed to restore config: ${(error as Error).message}`);
+        this.showToast(`Failed to restore config: ${(error as Error).message}`, 'error');
         if (this.view) {
           this.view.webview.postMessage({ type: "setLoading", value: false });
         }
@@ -1425,7 +1438,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
   private async handleCreateBlankConfig() {
     if (!vscode.workspace.workspaceFolders?.length) {
-      vscode.window.showErrorMessage('Please open a folder before creating a config.');
+      this.showToast('Please open a folder before creating a config.', 'error');
       return;
     }
     await vscode.window.withProgress(
@@ -1452,7 +1465,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           this.showToast("📝 Created blank battle.config");
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
-          vscode.window.showErrorMessage(`Failed to create config: ${errorMsg}`);
+          this.showToast(`Failed to create config: ${errorMsg}`, 'error');
         } finally {
           this.view?.webview.postMessage({ type: "configGenerationComplete" });
           await this.transitionToMainAfterGeneration();
@@ -1463,7 +1476,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
   private async handleCreateExampleConfig() {
     if (!vscode.workspace.workspaceFolders?.length) {
-      vscode.window.showErrorMessage('Please open a folder before creating a config.');
+      this.showToast('Please open a folder before creating a config.', 'error');
       return;
     }
     await vscode.window.withProgress(
@@ -1490,7 +1503,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           this.showToast("✨ Created example battle.config - customize it to your needs!");
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
-          vscode.window.showErrorMessage(`Failed to create config: ${errorMsg}`);
+          this.showToast(`Failed to create config: ${errorMsg}`, 'error');
         } finally {
           this.view?.webview.postMessage({ type: "configGenerationComplete" });
           await this.transitionToMainAfterGeneration();
@@ -1525,7 +1538,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         } catch (error) {
           console.error("Failed to redetect tools:", error);
           const errorMsg = error instanceof Error ? error.message : String(error);
-          vscode.window.showErrorMessage(`Failed to redetect tools: ${errorMsg}`);
+          this.showToast(`Failed to redetect tools: ${errorMsg}`, 'error');
         }
       }
     );
@@ -1541,7 +1554,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     deepScan: boolean = false
   ) {
     if (!vscode.workspace.workspaceFolders?.length) {
-      vscode.window.showErrorMessage('Please open a folder before generating a config.');
+      this.showToast('Please open a folder before generating a config.', 'error');
       return;
     }
     await vscode.window.withProgress(
@@ -1617,7 +1630,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         } catch (error) {
           console.error("[Battlestation] Failed to create config:", error);
           const errorMsg = error instanceof Error ? error.message : String(error);
-          vscode.window.showErrorMessage(`Failed to generate config: ${errorMsg}`);
+          this.showToast(`Failed to generate config: ${errorMsg}`, 'error');
         } finally {
           this.view?.webview.postMessage({ type: "configGenerationComplete" });
           await this.transitionToMainAfterGeneration();
@@ -1655,8 +1668,12 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
   /* ─── toast ─── */
 
-  private showToast(message: string) {
-    this.view?.webview.postMessage({ command: "showToast", message });
+  public showToast(message: string, type: 'info' | 'error' | 'warning' = 'info') {
+    if (this.view?.visible) {
+      this.view.webview.postMessage({ command: "showToast", message, type });
+    } else {
+      vscode.window.setStatusBarMessage(`Battlestation: ${message}`, type === 'error' ? 5000 : 3000);
+    }
   }
 }
 

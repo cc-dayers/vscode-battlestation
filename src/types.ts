@@ -33,6 +33,7 @@ export interface Group {
   backgroundColor?: string;
   borderColor?: string;
   hidden?: boolean;
+  secondaryGroupBy?: "workspace" | "none";
 }
 
 export interface BattleConfig {

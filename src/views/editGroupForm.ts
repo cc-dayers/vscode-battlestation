@@ -81,6 +81,15 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
           <div class="lp-hint">Click an icon above or type codicon name/emoji</div>
         </div>
 
+        <div class="lp-form-group">
+          <label>Secondary Grouping (Optional)</label>
+          <select id="secondaryGroupBy" style="width: 100%; padding: 6px; margin-top: 4px; background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border);">
+            <option value="none" ${group.secondaryGroupBy !== 'workspace' ? 'selected' : ''}>None</option>
+            <option value="workspace" ${group.secondaryGroupBy === 'workspace' ? 'selected' : ''}>Group by Workspace / Portal</option>
+          </select>
+          <div class="lp-hint">Use this to organize commands into sub-folders for monorepos.</div>
+        </div>
+
         <div class="lp-form-actions">
           <button type="button" class="lp-btn lp-btn-secondary" id="cancelBtn">Cancel</button>
           <button type="submit" class="lp-btn lp-btn-primary">Save Changes</button>
@@ -123,12 +132,14 @@ export function renderEditGroupForm(ctx: EditGroupContext): string {
           e.preventDefault();
           const groupName = document.getElementById('groupName').value.trim();
           const customIcon = document.getElementById('customIcon').value.trim();
+          const secondaryGroupBy = document.getElementById('secondaryGroupBy').value;
           const icon = customIcon || selectedIcon || '';
 
           if (!groupName) return;
           const newGroup = {
             name: groupName,
             icon: icon || undefined,
+            secondaryGroupBy: secondaryGroupBy === 'workspace' ? 'workspace' : undefined,
           };
           vscode.postMessage({ command: 'submitEditGroup', oldGroup, newGroup });
         });

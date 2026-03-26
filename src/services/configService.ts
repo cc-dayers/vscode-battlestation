@@ -1358,6 +1358,94 @@ export class ConfigService {
     await this.writeConfig(config);
   }
 
+  /** 
+   * Rescans all discoverable sources and synchronizes the config. 
+   * Removes references to scripts that no longer exist, and adds new ones. 
+   */
+  async syncConfig(deepScan = false): Promise<void> {
+    const exists = await this.configExists();
+    if (!exists) return; // Nothing to sync
+
+    const existingConfig = await this.readConfig();
+    
+    // 1. Gather current reality from disk
+    const newActions: Action[] = [];
+    newActions.push(...(await this.scanNpmScripts(deepScan)));
+    newActions.push(...(await this.scanMake(deepScan)));
+    newActions.push(...(await this.scanRust(deepScan)));
+    newActions.push(...(await this.scanGo(deepScan)));
+    newActions.push(...(await this.scanDocker(deepScan)));
+    newActions.push(...(await this.scanTasks()));
+    newActions.push(...(await this.scanLaunchConfigs()));
+
+    const newActionsMap = new Map<string, Action>();
+    newActions.forEach(a => newActionsMap.set(`${a.command}|${a.workspace || ''}`, a));
+
+    const discoverableTypes = new Set(["npm", "task", "launch", "make", "rust", "go", "docker"]);
+    const finalActions: Action[] = [];
+    
+    // 2. Process existing actions
+    for (const existing of existingConfig.actions) {
+      if (discoverableTypes.has(existing.type || '')) {
+         const key = `${existing.command}|${existing.workspace || ''}`;
+         const newActionMatch = newActionsMap.get(key);
+         if (newActionMatch) {
+            // It still exists in the workspace. Keep the user's customized version.
+            finalActions.push(existing);
+         } else {
+            // It is an auto-discoverable tool that no longer exists (e.g. script removed from package.json).
+            // Do not keep it. (Lost reference logic)
+         }
+      } else {
+         // It is a manually added tool (shell, vscode, etc.). Always keep.
+         finalActions.push(existing);
+      }
+    }
+
+    // 3. Add strictly NEW actions discovered
+    const existingKeys = new Set(finalActions.map(a => `${a.command}|${a.workspace || ''}`));
+    const finalGroups = [...(existingConfig.groups || [])];
+    const groupNamesSet = new Set(finalGroups.map(g => g.name));
+
+    const typeGroupNames: Record<string, string> = {
+      npm: "NPM Scripts", task: "VS Code Tasks", launch: "Launch Configs",
+      docker: "Docker", make: "Makefiles", rust: "Rust", go: "Go"
+    };
+
+    const typeGroupIcons: Record<string, string> = {
+      npm: "package", task: "checklist", launch: "rocket",
+      docker: "server-environment", make: "tools", rust: "gear", go: "terminal"
+    };
+
+    for (const newAct of newActions) {
+      const key = `${newAct.command}|${newAct.workspace || ''}`;
+      if (!existingKeys.has(key)) {
+         // Attempt to place in a default group
+         const defaultGroupName = typeGroupNames[newAct.type || 'other'];
+         if (defaultGroupName) {
+             newAct.group = defaultGroupName;
+             if (!groupNamesSet.has(defaultGroupName)) {
+                 finalGroups.push({
+                     name: defaultGroupName,
+                     icon: typeGroupIcons[newAct.type || 'other'] || "folder",
+                     color: this.getDefaultColorForGroup(defaultGroupName)
+                 });
+                 groupNamesSet.add(defaultGroupName);
+             }
+         }
+         finalActions.push(newAct);
+      }
+    }
+
+    const newConfig: Config = { 
+       ...existingConfig, 
+       actions: finalActions,
+       groups: finalGroups.length > 0 ? finalGroups : undefined
+    };
+
+    await this.writeConfig(newConfig);
+  }
+
   /* ─── Private ─── */
 
   private getDefaultColorForGroup(name: string): string | undefined {

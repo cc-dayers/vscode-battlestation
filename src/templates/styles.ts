@@ -176,25 +176,49 @@ export const toastStyles = `
     max-width: 300px;
     line-height: 1.4;
   }
+  .lp-toast.lp-toast-error {
+    background: var(--vscode-notificationsErrorIcon-foreground, #f48771);
+    color: var(--vscode-editor-background);
+    border-color: var(--vscode-notificationsErrorIcon-foreground, #f48771);
+  }
+  .lp-toast.lp-toast-warning {
+    background: var(--vscode-notificationsWarningIcon-foreground, #cca700);
+    color: var(--vscode-editor-background);
+    border-color: var(--vscode-notificationsWarningIcon-foreground, #cca700);
+  }
   .lp-toast.show {
     opacity: 1;
     transform: translateY(0);
+  }
+  @keyframes lp-shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-4px); }
+    40%, 80% { transform: translateX(4px); }
+  }
+  .lp-toast.lp-toast-error.show {
+    animation: lp-shake 0.4s ease-in-out;
   }
 `;
 
 export const toastScript = `
   let _toastTimeout;
-  function showToast(message) {
+  function showToast(message, type = 'info') {
     const toast = document.getElementById('toast');
     if (!toast) return;
     toast.textContent = message;
-    toast.classList.add('show');
+    toast.className = 'lp-toast show'; // reset classes
+    if (type === 'error') {
+      toast.classList.add('lp-toast-error');
+    } else if (type === 'warning') {
+      toast.classList.add('lp-toast-warning');
+    }
     clearTimeout(_toastTimeout);
-    _toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 2500);
+    const duration = type === 'error' ? 5000 : 2500;
+    _toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, duration);
   }
   window.addEventListener('message', event => {
     const msg = event.data;
-    if (msg.command === 'showToast') { showToast(msg.message); }
+    if (msg.command === 'showToast') { showToast(msg.message, msg.type); }
   });
 `;
 

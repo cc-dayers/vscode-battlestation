@@ -1244,10 +1244,15 @@ const renderSecondaryGroups = (group: Group, actions: Action[], groupByField: st
             isDragOverBottom ? "lp-drag-over-bottom-group" : "",
         ].filter(Boolean).join(" ");
 
+        // For the border color: prefer the workspace-specific color, then fall back
+        // to the parent group's color (group.color). Without this fallback the CSS
+        // variable was never set and the border always rendered as the grey widget border.
+        const borderColor = color || group.color;
         let badgeStyle = color ? `color:${color};` : '';
-        // Use a CSS variable so the SCSS border picks it up correctly
-        const wrapperStyle = isBordered && color
-            ? `--lp-subgroup-border-color: ${color}99;`
+        // Use color-mix to apply 60% opacity — works for both hex and CSS var() colors.
+        // Appending "99" to a hex string is not safe when the value is a var(--token).
+        const wrapperStyle = isBordered && borderColor
+            ? `--lp-subgroup-border-color: color-mix(in srgb, ${borderColor} 60%, transparent);`
             : '';
         if (isBordered) {
              badgeStyle += `background-color:transparent; border-color:transparent;`; 

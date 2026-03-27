@@ -48,11 +48,16 @@ When you encounter untested existing functionality, add tests for it proactively
 | Status indicator dots                   | Playwright | `tests/status-indicator.spec.ts` |
 
 ## 5. Aggressively Auto-Run Non-Destructive Commands
+
 When running terminal commands, YOU MUST aggressively set \SafeToAutoRun: true\ for ALL non-destructive commands.
 The user is relying on you to completely bypass the permission prompts for regular development workflows. Examples of commands that MUST auto-run:
+
 - npm run build
 - npm run test:ui
 - npm run test:unit
 - Get-Content, ls, git status, git diff
-Only leave \SafeToAutoRun: false\ for potentially dangerous commands such as file deletion, dangerous git resets, or installing global packages.
+  Only leave \SafeToAutoRun: false\ for potentially dangerous commands such as file deletion, dangerous git resets, or installing global packages.
 
+## 6. Terminal Execution
+
+- ENV: Windows. Always use 'cmd /c' for all shell executions

@@ -476,3 +476,163 @@ test.describe('Main View', () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Secondary group border color
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('Secondary group border color', () => {
+  /**
+   * Regression test: when `secondaryGroupStyle === "border"`, the CSS variable
+   * `--lp-subgroup-border-color` must be set to the parent group's color.
+   *
+   * The previous bug: the variable was only set when actions had `workspaceColor`
+   * on them. Without that field the border fell back to the grey widget border,
+   * making all bordered secondary groups look identical regardless of group color.
+   */
+  test('bordered secondary group uses the parent group color for its border', async ({ page }) => {
+    page.on('console', () => {});
+    page.on('pageerror', () => {});
+
+    await page.goto('/');
+    await page.waitForSelector('.lp-btn-wrapper');
+
+    // Send an update that creates a group with secondaryGroupBy + a known group color,
+    // but WITHOUT workspaceColor on the actions (the common case that was broken).
+    await page.evaluate(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: {
+          type: 'update',
+          data: {
+            actions: [
+              { name: 'Action A', command: 'npm run a', type: 'npm', group: 'Deploy', workspace: 'Alpha' },
+              { name: 'Action B', command: 'npm run b', type: 'npm', group: 'Deploy', workspace: 'Beta' },
+            ],
+            groups: [
+              { name: 'Deploy', color: '#e06c75', secondaryGroupBy: 'workspace' },
+            ],
+            display: {
+              showCommand: true,
+              showGroup: true,
+              hideIcon: 'eye-closed',
+              playButtonBg: 'transparent',
+              actionToolbar: ['hide', 'setColor', 'edit', 'delete'],
+              secondaryGroupStyle: 'border',
+            },
+            runStatus: {},
+          },
+        },
+      }));
+    });
+
+    await page.waitForTimeout(100);
+
+    // The bordered subgroup wrapper must exist
+    const subgroup = page.locator('.lp-subgroup--bordered').first();
+    await expect(subgroup).toBeVisible();
+
+    // Read the computed --lp-subgroup-border-color CSS variable from the element's
+    // inline style. It must NOT be empty (empty = the fix is missing).
+    const borderColorVar = await subgroup.evaluate((el) => {
+      return (el as HTMLElement).style.getPropertyValue('--lp-subgroup-border-color').trim();
+    });
+
+    expect(borderColorVar, 'Expected --lp-subgroup-border-color to be set from group.color, but it was empty').not.toBe('');
+
+    // The value should reference the parent group color (#e06c75) in some form
+    // (via color-mix wrapping). We check it contains the hex string.
+    expect(borderColorVar).toContain('#e06c75');
+  });
+
+  test('bordered secondary group with workspaceColor uses the workspace color for its border', async ({ page }) => {
+    page.on('console', () => {});
+    page.on('pageerror', () => {});
+
+    await page.goto('/');
+    await page.waitForSelector('.lp-btn-wrapper');
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: {
+          type: 'update',
+          data: {
+            actions: [
+              { name: 'Action A', command: 'npm run a', type: 'npm', group: 'Deploy', workspace: 'Alpha', workspaceColor: '#61afef' },
+              { name: 'Action B', command: 'npm run b', type: 'npm', group: 'Deploy', workspace: 'Alpha' },
+            ],
+            groups: [
+              { name: 'Deploy', color: '#e06c75', secondaryGroupBy: 'workspace' },
+            ],
+            display: {
+              showCommand: true,
+              showGroup: true,
+              hideIcon: 'eye-closed',
+              playButtonBg: 'transparent',
+              actionToolbar: ['hide', 'setColor', 'edit', 'delete'],
+              secondaryGroupStyle: 'border',
+            },
+            runStatus: {},
+          },
+        },
+      }));
+    });
+
+    await page.waitForTimeout(100);
+
+    const subgroup = page.locator('.lp-subgroup--bordered').first();
+    await expect(subgroup).toBeVisible();
+
+    const borderColorVar = await subgroup.evaluate((el) => {
+      return (el as HTMLElement).style.getPropertyValue('--lp-subgroup-border-color').trim();
+    });
+
+    // Workspace color (#61afef) takes priority over group color (#e06c75)
+    expect(borderColorVar).toContain('#61afef');
+  });
+
+  test('non-bordered secondary group does not set the border color CSS variable', async ({ page }) => {
+    page.on('console', () => {});
+    page.on('pageerror', () => {});
+
+    await page.goto('/');
+    await page.waitForSelector('.lp-btn-wrapper');
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: {
+          type: 'update',
+          data: {
+            actions: [
+              { name: 'Action A', command: 'npm run a', type: 'npm', group: 'Deploy', workspace: 'Alpha' },
+            ],
+            groups: [
+              { name: 'Deploy', color: '#e06c75', secondaryGroupBy: 'workspace' },
+            ],
+            display: {
+              showCommand: true,
+              showGroup: true,
+              hideIcon: 'eye-closed',
+              playButtonBg: 'transparent',
+              actionToolbar: ['hide', 'setColor', 'edit', 'delete'],
+              secondaryGroupStyle: 'badge',
+            },
+            runStatus: {},
+          },
+        },
+      }));
+    });
+
+    await page.waitForTimeout(100);
+
+    // In badge mode the subgroup wrapper must NOT have the --bordered class
+    const subgroup = page.locator('.lp-subgroup').first();
+    await expect(subgroup).toBeVisible();
+    await expect(subgroup).not.toHaveClass('lp-subgroup--bordered');
+
+    const borderColorVar = await subgroup.evaluate((el) => {
+      return (el as HTMLElement).style.getPropertyValue('--lp-subgroup-border-color').trim();
+    });
+    expect(borderColorVar).toBe('');
+  });
+});
+
+

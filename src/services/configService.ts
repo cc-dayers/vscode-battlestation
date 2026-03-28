@@ -1123,7 +1123,8 @@ export class ConfigService {
     defaultIcons: IconMapping[],
     enhancedActions?: Action[],
     enableColoring: boolean = false,
-    deepScan: boolean = false
+    deepScan: boolean = false,
+    secondaryGroupBy: 'auto' | 'workspace' | 'type' | 'none' = 'auto'
   ): Promise<void> {
     const actions: Action[] = [];
     const groups: Group[] = [];
@@ -1246,6 +1247,24 @@ export class ConfigService {
           color: assignDistinctPrimaryColor(groupName)
         });
         actionsInType.forEach((action) => (action.group = groupName));
+      });
+
+      // Infer secondaryGroupBy for each generated group
+      groups.forEach(g => {
+        const resolved = secondaryGroupBy === 'none'
+          ? undefined
+          : secondaryGroupBy === 'workspace' ? 'workspace'
+          : secondaryGroupBy === 'type' ? 'type'
+          : (() => {
+              // 'auto': inspect actions in this group
+              const groupActions = actions.filter(a => a.group === g.name);
+              const distinctWorkspaces = new Set(groupActions.map(a => a.workspace).filter((w): w is string => !!w));
+              if (distinctWorkspaces.size > 1) return 'workspace';
+              return undefined;
+            })();
+        if (resolved) {
+          g.secondaryGroupBy = resolved as 'workspace' | 'type';
+        }
       });
     }
 

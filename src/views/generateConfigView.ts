@@ -612,6 +612,16 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
           ${renderCheckbox("colorCheck", "Auto-colorize groups", true)}
           ${renderCheckbox("autoOpenCheck", "Auto-open config file", false)}
           ${renderCheckbox("deepScanCheck", "Deep Scan (Recursive) - thorough but slower", false)}
+          <div style="margin-top: 8px;">
+            <label for="secondaryGroupBySelect" style="font-size: 11px; font-weight: 600; opacity: 0.7; text-transform: uppercase; display: block; margin-bottom: 4px;">Secondary Grouping:</label>
+            <select id="secondaryGroupBySelect" style="width: 100%; padding: 5px 6px; font-size: 12px; background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border); border-radius: 3px; cursor: pointer;">
+              <option value="auto" selected>Auto-detect (recommended)</option>
+              <option value="workspace">Always group by workspace / portal</option>
+              <option value="type">Always group by type (build, test…)</option>
+              <option value="none">None</option>
+            </select>
+            <div style="font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 4px; font-style: italic;">ℹ️ Auto-detect applies workspace grouping when multiple workspaces are found in a group</div>
+          </div>
         </div>
       </div>
       
@@ -733,6 +743,8 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
             const enableColoring = optionsVisible ? document.getElementById('colorCheck').checked : true;
             const autoOpen = optionsVisible ? document.getElementById('autoOpenCheck').checked : false;
             const deepScan = optionsVisible ? document.getElementById('deepScanCheck').checked : false;
+            const secondaryGroupByEl = document.getElementById('secondaryGroupBySelect');
+            const secondaryGroupBy = optionsVisible && secondaryGroupByEl ? secondaryGroupByEl.value : 'auto';
             
             vscode.postMessage({
               command: 'createConfig',
@@ -740,7 +752,8 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
               enableGrouping,
               enableColoring,
               autoOpen,
-              deepScan
+              deepScan,
+              secondaryGroupBy
             });
           });
         }
@@ -768,6 +781,10 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
             const deepScan = optionsVisible
               ? (document.getElementById('deepScanCheck')?.checked ?? false)
               : false;
+            const secondaryGroupByEl = document.getElementById('secondaryGroupBySelect');
+            const secondaryGroupBy = optionsVisible && secondaryGroupByEl
+              ? (secondaryGroupByEl as HTMLSelectElement).value
+              : 'auto';
 
             vscode.postMessage({
               command: 'createConfig',
@@ -775,7 +792,8 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
               enableGrouping,
               enableColoring,
               autoOpen,
-              deepScan
+              deepScan,
+              secondaryGroupBy
             });
           });
         }

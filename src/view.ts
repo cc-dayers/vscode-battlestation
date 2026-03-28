@@ -155,7 +155,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
           message.detectionMethod || "hybrid",
           message.enableColoring || false,
           message.autoOpen || false,
-          message.deepScan || false
+          message.deepScan || false,
+          message.secondaryGroupBy || 'auto'
         );
         break;
       case "executeCommand":
@@ -1561,7 +1562,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     detectionMethod: "file" | "command" | "hybrid",
     enableColoring: boolean = false,
     autoOpen: boolean = false,
-    deepScan: boolean = false
+    deepScan: boolean = false,
+    secondaryGroupBy: 'auto' | 'workspace' | 'type' | 'none' = 'auto'
   ) {
     if (!vscode.workspace.workspaceFolders?.length) {
       this.showToast('Please open a folder before generating a config.', 'error');
@@ -1619,7 +1621,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
             BattlestationViewProvider.defaultIcons,
             enhancedActions,
             enableColoring,
-            deepScan
+            deepScan,
+            secondaryGroupBy
           );
 
           const created = await this.configService.configExists();

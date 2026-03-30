@@ -2,7 +2,7 @@
   "name": "battlestation",
   "displayName": "Battlestation",
   "description": "A configurable panel with action buttons driven by battle.json",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "publisher": "cc-dayers",
   "repository": {
     "type": "git",

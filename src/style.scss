@@ -261,11 +261,21 @@ body {
   padding: 4px 6px;
   margin-bottom: 4px;
   position: relative;
-  cursor: grab;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: var(--vscode-list-hoverBackground);
+  }
 
   &:active {
     cursor: grabbing;
   }
+}
+
+.lp-subgroup--collapsed .lp-subgroup-header {
+  margin-bottom: 0;
 }
 
 .lp-subgroup-badge {

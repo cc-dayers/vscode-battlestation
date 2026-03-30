@@ -6,9 +6,4 @@
             "matchCommandLine": true
         }
     },
-    "battlestation.display.showIcon": true,
-    "battlestation.display.showType": true,
-    "battlestation.display.showCommand": true,
-    "battlestation.display.showGroup": true,
-    "battlestation.display.hideIcon": "eye-closed"
 }

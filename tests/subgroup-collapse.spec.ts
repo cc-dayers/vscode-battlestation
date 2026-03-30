@@ -1,0 +1,82 @@
+import { test, expect } from '@playwright/test';
+
+test.describe('Secondary Group Collapse', () => {
+  test.beforeEach(async ({ page }) => {
+    // Suppress test-server console noise
+    page.on('console', () => {});
+    page.on('pageerror', () => {});
+
+    await page.goto('/');
+    await page.waitForSelector('.lp-btn-wrapper');
+
+    // Setup a custom state with secondary groups
+    await page.evaluate(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: {
+          type: 'update',
+          data: {
+            actions: [
+              { name: 'App A', command: 'npm run a', type: 'npm', group: 'Apps', workspace: 'Portal' },
+              { name: 'App B', command: 'npm run b', type: 'npm', group: 'Apps', workspace: 'Admin' },
+            ],
+            groups: [
+              { name: 'Apps', color: '#e06c75', secondaryGroupBy: 'workspace' },
+            ],
+            display: {
+              showCommand: true,
+              showGroup: true,
+              hideIcon: 'eye-closed',
+              playButtonBg: 'transparent',
+              actionToolbar: ['hide', 'setColor', 'edit', 'delete'],
+              secondaryGroupStyle: 'border',
+            },
+            runStatus: {},
+          },
+        },
+      }));
+    });
+    await page.waitForTimeout(100);
+  });
+
+  test('clicking subgroup header collapses it', async ({ page }) => {
+    // Both apps should be visible initially
+    await expect(page.locator('.lp-btn-wrapper', { hasText: 'App A' })).toBeVisible();
+    await expect(page.locator('.lp-btn-wrapper', { hasText: 'App B' })).toBeVisible();
+
+    // Click "Portal" subgroup header
+    await page.locator('.lp-subgroup-header', { hasText: 'Portal' }).click();
+    await page.waitForTimeout(100);
+
+    // App A should be hidden (not present in DOM or hidden by Lit), App B should remain visible
+    await expect(page.locator('.lp-btn-wrapper', { hasText: 'App A' })).not.toBeVisible();
+    await expect(page.locator('.lp-btn-wrapper', { hasText: 'App B' })).toBeVisible();
+    
+    // Check for collapsed class
+    await expect(page.locator('.lp-subgroup').filter({ hasText: 'Portal' })).toHaveClass(/lp-subgroup--collapsed/);
+  });
+
+  test('searching expands collapsed subgroups', async ({ page }) => {
+    // Collapse Portal
+    await page.locator('.lp-subgroup-header', { hasText: 'Portal' }).click();
+    await page.waitForTimeout(100);
+    await expect(page.locator('.lp-btn-wrapper', { hasText: 'App A' })).not.toBeVisible();
+
+    // Open search and type "App A"
+    await page.evaluate((d) => {
+      window.dispatchEvent(new MessageEvent('message', { data: d }));
+    }, { type: 'toggleSearch', visible: true });
+    await page.waitForSelector('.lp-search-box');
+    await page.fill('.lp-search-box', 'App A');
+    await page.waitForTimeout(100);
+
+    // App A should be visible now
+    await expect(page.locator('.lp-btn-wrapper', { hasText: 'App A' })).toBeVisible();
+
+    // Clear search
+    await page.fill('.lp-search-box', '');
+    await page.waitForTimeout(100);
+
+    // App A should be hidden again because it was previously collapsed
+    await expect(page.locator('.lp-btn-wrapper', { hasText: 'App A' })).not.toBeVisible();
+  });
+});

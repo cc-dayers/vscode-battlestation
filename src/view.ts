@@ -1013,7 +1013,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     const cfg = vscode.workspace.getConfiguration("battlestation");
     const current = cfg.get<Record<string, string>>("customIconMappings", {});
     current[itemType] = iconName;
-    await cfg.update("customIconMappings", current, vscode.ConfigurationTarget.Workspace);
+    await cfg.update("customIconMappings", current, vscode.ConfigurationTarget.Global);
     this.showToast(`\u2728 Icon "${iconName}" saved for type "${itemType}"`);
   }
 
@@ -1194,16 +1194,16 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     console.log('[ViewProvider] showingForm set to false');
 
     const cfg = vscode.workspace.getConfiguration("battlestation");
-    await cfg.update("display.showCommand", settings.showCommand, vscode.ConfigurationTarget.Workspace);
-    await cfg.update("display.showGroup", settings.showGroup, vscode.ConfigurationTarget.Workspace);
+    await cfg.update("display.showCommand", settings.showCommand, vscode.ConfigurationTarget.Global);
+    await cfg.update("display.showGroup", settings.showGroup, vscode.ConfigurationTarget.Global);
     if (settings.hideIcon) {
-      await cfg.update("display.hideIcon", settings.hideIcon, vscode.ConfigurationTarget.Workspace);
+      await cfg.update("display.hideIcon", settings.hideIcon, vscode.ConfigurationTarget.Global);
     }
     if (Array.isArray(settings.actionToolbar)) {
-      await cfg.update("display.actionToolbar", settings.actionToolbar, vscode.ConfigurationTarget.Workspace);
+      await cfg.update("display.actionToolbar", settings.actionToolbar, vscode.ConfigurationTarget.Global);
     }
     if (settings.secondaryGroupStyle) {
-      await cfg.update("display.secondaryGroupStyle", settings.secondaryGroupStyle, vscode.ConfigurationTarget.Workspace);
+      await cfg.update("display.secondaryGroupStyle", settings.secondaryGroupStyle, vscode.ConfigurationTarget.Global);
     }
     console.log('[ViewProvider] All settings updated, calling refresh');
     void this.refresh();

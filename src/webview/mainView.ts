@@ -19,6 +19,7 @@ interface MainViewState {
     };
     iconMap: Record<string, string>;
     collapsedGroups: string[];
+    collapsedSubGroups: string[];
     // Transients
     showSearch: boolean;
     showHidden?: boolean;
@@ -93,6 +94,7 @@ const startState: MainViewState = {
     },
     iconMap: {},
     collapsedGroups: [],
+    collapsedSubGroups: [],
     showSearch: false,
     showHidden: false, // Default
     selectionMode: false,
@@ -107,10 +109,19 @@ if (window.__INITIAL_DATA__) {
     Object.assign(startState, window.__INITIAL_DATA__);
 }
 
-// Restore minimal state (collapsed groups)
-const storedState = (vscode.getState() as Partial<MainViewState>) || {};
+// Restore transient UI state (survives panel switches within the same session)
+const storedState = (vscode.getState() as Partial<MainViewState & { showSearch: boolean; searchQuery: string }>) || {};
 if (storedState.collapsedGroups) {
     startState.collapsedGroups = storedState.collapsedGroups;
+}
+if (storedState.collapsedSubGroups) {
+    startState.collapsedSubGroups = storedState.collapsedSubGroups;
+}
+if (storedState.searchQuery) {
+    startState.searchQuery = storedState.searchQuery;
+    startState.showSearch = true; // always show bar if there was an active query
+} else if (storedState.showSearch) {
+    startState.showSearch = storedState.showSearch;
 }
 
 // Reactive State Container
@@ -118,9 +129,14 @@ const state = new Proxy(startState, {
     set(target, p, value) {
         Reflect.set(target, p, value);
         requestRender();
-        // Persist certain state
-        if (p === "collapsedGroups") {
-            vscode.setState({ ...storedState, collapsedGroups: value });
+        // Persist state that should survive panel visibility toggles
+        if (p === "collapsedGroups" || p === "collapsedSubGroups" || p === "searchQuery" || p === "showSearch") {
+            vscode.setState({
+                collapsedGroups: (p === "collapsedGroups" ? value : target.collapsedGroups) as string[],
+                collapsedSubGroups: (p === "collapsedSubGroups" ? value : target.collapsedSubGroups) as string[],
+                searchQuery: (p === "searchQuery" ? value : target.searchQuery) as string,
+                showSearch: (p === "showSearch" ? value : target.showSearch) as boolean,
+            });
         }
         return true;
     },
@@ -475,6 +491,17 @@ const toggleGroup = (groupName: string) => {
         newCollapsed.add(groupName);
     }
     state.collapsedGroups = Array.from(newCollapsed);
+};
+
+const toggleSubGroup = (groupName: string, subGroupName: string) => {
+    const key = `${groupName}::${subGroupName}`;
+    const newCollapsed = new Set(state.collapsedSubGroups);
+    if (newCollapsed.has(key)) {
+        newCollapsed.delete(key);
+    } else {
+        newCollapsed.add(key);
+    }
+    state.collapsedSubGroups = Array.from(newCollapsed);
 };
 
 const executeAction = (item: Action) => {
@@ -1230,7 +1257,9 @@ const renderSecondaryGroups = (group: Group, actions: Action[], groupByField: st
     return subGroupOrder.map(label => {
         const subActs = subGroupsMap.get(label)!;
         const color = subGroupColors.get(label);
-        
+        const subGroupKey = `${group.name}::${label}`;
+        const isCollapsed = !state.searchQuery && state.collapsedSubGroups.includes(subGroupKey);
+
         const isDraggingThis = dragSrcSubgroup?.group === group.name && dragSrcSubgroup?.workspace === label;
         const isDragOverTop = dragOverSubgroup?.group === group.name && dragOverSubgroup?.workspace === label && dragOverSubgroupTop;
         const isDragOverBottom = dragOverSubgroup?.group === group.name && dragOverSubgroup?.workspace === label && !dragOverSubgroupTop;
@@ -1239,6 +1268,7 @@ const renderSecondaryGroups = (group: Group, actions: Action[], groupByField: st
         const dragClasses = [
             "lp-subgroup",
             isBordered ? "lp-subgroup--bordered" : "",
+            isCollapsed ? "lp-subgroup--collapsed" : "",
             isDraggingThis ? "lp-dragging-group" : "",
             isDragOverTop ? "lp-drag-over-top-group" : "",
             isDragOverBottom ? "lp-drag-over-bottom-group" : "",
@@ -1266,19 +1296,23 @@ const renderSecondaryGroups = (group: Group, actions: Action[], groupByField: st
             @dragleave=${(e: DragEvent) => handleDragLeaveSubgroupHeader(e, group, label)}
             @drop=${(e: DragEvent) => handleDropOnSubgroupHeader(e, group, label)}>
             <div class="lp-subgroup-header" draggable="true"
+                @click=${() => toggleSubGroup(group.name, label)}
                 @dragstart=${(e: DragEvent) => handleSubgroupDragStart(e, group, label)}
                 @dragend=${handleSubgroupDragEnd}>
                 <button class="lp-group-drag-handle" title="Drag to reorder group" @click=${(e:Event) => { e.preventDefault(); e.stopPropagation(); }}>
                     <span class="codicon codicon-gripper"></span>
                 </button>
                 <div class="lp-subgroup-badge" style=${badgeStyle}>
+                   <span class="codicon codicon-chevron-${isCollapsed ? 'right' : 'down'} lp-group-chevron"></span>
                    ${isBordered ? '' : html`<span class="codicon codicon-briefcase lp-subgroup-icon"></span>`}
                    <span class="lp-subgroup-label-text">${label}</span>
                 </div>
             </div>
-            <div class="lp-subgroup-items">
-                ${subActs.map(a => renderButton(a, true))}
-            </div>
+            ${isCollapsed ? null : html`
+                <div class="lp-subgroup-items">
+                    ${subActs.map(a => renderButton(a, true))}
+                </div>
+            `}
         </div>
         `;
     });

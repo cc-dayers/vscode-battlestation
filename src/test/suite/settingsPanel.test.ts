@@ -31,9 +31,9 @@ suite('Settings Panel Integration Test Suite', () => {
 
         // Save settings
         // Save settings
-        await config.update('display.showCommand', true, vscode.ConfigurationTarget.Workspace);
-        await config.update('display.showGroup', true, vscode.ConfigurationTarget.Workspace);
-        await config.update('display.hideIcon', 'trash', vscode.ConfigurationTarget.Workspace);
+        await config.update('display.showCommand', true, vscode.ConfigurationTarget.Global);
+        await config.update('display.showGroup', true, vscode.ConfigurationTarget.Global);
+        await config.update('display.hideIcon', 'trash', vscode.ConfigurationTarget.Global);
 
         // Wait for config to propagate
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -45,8 +45,8 @@ suite('Settings Panel Integration Test Suite', () => {
         assert.strictEqual(updatedConfig.get('display.hideIcon'), 'trash', 'hideIcon should be trash');
 
         // Cleanup - reset to defaults
-        await config.update('display.hideIcon', 'eye-closed', vscode.ConfigurationTarget.Workspace);
-        await config.update('display.hideIcon', 'eye-closed', vscode.ConfigurationTarget.Workspace);
+        await config.update('display.hideIcon', 'eye-closed', vscode.ConfigurationTarget.Global);
+        await config.update('display.hideIcon', 'eye-closed', vscode.ConfigurationTarget.Global);
     });
 
     test('Multiple rapid config updates should not cause data loss', async function () {
@@ -62,7 +62,7 @@ suite('Settings Panel Integration Test Suite', () => {
         ];
 
         for (const update of updates) {
-            await config.update(update.key, update.value, vscode.ConfigurationTarget.Workspace);
+            await config.update(update.key, update.value, vscode.ConfigurationTarget.Global);
         }
 
         // Wait for all updates to complete
@@ -76,8 +76,8 @@ suite('Settings Panel Integration Test Suite', () => {
 
         // Cleanup
         // Cleanup
-        await config.update('display.showGroup', true, vscode.ConfigurationTarget.Workspace);
-        await config.update('display.hideIcon', 'eye-closed', vscode.ConfigurationTarget.Workspace);
+        await config.update('display.showGroup', true, vscode.ConfigurationTarget.Global);
+        await config.update('display.hideIcon', 'eye-closed', vscode.ConfigurationTarget.Global);
     });
 
     test('Hide icon options should be valid', async function () {
@@ -87,7 +87,7 @@ suite('Settings Panel Integration Test Suite', () => {
         const validOptions = ['eye-closed', 'x', 'trash', 'close', 'circle-slash'];
 
         for (const icon of validOptions) {
-            await config.update('display.hideIcon', icon, vscode.ConfigurationTarget.Workspace);
+            await config.update('display.hideIcon', icon, vscode.ConfigurationTarget.Global);
             await new Promise(resolve => setTimeout(resolve, 50));
 
             const updatedConfig = vscode.workspace.getConfiguration('battlestation');
@@ -95,7 +95,7 @@ suite('Settings Panel Integration Test Suite', () => {
         }
 
         // Reset to default
-        await config.update('display.hideIcon', 'eye-closed', vscode.ConfigurationTarget.Workspace);
+        await config.update('display.hideIcon', 'eye-closed', vscode.ConfigurationTarget.Global);
     });
 
     test('Config file operations should work with settings changes', async function () {
@@ -107,7 +107,7 @@ suite('Settings Panel Integration Test Suite', () => {
 
         // Change a setting
         const config = vscode.workspace.getConfiguration('battlestation');
-        await config.update('display.showGroup', false, vscode.ConfigurationTarget.Workspace);
+        await config.update('display.showGroup', false, vscode.ConfigurationTarget.Global);
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Config file should still exist and be valid
@@ -122,7 +122,7 @@ suite('Settings Panel Integration Test Suite', () => {
         assert.strictEqual(newConfig.actions.length, originalActionCount, 'Action count should be unchanged');
 
         // Cleanup
-        await config.update('display.showGroup', true, vscode.ConfigurationTarget.Workspace);
+        await config.update('display.showGroup', true, vscode.ConfigurationTarget.Global);
     });
 
     test('Settings changes should not affect config history', async function () {
@@ -134,11 +134,11 @@ suite('Settings Panel Integration Test Suite', () => {
 
         // Change settings multiple times
         const config = vscode.workspace.getConfiguration('battlestation');
-        await config.update('display.showGroup', false, vscode.ConfigurationTarget.Workspace);
+        await config.update('display.showGroup', false, vscode.ConfigurationTarget.Global);
         await new Promise(resolve => setTimeout(resolve, 50));
-        await config.update('display.showCommand', false, vscode.ConfigurationTarget.Workspace);
+        await config.update('display.showCommand', false, vscode.ConfigurationTarget.Global);
         await new Promise(resolve => setTimeout(resolve, 50));
-        await config.update('display.showGroup', true, vscode.ConfigurationTarget.Workspace);
+        await config.update('display.showGroup', true, vscode.ConfigurationTarget.Global);
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // History count should be unchanged (settings don't create config history)
@@ -146,6 +146,6 @@ suite('Settings Panel Integration Test Suite', () => {
         assert.strictEqual(finalVersions.length, initialCount, 'History count should be unchanged by settings changes');
 
         // Cleanup
-        await config.update('display.showCommand', true, vscode.ConfigurationTarget.Workspace);
+        await config.update('display.showCommand', true, vscode.ConfigurationTarget.Global);
     });
 });

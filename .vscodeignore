@@ -1,15 +1,35 @@
 # Development files
 .vscode/**
 .vscode-test/**
+.vscode-test.mjs
 .gitignore
 .vscodeignore
 .claude/**
+.github/**
+.playwright-mcp/**
 
 # Source files (compiled files in dist/ are included)
 src/**
 out/**
+dist/test/**
 tsconfig.json
 esbuild.js
+scripts/**
+tests/**
+screenshots/**
+temp_last30days/**
+test-results/**
+playwright.config.ts
+eslint.config.mjs
+AGENTS.md
+CLAUDE.md
+PLAN.md
+TESTING.md
+out*.log
+*.log
+test_output.txt
+test_errors.txt
+unit-test-output.txt
 
 # Dependencies (not needed in package)
 node_modules/**

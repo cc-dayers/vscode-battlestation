@@ -13,6 +13,7 @@ import { renderErrorView } from '../src/views/errorView';
 import { renderAddActionForm } from '../src/views/addItemForm';
 import { renderAddActionWizard } from '../src/views/addActionWizard';
 import { renderEditActionForm } from '../src/views/editItemForm';
+import { renderGenerateConfigView } from '../src/views/generateConfigView';
 import type { Action } from '../src/types';
 
 const outDir = path.join(__dirname, 'test-pages');
@@ -120,5 +121,19 @@ const editWorkspaceHtml = renderEditActionForm({
 }).replace('</head>', mockVscodeApi + '</head>');
 fs.writeFileSync(path.join(outDir, 'edit-action-workspace.html'), editWorkspaceHtml);
 console.log('✓ edit-action-workspace.html');
+
+// ── Generate Config View ────────────────────────────────────────
+const generateConfigHtml = renderGenerateConfigView({
+  cspSource: CSP,
+  nonce: NONCE,
+  codiconStyles: CODICON,
+  hasNpm: true,
+  hasTasks: true,
+  hasLaunch: true,
+  hasWorkspace: true,
+  showWelcome: false,
+}).replace('</head>', mockVscodeApi + '</head>');
+fs.writeFileSync(path.join(outDir, 'generate-config.html'), generateConfigHtml);
+console.log('✓ generate-config.html');
 
 console.log('\nTest pages written to scripts/test-pages/');

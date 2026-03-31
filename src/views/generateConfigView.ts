@@ -783,7 +783,7 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
               : false;
             const secondaryGroupByEl = document.getElementById('secondaryGroupBySelect');
             const secondaryGroupBy = optionsVisible && secondaryGroupByEl
-              ? (secondaryGroupByEl as HTMLSelectElement).value
+              ? secondaryGroupByEl.value
               : 'auto';
 
             vscode.postMessage({

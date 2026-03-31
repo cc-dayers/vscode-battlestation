@@ -114,4 +114,32 @@ suite('Generate Config UI Test Suite', () => {
         assert.ok(html.includes("message?.type === 'configGenerationComplete'"), 'Should handle generation complete message');
         assert.ok(html.includes('setGenerationLoading(true);'), 'Should enable generation loading when creating config');
     });
+
+    test('Should emit browser-valid script for generate interactions', () => {
+        const ctx: GenerateConfigContext = {
+            cspSource: 'default-src "none"',
+            nonce: 'test-nonce',
+            codiconStyles: '',
+            hasNpm: true,
+            hasTasks: true,
+            hasLaunch: true,
+            hasWorkspace: true,
+            showWelcome: false
+        };
+
+        const html = renderGenerateConfigView(ctx);
+
+        assert.ok(
+            html.includes("showOptionsCheck?.addEventListener('change', updateOptionState);"),
+            'Checkbox change handler should be present'
+        );
+        assert.ok(
+            html.includes("secondaryGroupByEl.value"),
+            'Generate script should read the secondary grouping select value'
+        );
+        assert.ok(
+            !html.includes(' as HTMLSelectElement'),
+            'Inline browser script must not contain TypeScript-only casts'
+        );
+    });
 });

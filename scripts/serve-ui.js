@@ -181,7 +181,7 @@ const server = http.createServer((req, res) => {
   }
 
   // Generated test pages (run `npx ts-node scripts/gen-test-pages.ts` to rebuild)
-  const testPageRoutes = { '/error': 'error.html', '/add-action': 'add-action.html', '/add-wizard': 'add-wizard.html', '/edit-action': 'edit-action.html', '/edit-action-workspace': 'edit-action-workspace.html' };
+  const testPageRoutes = { '/error': 'error.html', '/add-action': 'add-action.html', '/add-wizard': 'add-wizard.html', '/edit-action': 'edit-action.html', '/edit-action-workspace': 'edit-action-workspace.html', '/generate-config': 'generate-config.html' };
   if (testPageRoutes[parsedReq.pathname]) {
     const pagePath = path.join(__dirname, 'test-pages', testPageRoutes[parsedReq.pathname]);
     if (fs.existsSync(pagePath)) {

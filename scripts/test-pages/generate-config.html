@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline' 'unsafe-inline'; font-src 'unsafe-inline'; script-src 'unsafe-inline' 'nonce-test-nonce-12345';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  <title>Battlestation</title>
+  <style>
+      body {
+        font-family: var(--vscode-font-family);
+        color: var(--vscode-foreground);
+        background: transparent;
+        padding: 16px 8px;
+        margin: 0;
+      }
+      h2 { font-size: 14px; margin: 0 0 8px; }
+      p { font-size: 12px; opacity: 0.8; margin: 0 0 12px; }
+      .lp-sources {
+        text-align: left;
+        margin: 0 0 12px;
+        padding: 8px;
+        background: var(--vscode-editor-background);
+        border-radius: 4px;
+      }
+      .lp-sources-title {
+        font-size: 11px;
+        font-weight: 600;
+        opacity: 0.7;
+        margin: 0 0 8px;
+        text-transform: uppercase;
+      }
+      .lp-enhanced-section {
+        margin: 8px 0 12px;
+        border: 1px solid var(--vscode-widget-border);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .lp-enhanced-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        background: var(--vscode-editor-background);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        user-select: none;
+      }
+      .lp-enhanced-header:hover {
+        background: var(--vscode-list-hoverBackground);
+      }
+      .lp-enhanced-header .codicon {
+        font-size: 14px;
+      }
+      .lp-enhanced-content {
+        padding: 8px;
+        background: var(--vscode-editor-background);
+      }
+      .lp-enhanced-content .lp-sources {
+        margin-bottom: 8px;
+      }
+      .lp-enhanced-content .lp-sources:last-child {
+        margin-bottom: 0;
+      }
+      .lp-sources--detection {
+        border-bottom: 1px solid var(--vscode-widget-border);
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+      }
+      .lp-radio-group {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin-top: 4px;
+      }
+      .lp-radio-input {
+        cursor: pointer;
+      }
+      .lp-detection-hint {
+        font-size: 11px;
+        color: var(--vscode-descriptionForeground);
+        margin-top: 6px;
+        font-style: italic;
+      }
+      .lp-setup-desc {
+        margin-bottom: 20px;
+      }
+      .lp-form-actions--welcome {
+        margin-top: 20px;
+      }
+      .lp-show-options-check {
+        cursor: pointer;
+        margin: 0;
+      }
+      .lp-options-hidden {
+        display: none;
+      }
+      .lp-generation-overlay {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: color-mix(in srgb, var(--vscode-editor-background) 86%, transparent);
+        z-index: 100;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .lp-generation-overlay.visible {
+        display: inline-flex;
+      }
+      
+  .lp-checkbox-row {
+    display: flex;
+    align-items: center;
+    margin: 4px 0;
+    cursor: pointer;
+    user-select: none;
+    font-size: 12px;
+    padding: 4px;
+    border-radius: 3px;
+    transition: background 0.1s;
+  }
+  .lp-checkbox-row:hover {
+    background: var(--vscode-list-hoverBackground);
+  }
+  .lp-checkbox-row input {
+    margin: 0 8px 0 0;
+    cursor: pointer;
+  }
+  .lp-checkbox-row.disabled input {
+    cursor: not-allowed;
+  }
+
+      
+  .lp-option-card {
+    display: block;
+    margin: 16px 0;
+    padding: 12px;
+    background: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-widget-border);
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+  .lp-option-card:hover {
+    background: var(--vscode-list-hoverBackground);
+    border-color: var(--vscode-focusBorder);
+  }
+  .lp-option-card.selected {
+    background: var(--vscode-inputOption-activeBackground);
+    border-color: var(--vscode-focusBorder);
+    color: var(--vscode-inputOption-activeForeground);
+    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+  }
+  .lp-option-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .lp-option-title {
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .lp-option-desc {
+    margin-left: 24px;
+    margin-top: 4px;
+    font-size: 11px;
+    opacity: 0.8;
+  }
+
+      .lp-form-actions { display: flex; gap: 8px; }
+      
+  .lp-btn {
+    flex: 1;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .lp-btn-primary {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+  }
+  .lp-btn-primary:hover {
+    background: var(--vscode-button-hoverBackground);
+  }
+  .lp-btn-secondary {
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+  }
+  .lp-btn-secondary:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+  }
+
+    </style>
+
+<script nonce="test-nonce-12345">
+  window.__lastCommand = null;
+  window.acquireVsCodeApi = () => ({
+    postMessage: (msg) => {
+      window.__lastCommand = msg;
+      const t = document.getElementById('vsc-toast') || document.createElement('div');
+      t.id = 'vsc-toast';
+      t.style = 'position:fixed;bottom:10px;right:10px;background:#0e639c;color:#fff;padding:8px 16px;border-radius:4px;z-index:9999;font-family:sans-serif;font-size:13px';
+      t.innerText = 'COMMAND: ' + JSON.stringify(msg);
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    },
+    getState: () => ({}),
+    setState: () => {}
+  });
+</script>
+</head>
+<body>
+
+      <h2>🚀 Generate Configuration</h2><p>Auto-detect commands from your workspace.</p>
+      
+      <label class="lp-option-card" id="showOptionsLabel" for="showOptionsCheck">
+        <div class="lp-option-header">
+          <input type="checkbox" id="showOptionsCheck" class="lp-show-options-check" >
+          <span class="lp-option-title">Show generation options</span>
+        </div>
+        <div class="lp-option-desc">
+          When unchecked, all available sources are automatically included
+        </div>
+      </label>
+
+      <div id="optionsContainer" class="lp-options-hidden">
+        <div class="lp-sources">
+          <div class="lp-sources-title">Auto-detect from:</div>
+          
+  <label class="lp-checkbox-row " for="npmCheck">
+    <input type="checkbox" id="npmCheck" checked >
+    <span>npm scripts (package.json)</span>
+  </label>
+          
+  <label class="lp-checkbox-row " for="tasksCheck">
+    <input type="checkbox" id="tasksCheck" checked >
+    <span>VS Code tasks (tasks.json)</span>
+  </label>
+          
+  <label class="lp-checkbox-row " for="launchCheck">
+    <input type="checkbox" id="launchCheck" checked >
+    <span>Launch configs (launch.json)</span>
+  </label>
+          
+  <label class="lp-checkbox-row " for="dockerCheck">
+    <input type="checkbox" id="dockerCheck" checked >
+    <span>Docker Compose</span>
+  </label>
+          
+  <label class="lp-checkbox-row " for="makeCheck">
+    <input type="checkbox" id="makeCheck" checked >
+    <span>Makefiles</span>
+  </label>
+          
+  <label class="lp-checkbox-row " for="rustCheck">
+    <input type="checkbox" id="rustCheck" checked >
+    <span>Rust (Cargo)</span>
+  </label>
+          
+  <label class="lp-checkbox-row " for="goCheck">
+    <input type="checkbox" id="goCheck" checked >
+    <span>Go (go.mod)</span>
+  </label>
+        </div>
+        
+        <div class="lp-sources">
+          <div class="lp-sources-title">Global Options:</div>
+          
+  <label class="lp-checkbox-row " for="groupCheck">
+    <input type="checkbox" id="groupCheck" checked >
+    <span>Group by type</span>
+  </label>
+          
+  <label class="lp-checkbox-row " for="colorCheck">
+    <input type="checkbox" id="colorCheck" checked >
+    <span>Auto-colorize groups</span>
+  </label>
+          
+  <label class="lp-checkbox-row " for="autoOpenCheck">
+    <input type="checkbox" id="autoOpenCheck"  >
+    <span>Auto-open config file</span>
+  </label>
+          
+  <label class="lp-checkbox-row " for="deepScanCheck">
+    <input type="checkbox" id="deepScanCheck"  >
+    <span>Deep Scan (Recursive) - thorough but slower</span>
+  </label>
+          <div style="margin-top: 8px;">
+            <label for="secondaryGroupBySelect" style="font-size: 11px; font-weight: 600; opacity: 0.7; text-transform: uppercase; display: block; margin-bottom: 4px;">Secondary Grouping:</label>
+            <select id="secondaryGroupBySelect" style="width: 100%; padding: 5px 6px; font-size: 12px; background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border); border-radius: 3px; cursor: pointer;">
+              <option value="auto" selected>Auto-detect (recommended)</option>
+              <option value="workspace">Always group by workspace / portal</option>
+              <option value="type">Always group by type (build, test…)</option>
+              <option value="none">None</option>
+            </select>
+            <div style="font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 4px; font-style: italic;">ℹ️ Auto-detect applies workspace grouping when multiple workspaces are found in a group</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="lp-form-actions">
+        <button type="button" class="lp-btn lp-btn-secondary" id="cancelBtn">Cancel</button>
+        <button type="button" class="lp-btn lp-btn-primary" id="createBtn">Generate</button>
+      </div>
+      <div id="generationOverlay" class="lp-generation-overlay" aria-live="polite" aria-hidden="true">
+        <span class="codicon codicon-loading codicon-modifier-spin"></span>
+        <span>Generating config...</span>
+      </div>
+    
+<script nonce="test-nonce-12345">
+  (function() {
+    if (typeof acquireVsCodeApi === 'function') {
+      const originalAcquire = acquireVsCodeApi;
+      let cachedApi = null;
+      window.acquireVsCodeApi = function() {
+        if (!cachedApi) {
+          cachedApi = originalAcquire.apply(this, arguments);
+          
+          // Support mice with "Back" buttons (button 3 or 4 are standard)
+          window.addEventListener('mouseup', (e) => {
+            if (e.button === 3 || e.button === 4) {
+              cachedApi.postMessage({ command: 'cancelForm' });
+            }
+          });
+          
+          // Support keyboard back (Alt+Left on Windows/Linux, Cmd+Left on Mac)
+          window.addEventListener('keydown', (e) => {
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            if ((!isMac && e.altKey && e.key === 'ArrowLeft') || 
+                (isMac && e.metaKey && e.key === 'ArrowLeft')) {
+              cachedApi.postMessage({ command: 'cancelForm' });
+            }
+          });
+        }
+        return cachedApi;
+      };
+    }
+  })();
+
+      (function () {
+        const vscode = acquireVsCodeApi();
+        const generationOverlay = document.getElementById('generationOverlay');
+        
+        // Toggle options visibility with visual state
+        const showOptionsCheck = document.getElementById('showOptionsCheck');
+        const showOptionsLabel = document.getElementById('showOptionsLabel');
+        const optionsContainer = document.getElementById('optionsContainer');
+
+        function updateOptionState() {
+          const checked = showOptionsCheck?.checked;
+          if (optionsContainer) optionsContainer.style.display = checked ? 'block' : 'none';
+          if (showOptionsLabel) {
+            if (checked) showOptionsLabel.classList.add('selected');
+            else showOptionsLabel.classList.remove('selected');
+          }
+        }
+
+        showOptionsCheck?.addEventListener('change', updateOptionState);
+        // Initialize state
+        updateOptionState();
+        
+        function setButtonLoading(button, isLoading, loadingText = 'Generating...') {
+          if (!button) return;
+          
+          if (isLoading) {
+            button.disabled = true;
+            button.dataset.originalText = button.textContent;
+            const icon = button.querySelector('.codicon');
+            if (icon) {
+              icon.className = 'codicon codicon-loading codicon-modifier-spin';
+            }
+            const textNode = Array.from(button.childNodes).find(n => n.nodeType === 3);
+            if (textNode) textNode.textContent = loadingText;
+          } else {
+            button.disabled = false;
+            if (button.dataset.originalText) {
+              const textNode = Array.from(button.childNodes).find(n => n.nodeType === 3);
+              if (textNode) textNode.textContent = button.dataset.originalText;
+            }
+          }
+        }
+
+        function setGenerationLoading(isLoading) {
+          if (generationOverlay) {
+            generationOverlay.classList.toggle('visible', isLoading);
+            generationOverlay.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
+          }
+        }
+
+        function clearGenerationLoading() {
+          setGenerationLoading(false);
+          setButtonLoading(document.getElementById('generateBtn'), false);
+          setButtonLoading(document.getElementById('createBtn'), false);
+          setButtonLoading(document.getElementById('createBlankBtn'), false);
+        }
+
+        window.addEventListener('message', (event) => {
+          const message = event.data;
+          if (message?.type === 'configGenerationStarted') {
+            setGenerationLoading(true);
+          }
+          if (message?.type === 'configGenerationComplete') {
+            clearGenerationLoading();
+          }
+        });
+        
+        document.getElementById('createBlankBtn')?.addEventListener('click', () => {
+          const btn = document.getElementById('createBlankBtn');
+          setGenerationLoading(true);
+          setButtonLoading(btn, true, 'Creating...');
+          vscode.postMessage({ command: 'createBlankConfig' });
+        });
+
+        function collectSources() {
+          const sources = {};
+          
+          const npmCheck = document.getElementById('npmCheck');
+          const tasksCheck = document.getElementById('tasksCheck');
+          const launchCheck = document.getElementById('launchCheck');
+          const dockerCheck = document.getElementById('dockerCheck');
+          const makeCheck = document.getElementById('makeCheck');
+          const rustCheck = document.getElementById('rustCheck');
+          const goCheck = document.getElementById('goCheck');
+          
+          if (npmCheck) sources.npm = npmCheck.checked;
+          if (tasksCheck) sources.tasks = tasksCheck.checked;
+          if (launchCheck) sources.launch = launchCheck.checked;
+          if (dockerCheck) sources.docker = dockerCheck.checked;
+          if (makeCheck) sources.make = makeCheck.checked;
+          if (rustCheck) sources.rust = rustCheck.checked;
+          if (goCheck) sources.go = goCheck.checked;
+          
+          return sources;
+        }
+
+        const generateBtn = document.getElementById('generateBtn');
+        if (generateBtn) {
+          generateBtn.addEventListener('click', () => {
+            setGenerationLoading(true);
+            setButtonLoading(generateBtn, true);
+            
+            const optionsVisible = showOptionsCheck?.checked || false;
+            const sources = collectSources();
+            const effectiveSources = optionsVisible
+              ? sources
+              : { ...sources, npm: true, tasks: true, launch: true, docker: true, make: true, rust: true, go: true };
+            const enableGrouping = optionsVisible ? document.getElementById('groupCheck').checked : true;
+            const enableColoring = optionsVisible ? document.getElementById('colorCheck').checked : true;
+            const autoOpen = optionsVisible ? document.getElementById('autoOpenCheck').checked : false;
+            const deepScan = optionsVisible ? document.getElementById('deepScanCheck').checked : false;
+            const secondaryGroupByEl = document.getElementById('secondaryGroupBySelect');
+            const secondaryGroupBy = optionsVisible && secondaryGroupByEl ? secondaryGroupByEl.value : 'auto';
+            
+            vscode.postMessage({
+              command: 'createConfig',
+              sources: effectiveSources,
+              enableGrouping,
+              enableColoring,
+              autoOpen,
+              deepScan,
+              secondaryGroupBy
+            });
+          });
+        }
+
+        const createBtn = document.getElementById('createBtn');
+        if (createBtn) {
+          createBtn.addEventListener('click', () => {
+            setGenerationLoading(true);
+            setButtonLoading(createBtn, true);
+            
+            const optionsVisible = showOptionsCheck?.checked || false;
+            const sources = collectSources();
+            const effectiveSources = optionsVisible
+              ? sources
+              : { ...sources, npm: true, tasks: true, launch: true, docker: true, make: true, rust: true, go: true };
+            const enableGrouping = optionsVisible
+              ? (document.getElementById('groupCheck')?.checked ?? true)
+              : true;
+            const enableColoring = optionsVisible
+              ? (document.getElementById('colorCheck')?.checked ?? true)
+              : true;
+            const autoOpen = optionsVisible
+              ? (document.getElementById('autoOpenCheck')?.checked ?? false)
+              : false;
+            const deepScan = optionsVisible
+              ? (document.getElementById('deepScanCheck')?.checked ?? false)
+              : false;
+            const secondaryGroupByEl = document.getElementById('secondaryGroupBySelect');
+            const secondaryGroupBy = optionsVisible && secondaryGroupByEl
+              ? secondaryGroupByEl.value
+              : 'auto';
+
+            vscode.postMessage({
+              command: 'createConfig',
+              sources: effectiveSources,
+              enableGrouping,
+              enableColoring,
+              autoOpen,
+              deepScan,
+              secondaryGroupBy
+            });
+          });
+        }
+        
+        const cancelBtn = document.getElementById('cancelBtn');
+        if (cancelBtn) {
+          cancelBtn.addEventListener('click', () => {
+            vscode.postMessage({ command: 'cancelForm' });
+          });
+        }
+
+        // Event delegation for detection method changes
+        document.addEventListener('change', (e) => {
+          if (e.target.matches && e.target.matches('input[name="detectionMethod"]')) {
+            const method = e.target.value;
+            vscode.postMessage({ command: 'redetectTools', detectionMethod: method });
+          }
+        });
+      })();
+    
+</script>
+
+</body>
+</html>

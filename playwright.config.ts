@@ -26,7 +26,7 @@ export default defineConfig({
   // Auto-start the UI test server before running tests; reuse if already up
   // (so `npm run test:ui-server` in a separate terminal gives instant re-runs)
   webServer: {
-    command: 'node scripts/serve-ui.js',
+    command: 'npm run test:ui-server',
     url: 'http://localhost:3000',
     reuseExistingServer: true,
     timeout: 10_000,

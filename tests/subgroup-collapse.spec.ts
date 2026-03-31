@@ -79,4 +79,24 @@ test.describe('Secondary Group Collapse', () => {
     // App A should be hidden again because it was previously collapsed
     await expect(page.locator('.lp-btn-wrapper', { hasText: 'App A' })).not.toBeVisible();
   });
+
+  test('subgroup header is not draggable and uses only the drag handle for reordering affordance', async ({ page }) => {
+    const header = page.locator('.lp-subgroup-header', { hasText: 'Portal' });
+    const dragHandle = header.locator('.lp-group-drag-handle');
+
+    await expect(header.locator('.lp-group-chevron')).toHaveCount(0);
+
+    const headerDraggable = await header.evaluate((el) => el.getAttribute('draggable'));
+    expect(headerDraggable).toBeNull();
+
+    const handleDraggable = await dragHandle.evaluate((el) => el.getAttribute('draggable'));
+    expect(handleDraggable).toBe('true');
+
+    const spacing = await page.evaluate(() => {
+      const handle = document.querySelector('.lp-subgroup-header .lp-group-drag-handle') as HTMLElement | null;
+      if (!handle) return null;
+      return getComputedStyle(handle).marginRight;
+    });
+    expect(spacing).toBe('2px');
+  });
 });

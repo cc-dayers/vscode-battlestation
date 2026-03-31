@@ -53,4 +53,29 @@ suite('Flyout Menu Architecture Test Suite', () => {
             assert.ok(containerBlock.includes('display: flex'), 'Should use flex for vertical alignment to avoid stacking context');
         }
     });
+
+    test('Subgroup header uses handle-only drag without chevron', () => {
+        const source = fs.readFileSync(webviewFile, 'utf8');
+        const subgroupBlockStart = source.indexOf('<div class="lp-subgroup-header"');
+        assert.ok(subgroupBlockStart !== -1, 'Should render subgroup header markup');
+
+        const subgroupBlockEnd = source.indexOf('</div>', subgroupBlockStart);
+        const subgroupBlock = source.substring(subgroupBlockStart, subgroupBlockEnd);
+
+        assert.ok(subgroupBlock.includes('<button class="lp-group-drag-handle" draggable="true"'), 'Subgroup should drag from the dedicated handle');
+        assert.ok(subgroupBlock.includes('title="Drag to reorder subgroup"'), 'Subgroup drag handle should have subgroup-specific title');
+        assert.ok(!subgroupBlock.includes('lp-group-chevron'), 'Subgroup header should not render a chevron icon');
+        assert.ok(!subgroupBlock.includes('draggable="true"\n                @click') && !subgroupBlock.includes('<div class="lp-subgroup-header" draggable="true"'), 'Subgroup header container should not itself be draggable');
+    });
+
+    test('Subgroup styling tightens handle spacing without collapsed chevron state', () => {
+        const source = fs.readFileSync(styleFile, 'utf8');
+
+        assert.ok(/\.lp-subgroup-header\s*\{[\s\S]*?gap:\s*2px;[\s\S]*?\}/.test(source), 'Subgroup header should reduce spacing around the handle and label');
+        assert.ok(/\.lp-subgroup-badge\s*\{[\s\S]*?gap:\s*4px;[\s\S]*?\}/.test(source), 'Subgroup badge should use tighter internal spacing');
+
+        assert.ok(/\.lp-drag-handle,\s*\.lp-group-drag-handle\s*\{[\s\S]*?flex:\s*0 0 12px;/.test(source), 'Shared group drag handle styles should still exist');
+        assert.ok(source.includes('margin-right: 2px;'), 'Drag handle should keep a small explicit right margin');
+        assert.ok(!source.includes('.lp-subgroup--collapsed .lp-group-chevron'), 'Collapsed subgroup styling should no longer depend on subgroup chevrons');
+    });
 });

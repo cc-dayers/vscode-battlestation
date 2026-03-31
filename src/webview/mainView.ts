@@ -48,13 +48,20 @@ const root = document.getElementById("root");
 let isBatchingState = false;
 let hasPendingRender = false;
 
-const requestRender = () => {
+function requestRender() {
     if (isBatchingState) {
         hasPendingRender = true;
         return;
     }
-    renderView();
-};
+    if (hasPendingRender) return;
+    
+    hasPendingRender = true;
+    queueMicrotask(() => {
+        if (!hasPendingRender) return;
+        hasPendingRender = false;
+        renderView();
+    });
+}
 
 const batchStateUpdates = (updater: () => void) => {
     isBatchingState = true;
@@ -403,7 +410,8 @@ const handleDropOnGroupHeader = (e: DragEvent, group: Group) => {
 const handleSubgroupDragStart = (e: DragEvent, group: Group, workspace: string) => {
     dragSrcSubgroup = { group: group.name, workspace };
     e.dataTransfer!.effectAllowed = 'move';
-    const header = (e.currentTarget as HTMLElement).closest('.lp-subgroup-header') as HTMLElement;
+    const handle = e.currentTarget as HTMLElement;
+    const header = handle.closest('.lp-subgroup-header') as HTMLElement;
     if (header) {
         const rect = header.getBoundingClientRect();
         e.dataTransfer!.setDragImage(header, e.clientX - rect.left, e.clientY - rect.top);
@@ -1295,15 +1303,16 @@ const renderSecondaryGroups = (group: Group, actions: Action[], groupByField: st
             @dragover=${(e: DragEvent) => handleDragOverSubgroupHeader(e, group, label)}
             @dragleave=${(e: DragEvent) => handleDragLeaveSubgroupHeader(e, group, label)}
             @drop=${(e: DragEvent) => handleDropOnSubgroupHeader(e, group, label)}>
-            <div class="lp-subgroup-header" draggable="true"
-                @click=${() => toggleSubGroup(group.name, label)}
-                @dragstart=${(e: DragEvent) => handleSubgroupDragStart(e, group, label)}
-                @dragend=${handleSubgroupDragEnd}>
-                <button class="lp-group-drag-handle" title="Drag to reorder group" @click=${(e:Event) => { e.preventDefault(); e.stopPropagation(); }}>
+            <div class="lp-subgroup-header"
+                @click=${() => toggleSubGroup(group.name, label)}>
+                <button class="lp-group-drag-handle" draggable="true"
+                    title="Drag to reorder subgroup" aria-label=${`Drag subgroup ${label} to reorder`}
+                    @click=${(e:Event) => { e.preventDefault(); e.stopPropagation(); }}
+                    @dragstart=${(e: DragEvent) => handleSubgroupDragStart(e, group, label)}
+                    @dragend=${handleSubgroupDragEnd}>
                     <span class="codicon codicon-gripper"></span>
                 </button>
                 <div class="lp-subgroup-badge" style=${badgeStyle}>
-                   <span class="codicon codicon-chevron-${isCollapsed ? 'right' : 'down'} lp-group-chevron"></span>
                    ${isBordered ? '' : html`<span class="codicon codicon-briefcase lp-subgroup-icon"></span>`}
                    <span class="lp-subgroup-label-text">${label}</span>
                 </div>
@@ -1456,7 +1465,11 @@ const renderSearch = (visibleActions: Action[]) => {
     `;
 };
 
-const renderView = () => {
+/**
+ * Main render function for the entire view.
+ * Uses Lit-html to update the DOM efficiently based on reactive state.
+ */
+function renderView() {
     if (!root) return;
 
     // Filter actions

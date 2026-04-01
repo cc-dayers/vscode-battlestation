@@ -1629,6 +1629,9 @@ window.addEventListener('message', event => {
             break;
         case 'toggleSearch':
             state.showSearch = msg.visible;
+            if (msg.clearQuery) {
+                state.searchQuery = '';
+            }
             // focus logic if needed, or let renderView handle it
             break;
         case 'collapseAllGroups':

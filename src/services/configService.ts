@@ -642,6 +642,56 @@ export class ConfigService {
 
   /* ─── Scanning helpers ─── */
 
+  /**
+   * Finds *.code-workspace files in the current workspace folders, parses their
+   * `folders` entries, and returns URIs for any directories not already present
+   * as VS Code workspace folders. Used by deep-scan mode to pick up sibling
+   * repos or monorepo roots that are listed in a workspace file but not open as
+   * top-level workspace folders.
+   */
+  private async resolveWorkspaceFileFolders(
+    workspaceFolders: readonly vscode.WorkspaceFolder[]
+  ): Promise<{ uri: vscode.Uri; name: string }[]> {
+    const knownPaths = new Set(workspaceFolders.map(f => f.uri.fsPath));
+    const extra: { uri: vscode.Uri; name: string }[] = [];
+    const seen = new Set<string>();
+
+    for (const folder of workspaceFolders) {
+      try {
+        const wsFiles = await vscode.workspace.findFiles(
+          new vscode.RelativePattern(folder, '*.code-workspace'),
+          null,
+          10
+        );
+        for (const wsFile of wsFiles) {
+          try {
+            const raw = await this.readText(wsFile);
+            const wsJson = JSON.parse(this.stripJsonComments(raw));
+            const entries: { path?: string }[] = wsJson.folders || [];
+            const wsDir = vscode.Uri.joinPath(wsFile, '..');
+            for (const entry of entries) {
+              if (!entry.path) continue;
+              const folderUri = /^([A-Za-z]:|\/|\/)/.test(entry.path)
+                ? vscode.Uri.file(entry.path)
+                : vscode.Uri.joinPath(wsDir, entry.path);
+              const fsPath = folderUri.fsPath;
+              if (!knownPaths.has(fsPath) && !seen.has(fsPath)) {
+                seen.add(fsPath);
+                const name = entry.path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || entry.path;
+                extra.push({ uri: folderUri, name });
+              }
+            }
+          } catch {
+            // skip invalid workspace file
+          }
+        }
+      } catch {
+        // skip
+      }
+    }
+    return extra;
+  }
+
   async scanNpmScripts(deepScan: boolean = false): Promise<Action[]> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) return [];
@@ -684,6 +734,32 @@ export class ConfigService {
       // Recursively scan subdirectories for package.json files
       if (deepScan) {
         await this.scanNpmScriptsRecursive(folder.uri, allActions, seenActions, workspaceName, isRootWorkspace);
+      }
+    }
+
+    // Deep scan: also scan folders referenced in any *.code-workspace files
+    if (deepScan) {
+      const extraFolders = await this.resolveWorkspaceFileFolders(workspaceFolders);
+      for (const folder of extraFolders) {
+        const pkgUri = vscode.Uri.joinPath(folder.uri, "package.json");
+        if (await this.fileExists(pkgUri)) {
+          try {
+            const raw = await this.readText(pkgUri);
+            const pkg = JSON.parse(raw);
+            const scripts = pkg.scripts || {};
+            Object.keys(scripts).forEach((scriptName) => {
+              const command = `npm run ${scriptName}`;
+              const key = `${scriptName}|${command}|${folder.name}`;
+              if (!seenActions.has(key)) {
+                seenActions.add(key);
+                allActions.push({ name: scriptName, command, type: "npm", cwd: folder.uri.fsPath, workspace: folder.name });
+              }
+            });
+          } catch {
+            // skip invalid package.json
+          }
+        }
+        await this.scanNpmScriptsRecursive(folder.uri, allActions, seenActions, folder.name, false);
       }
     }
 
@@ -810,6 +886,30 @@ export class ConfigService {
       }
     }
     
+    // Deep scan: also search inside folders referenced by *.code-workspace files
+    if (deepScan) {
+      const extraFolders = await this.resolveWorkspaceFileFolders(workspaceFolders);
+      for (const folder of extraFolders) {
+        try {
+          const globPattern = `**/{${patterns.join(',')}}`;
+          const relativePattern = new vscode.RelativePattern(folder.uri, globPattern);
+          const uris = await vscode.workspace.findFiles(relativePattern, '**/node_modules/**');
+          for (const uri of uris) {
+            const fsPath = uri.fsPath;
+            const folderFsPath = folder.uri.fsPath;
+            const relPath = fsPath.startsWith(folderFsPath)
+              ? fsPath.slice(folderFsPath.length).replace(/^[\\/]/, '').replace(/\\/g, '/')
+              : '';
+            const folderPath = relPath.substring(0, relPath.lastIndexOf('/')) || '';
+            const workspaceLabel = folderPath ? `${folder.name}/${folderPath}` : folder.name;
+            results.push({ uri, isRoot: folderPath === '', relativePath: workspaceLabel });
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
     // Deduplicate by path
     const unique = new Map<string, any>();
     for (const res of results) {
@@ -898,14 +998,22 @@ export class ConfigService {
     return actions;
   }
 
-  async scanTasks(): Promise<Action[]> {
+  async scanTasks(deepScan = false): Promise<Action[]> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) return [];
 
-    const allActions: Action[] = [];
-    const isRootWorkspace = workspaceFolders.length === 1;
+    type FolderEntry = { uri: vscode.Uri; name: string; alwaysLabel: boolean };
+    const foldersToScan: FolderEntry[] = workspaceFolders.map(f => ({
+      uri: f.uri, name: f.name, alwaysLabel: workspaceFolders.length > 1
+    }));
+    if (deepScan) {
+      const extra = await this.resolveWorkspaceFileFolders(workspaceFolders);
+      foldersToScan.push(...extra.map(f => ({ ...f, alwaysLabel: true })));
+    }
 
-    for (const folder of workspaceFolders) {
+    const allActions: Action[] = [];
+
+    for (const folder of foldersToScan) {
       const uri = vscode.Uri.joinPath(folder.uri, ".vscode", "tasks.json");
       if (!(await this.fileExists(uri))) continue;
 
@@ -943,11 +1051,11 @@ export class ConfigService {
             // Use workspace field for secondary grouping
             // If we have both a workspace folder and a task group, combine them
             let workspaceValue: string | undefined;
-            if (!isRootWorkspace && secondaryGroup) {
+            if (folder.alwaysLabel && secondaryGroup) {
               workspaceValue = `${folder.name} - ${secondaryGroup}`;
             } else if (secondaryGroup) {
               workspaceValue = secondaryGroup;
-            } else if (!isRootWorkspace) {
+            } else if (folder.alwaysLabel) {
               workspaceValue = folder.name;
             }
 
@@ -967,14 +1075,22 @@ export class ConfigService {
     return allActions;
   }
 
-  async scanLaunchConfigs(): Promise<Action[]> {
+  async scanLaunchConfigs(deepScan = false): Promise<Action[]> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) return [];
 
-    const allActions: Action[] = [];
-    const isRootWorkspace = workspaceFolders.length === 1;
+    type FolderEntry = { uri: vscode.Uri; name: string; alwaysLabel: boolean };
+    const foldersToScan: FolderEntry[] = workspaceFolders.map(f => ({
+      uri: f.uri, name: f.name, alwaysLabel: workspaceFolders.length > 1
+    }));
+    if (deepScan) {
+      const extra = await this.resolveWorkspaceFileFolders(workspaceFolders);
+      foldersToScan.push(...extra.map(f => ({ ...f, alwaysLabel: true })));
+    }
 
-    for (const folder of workspaceFolders) {
+    const allActions: Action[] = [];
+
+    for (const folder of foldersToScan) {
       const uri = vscode.Uri.joinPath(folder.uri, ".vscode", "launch.json");
       if (!(await this.fileExists(uri))) continue;
 
@@ -995,7 +1111,7 @@ export class ConfigService {
               name: c.name.trim(),
               command: `workbench.action.debug.start|${c.name.trim()}`,
               type: "launch",
-              workspace: isRootWorkspace ? undefined : folder.name,
+              workspace: folder.alwaysLabel ? folder.name : undefined,
             };
             allActions.push(action);
           });
@@ -1011,7 +1127,7 @@ export class ConfigService {
               name: c.name.trim(),
               command: `workbench.action.debug.start|${c.name.trim()}`,
               type: "launch",
-              workspace: isRootWorkspace ? undefined : folder.name,
+              workspace: folder.alwaysLabel ? folder.name : undefined,
             };
             allActions.push(action);
           });
@@ -1162,10 +1278,10 @@ export class ConfigService {
       actions.push(...(await this.scanDocker(deepScan)));
     }
     if (sources.tasks) {
-      actions.push(...(await this.scanTasks()));
+      actions.push(...(await this.scanTasks(deepScan)));
     }
     if (sources.launch) {
-      actions.push(...(await this.scanLaunchConfigs()));
+      actions.push(...(await this.scanLaunchConfigs(deepScan)));
     }
 
     // 2. Identify likely groups if grouping is enabled
@@ -1394,8 +1510,8 @@ export class ConfigService {
     newActions.push(...(await this.scanRust(deepScan)));
     newActions.push(...(await this.scanGo(deepScan)));
     newActions.push(...(await this.scanDocker(deepScan)));
-    newActions.push(...(await this.scanTasks()));
-    newActions.push(...(await this.scanLaunchConfigs()));
+    newActions.push(...(await this.scanTasks(deepScan)));
+    newActions.push(...(await this.scanLaunchConfigs(deepScan)));
 
     const newActionsMap = new Map<string, Action>();
     newActions.forEach(a => newActionsMap.set(`${a.command}|${a.workspace || ''}`, a));

@@ -1330,7 +1330,11 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         const msg = deleteHistory ? `Deleted ${result.location} and history backups` : `Deleted ${result.location}`;
         this.showToast(msg);
         vscode.window.showInformationMessage(msg);
-        
+
+        // Clear search state — no point keeping a filter with no config
+        this.searchVisible = false;
+        this.view?.webview.postMessage({ type: "toggleSearch", visible: false, clearQuery: true });
+
         if (deleteHistory) {
           await this.handleShowGenerateConfig();
         } else {

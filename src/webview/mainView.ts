@@ -1428,11 +1428,17 @@ const renderSearch = (visibleActions: Action[]) => {
     return html`
     <div id="searchContainer" class="lp-search-container">
         <div class="lp-search-row">
-            <input type="text" class="lp-search-box" 
-                placeholder="🔍 Search actions..." 
+            <input type="text" class="lp-search-box"
+                placeholder="🔍 Search actions..."
                 .value=${state.searchQuery}
                 @input=${(e: Event) => { state.searchQuery = (e.target as HTMLInputElement).value; searchGroupPickerOpen = false; }}
             >
+            ${state.searchQuery ? html`
+                <button class="lp-search-clear-btn" title="Clear search" aria-label="Clear search"
+                    @click=${() => { state.searchQuery = ''; searchGroupPickerOpen = false; renderView(); }}>
+                    <span class="codicon codicon-close"></span>
+                </button>
+            ` : null}
             ${hasGroupsAndResults ? html`
                 <div class="lp-search-assign-wrap">
                     <button class="lp-search-assign-btn ${searchGroupPickerOpen ? 'lp-search-assign-btn--open' : ''}"

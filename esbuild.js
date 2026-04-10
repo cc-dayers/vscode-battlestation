@@ -70,7 +70,11 @@ async function main() {
   });
 
   const webviewCtx = await esbuild.context({
-    entryPoints: ["src/webview/settingsView.ts", "src/webview/mainView.ts"],
+    entryPoints: [
+      "src/webview/settingsView.ts",
+      "src/webview/mainView.ts",
+      "src/webview/workflowBuilder.ts",
+    ],
     bundle: true,
     format: "esm",
     minify: production,

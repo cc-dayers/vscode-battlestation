@@ -5,6 +5,7 @@
 .gitignore
 .vscodeignore
 .claude/**
+.codex/**
 .github/**
 .playwright-mcp/**
 
@@ -24,6 +25,7 @@ eslint.config.mjs
 AGENTS.md
 CLAUDE.md
 PLAN.md
+PUBLISHING.md
 TESTING.md
 out*.log
 *.log

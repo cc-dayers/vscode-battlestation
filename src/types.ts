@@ -8,6 +8,7 @@ export interface ActionParam {
 }
 
 export interface Action {
+  id?: string;
   name: string;
   command: string;
   type: string;
@@ -19,6 +20,18 @@ export interface Action {
   params?: ActionParam[]; // Runtime input variables interpolated into command
   backgroundColor?: string;
   rowBackgroundColor?: string;
+}
+
+export interface WorkflowStep {
+  id: string;
+  actionId: string;
+  continueOnError?: boolean;
+}
+
+export interface Workflow {
+  id: string;
+  name: string;
+  steps: WorkflowStep[];
 }
 
 export interface IconMapping {
@@ -45,6 +58,7 @@ export interface Config {
   actions: Action[];
   groups?: Group[];
   icons?: IconMapping[];
+  workflows?: Workflow[];
   customColors?: string[]; // User-defined color palette
   [key: string]: any; // Allow arbitrary keys from config
 }

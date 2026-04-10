@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
-import type { Config, Action, Group, IconMapping } from "../types";
+import type { Config, Action, Group, IconMapping, Workflow, WorkflowStep } from "../types";
 import { getPreferredThemeColorForName, pickDistinctThemeColor } from "../utils/themeColors";
+import { createEntityId } from "../utils/id";
+import { getWorkflowActionKey } from "../utils/workflows";
 
 interface HistoryEntry {
   timestamp: number;
@@ -203,12 +205,104 @@ export class ConfigService {
     }
   }
 
-  private normalizeConfig(raw: any): Config | null {
-    if (!raw || typeof raw !== "object") return null;
-    if (!Array.isArray(raw.actions)) return null;
+  private ensureUniqueId(id: unknown, usedIds: Set<string>, prefix: string): { value: string; didMutate: boolean } {
+    if (typeof id === "string" && id.trim().length > 0 && !usedIds.has(id)) {
+      usedIds.add(id);
+      return { value: id, didMutate: false };
+    }
+
+    let value = createEntityId(prefix);
+    while (usedIds.has(value)) {
+      value = createEntityId(prefix);
+    }
+    usedIds.add(value);
+    return { value, didMutate: true };
+  }
+
+  private normalizeAction(raw: any, usedIds: Set<string>): { action: Action | null; didMutate: boolean } {
+    if (!raw || typeof raw !== "object") {
+      return { action: null, didMutate: false };
+    }
+
+    const { value: id, didMutate } = this.ensureUniqueId(raw.id, usedIds, "action");
+    return {
+      action: {
+        ...raw,
+        id,
+      },
+      didMutate,
+    };
+  }
+
+  private normalizeWorkflowStep(raw: any, usedIds: Set<string>): { step: WorkflowStep | null; didMutate: boolean } {
+    if (!raw || typeof raw !== "object") {
+      return { step: null, didMutate: false };
+    }
+
+    const { value: id, didMutate: idMutated } = this.ensureUniqueId(raw.id, usedIds, "step");
+    const actionId = typeof raw.actionId === "string" ? raw.actionId : "";
+
+    return {
+      step: {
+        id,
+        actionId,
+        continueOnError: raw.continueOnError === true ? true : undefined,
+      },
+      didMutate: idMutated || actionId !== raw.actionId,
+    };
+  }
+
+  private normalizeWorkflow(raw: any, usedIds: Set<string>): { workflow: Workflow | null; didMutate: boolean } {
+    if (!raw || typeof raw !== "object") {
+      return { workflow: null, didMutate: false };
+    }
+
+    const { value: id, didMutate: idMutated } = this.ensureUniqueId(raw.id, usedIds, "workflow");
+    const name = typeof raw.name === "string" && raw.name.trim().length > 0
+      ? raw.name.trim()
+      : "Untitled Workflow";
+    const rawSteps = Array.isArray(raw.steps) ? raw.steps : [];
+
+    const usedStepIds = new Set<string>();
+    let stepsMutated = !Array.isArray(raw.steps);
+    const steps = rawSteps
+      .map((stepRaw: any) => {
+        const { step, didMutate } = this.normalizeWorkflowStep(stepRaw, usedStepIds);
+        if (didMutate) {
+          stepsMutated = true;
+        }
+        return step;
+      })
+      .filter((step: WorkflowStep | null): step is WorkflowStep => step !== null);
+
+    return {
+      workflow: {
+        id,
+        name,
+        steps,
+      },
+      didMutate: idMutated || name !== raw.name || stepsMutated,
+    };
+  }
+
+  private normalizeConfig(raw: any): { config: Config | null; didMutate: boolean } {
+    if (!raw || typeof raw !== "object") return { config: null, didMutate: false };
+    if (!Array.isArray(raw.actions)) return { config: null, didMutate: false };
+
+    const usedActionIds = new Set<string>();
+    let didMutate = false;
+    const actions = raw.actions
+      .map((actionRaw: any) => {
+        const { action, didMutate: actionMutated } = this.normalizeAction(actionRaw, usedActionIds);
+        if (actionMutated) {
+          didMutate = true;
+        }
+        return action;
+      })
+      .filter((action: Action | null): action is Action => action !== null);
 
     const normalized: Config = {
-      actions: raw.actions,
+      actions,
     };
 
     if (Array.isArray(raw.groups)) {
@@ -248,7 +342,26 @@ export class ConfigService {
       normalized.customColors = raw.customColors;
     }
 
-    return normalized;
+    if (Array.isArray(raw.workflows)) {
+      const usedWorkflowIds = new Set<string>();
+      normalized.workflows = raw.workflows
+        .map((workflowRaw: any) => {
+          const { workflow, didMutate: workflowMutated } = this.normalizeWorkflow(workflowRaw, usedWorkflowIds);
+          if (workflowMutated) {
+            didMutate = true;
+          }
+          return workflow;
+        })
+        .filter((workflow: Workflow | null): workflow is Workflow => workflow !== null);
+    }
+
+    return { config: normalized, didMutate };
+  }
+
+  private async persistNormalizedConfig(uri: vscode.Uri, config: Config): Promise<number> {
+    await this.writeText(uri, JSON.stringify(config, null, 2));
+    const stat = await vscode.workspace.fs.stat(uri);
+    return stat.mtime;
   }
 
   private getTimestampLabel(): string {
@@ -337,7 +450,7 @@ export class ConfigService {
           const raw = await this.readText(uri);
           const config = JSON.parse(raw);
           const normalized = this.normalizeConfig(config);
-          if (normalized) {
+          if (normalized.config) {
             const stat = await vscode.workspace.fs.stat(uri);
             const entry: HistoryEntry = {
               timestamp: stat.mtime,
@@ -349,7 +462,7 @@ export class ConfigService {
                 minute: '2-digit',
                 hour12: true
               }),
-              config: normalized,
+              config: normalized.config,
             };
 
             const historyUri = this.getHistoryUri();
@@ -445,11 +558,14 @@ export class ConfigService {
     try {
       const raw = await this.readText(uri);
       const parsed = JSON.parse(raw);
-      const normalized = this.normalizeConfig(parsed);
-      if (!normalized) {
+      const { config, didMutate } = this.normalizeConfig(parsed);
+      if (!config) {
         return { uri, exists: true, valid: false, error: "Invalid config structure" };
       }
-      return { uri, exists: true, valid: true, config: normalized };
+      if (didMutate) {
+        await this.persistNormalizedConfig(uri, config);
+      }
+      return { uri, exists: true, valid: true, config };
     } catch (error) {
       return {
         uri,
@@ -474,9 +590,15 @@ export class ConfigService {
 
       const raw = await this.readText(uri);
       const parsed = JSON.parse(raw);
-      const config = this.normalizeConfig(parsed);
+      const { config, didMutate } = this.normalizeConfig(parsed);
       if (!config) return { actions: [] };
-      this.configCache = { config, timestamp: mtime };
+
+      let cacheTimestamp = mtime;
+      if (didMutate) {
+        cacheTimestamp = await this.persistNormalizedConfig(uri, config);
+      }
+
+      this.configCache = { config, timestamp: cacheTimestamp };
       return config;
     } catch {
       return { actions: [] };
@@ -505,7 +627,12 @@ export class ConfigService {
       }
     }
 
-    const json = JSON.stringify(config, null, 2);
+    const normalized = this.normalizeConfig(config);
+    if (!normalized.config) {
+      throw new Error("Cannot write invalid config structure.");
+    }
+
+    const json = JSON.stringify(normalized.config, null, 2);
     await this.writeText(uri, json);
     this.invalidateCache();
 
@@ -1454,18 +1581,40 @@ export class ConfigService {
     let finalActions = actions;
     let finalGroups: Group[] | undefined = groups.length > 0 ? groups : undefined;
     let finalIcons: IconMapping[] = defaultIcons;
+    let finalWorkflows: Workflow[] | undefined;
 
     const exists = await this.configExists();
     if (exists) {
       try {
         const existingConfig = await this.readConfig();
+        finalWorkflows = existingConfig.workflows;
+        const existingActionsByKey = new Map(
+          existingConfig.actions.map((action) => [getWorkflowActionKey(action), action] as const)
+        );
+        const normalizedScannedActions = actions.map((action) => {
+          const existing = existingActionsByKey.get(getWorkflowActionKey(action));
+          if (!existing) {
+            return action;
+          }
+
+          return {
+            ...action,
+            id: existing.id,
+            hidden: existing.hidden,
+            backgroundColor: existing.backgroundColor,
+            rowBackgroundColor: existing.rowBackgroundColor,
+            params: existing.params,
+            group: existing.group ?? action.group,
+            workspaceColor: existing.workspaceColor ?? action.workspaceColor,
+          };
+        });
         const autoGeneratedPrefixes = ["npm: ", "Task: ", "Launch: "];
-        const newKeys = new Set(actions.map(a => `${a.command}|${a.workspace || ''}`));
+        const newKeys = new Set(normalizedScannedActions.map((action) => getWorkflowActionKey(action)));
         const customActions = existingConfig.actions.filter(
           (item) => !autoGeneratedPrefixes.some((prefix) => item.name.startsWith(prefix)) &&
-                    !newKeys.has(`${item.command}|${item.workspace || ''}`)
+                    !newKeys.has(getWorkflowActionKey(item))
         );
-        finalActions = [...actions, ...customActions];
+        finalActions = [...normalizedScannedActions, ...customActions];
 
         if (existingConfig.groups && existingConfig.groups.length > 0) {
           const existingNames = new Set(existingConfig.groups.map((g) => g.name));
@@ -1489,6 +1638,7 @@ export class ConfigService {
       actions: finalActions,
       groups: finalGroups,
       icons: finalIcons,
+      workflows: finalWorkflows,
     };
     await this.writeConfig(config);
   }
@@ -1514,7 +1664,7 @@ export class ConfigService {
     newActions.push(...(await this.scanLaunchConfigs(deepScan)));
 
     const newActionsMap = new Map<string, Action>();
-    newActions.forEach(a => newActionsMap.set(`${a.command}|${a.workspace || ''}`, a));
+    newActions.forEach(action => newActionsMap.set(getWorkflowActionKey(action), action));
 
     const discoverableTypes = new Set(["npm", "task", "launch", "make", "rust", "go", "docker"]);
     const finalActions: Action[] = [];
@@ -1522,11 +1672,15 @@ export class ConfigService {
     // 2. Process existing actions
     for (const existing of existingConfig.actions) {
       if (discoverableTypes.has(existing.type || '')) {
-         const key = `${existing.command}|${existing.workspace || ''}`;
+         const key = getWorkflowActionKey(existing);
          const newActionMatch = newActionsMap.get(key);
          if (newActionMatch) {
-            // It still exists in the workspace. Keep the user's customized version.
-            finalActions.push(existing);
+            // It still exists in the workspace. Keep the user's customized version and ID.
+            finalActions.push({
+              ...newActionMatch,
+              ...existing,
+              id: existing.id ?? newActionMatch.id,
+            });
          } else {
             // It is an auto-discoverable tool that no longer exists (e.g. script removed from package.json).
             // Do not keep it. (Lost reference logic)
@@ -1538,7 +1692,7 @@ export class ConfigService {
     }
 
     // 3. Add strictly NEW actions discovered
-    const existingKeys = new Set(finalActions.map(a => `${a.command}|${a.workspace || ''}`));
+    const existingKeys = new Set(finalActions.map((action) => getWorkflowActionKey(action)));
     const finalGroups = [...(existingConfig.groups || [])];
     const groupNamesSet = new Set(finalGroups.map(g => g.name));
 
@@ -1553,7 +1707,7 @@ export class ConfigService {
     };
 
     for (const newAct of newActions) {
-      const key = `${newAct.command}|${newAct.workspace || ''}`;
+      const key = getWorkflowActionKey(newAct);
       if (!existingKeys.has(key)) {
          // Attempt to place in a default group
          const defaultGroupName = typeGroupNames[newAct.type || 'other'];

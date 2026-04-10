@@ -14,6 +14,7 @@ import { renderAddActionForm } from '../src/views/addItemForm';
 import { renderAddActionWizard } from '../src/views/addActionWizard';
 import { renderEditActionForm } from '../src/views/editItemForm';
 import { renderGenerateConfigView } from '../src/views/generateConfigView';
+import { renderWorkflowBuilderView } from '../src/views/workflowBuilderView';
 import type { Action } from '../src/types';
 
 const outDir = path.join(__dirname, 'test-pages');
@@ -135,5 +136,49 @@ const generateConfigHtml = renderGenerateConfigView({
 }).replace('</head>', mockVscodeApi + '</head>');
 fs.writeFileSync(path.join(outDir, 'generate-config.html'), generateConfigHtml);
 console.log('✓ generate-config.html');
+
+// ── Workflow Builder View ───────────────────────────────────────
+const workflowActions: Action[] = [
+  { id: 'action-build', name: 'Build Project', command: 'npm run build', type: 'npm', group: 'Build' },
+  { id: 'action-test', name: 'Run Tests', command: 'npm test', type: 'npm', group: 'Test' },
+  { id: 'action-deploy', name: 'Deploy App', command: 'npm run deploy', type: 'npm', group: 'Release' },
+];
+
+const workflowBuilderHtml = renderWorkflowBuilderView({
+  cspSource: CSP,
+  nonce: NONCE,
+  codiconStyles: CODICON,
+  initialData: {
+    actions: workflowActions,
+    workflows: [
+      {
+        id: 'workflow-release',
+        name: 'Release Train',
+        stepCount: 2,
+        valid: true,
+        invalidReasons: [],
+        steps: [
+          { id: 'step-build', actionId: 'action-build', continueOnError: false, valid: true, action: workflowActions[0] },
+          { id: 'step-test', actionId: 'action-test', continueOnError: true, valid: true, action: workflowActions[1] },
+        ],
+      },
+      {
+        id: 'workflow-invalid',
+        name: 'Broken Chain',
+        stepCount: 1,
+        valid: false,
+        invalidReasons: ['Referenced action no longer exists.'],
+        steps: [
+          { id: 'step-missing', actionId: 'missing-action', continueOnError: false, valid: false, reason: 'Referenced action no longer exists.' },
+        ],
+      },
+    ],
+    activeWorkflowId: 'workflow-release',
+  },
+  scriptUri: '/workflowBuilder.js',
+  cssUri: '/output.css',
+}).replace('</head>', mockVscodeApi + '</head>');
+fs.writeFileSync(path.join(outDir, 'workflow-builder.html'), workflowBuilderHtml);
+console.log('✓ workflow-builder.html');
 
 console.log('\nTest pages written to scripts/test-pages/');

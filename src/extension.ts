@@ -1,19 +1,47 @@
 import * as vscode from "vscode";
 import { BattlestationViewProvider } from "./view";
 import { ConfigService } from "./services/configService";
+import { RunStatusService } from "./services/runStatusService";
+import { ActionExecutionService } from "./services/actionExecutionService";
+import { WorkflowExecutionService } from "./services/workflowExecutionService";
+import { WorkflowBuilderPanel } from "./workflowBuilderPanel";
 
 export function activate(context: vscode.ExtensionContext) {
   const configService = new ConfigService(context);
-  const provider = new BattlestationViewProvider(context, configService);
+  const runStatusService = new RunStatusService();
+  const actionExecutionService = new ActionExecutionService(runStatusService);
+  const workflowExecutionService = new WorkflowExecutionService(configService, actionExecutionService);
+  const workflowBuilderPanel = new WorkflowBuilderPanel(context, configService, workflowExecutionService);
+  const provider = new BattlestationViewProvider(
+    context,
+    configService,
+    actionExecutionService,
+    workflowExecutionService,
+    workflowBuilderPanel,
+    runStatusService
+  );
 
   context.subscriptions.push(
     provider,
+    workflowBuilderPanel,
     vscode.window.registerWebviewViewProvider("battlestation.view", provider)
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand("battlestation.open", () => {
       vscode.commands.executeCommand("battlestation.view.focus");
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("battlestation.openWorkflowBuilder", (workflowId?: string) => {
+      void provider.openWorkflowBuilder(workflowId);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("battlestation.runWorkflow", (workflowId?: string) => {
+      void provider.runWorkflow(workflowId);
     })
   );
 

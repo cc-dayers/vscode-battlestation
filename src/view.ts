@@ -2,6 +2,9 @@ import * as vscode from "vscode";
 import type { Action, IconMapping, Group, Config } from "./types";
 import { ConfigService } from "./services/configService";
 import { ToolDetectionService } from "./services/toolDetectionService";
+import { ActionExecutionService } from "./services/actionExecutionService";
+import { RunStatusService } from "./services/runStatusService";
+import { WorkflowExecutionService } from "./services/workflowExecutionService";
 import { getNonce } from "./templates/nonce";
 import {
   renderMainView,
@@ -16,6 +19,8 @@ import {
   renderAddActionWizard,
 } from "./views";
 import { THEME_COLOR_OPTIONS } from "./utils/themeColors";
+import { buildWorkflowSummaries } from "./utils/workflows";
+import { WorkflowBuilderPanel } from "./workflowBuilderPanel";
 // Import codicon CSS as a string at build time via esbuild plugin
 import codiconCssTemplate from "../media/codicon.css";
 
@@ -44,8 +49,8 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   };
 
   private readonly disposables: vscode.Disposable[] = [];
-  // In-memory run status — session only, never written to disk
   private readonly runStatus = new Map<string, { exitCode: number; timestamp: number }>();
+  // In-memory run status — session only, never written to disk
 
   public static readonly defaultIcons: IconMapping[] = [
     { type: "shell", icon: "terminal" },
@@ -67,12 +72,24 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly actionExecutionService: ActionExecutionService,
+    private readonly workflowExecutionService: WorkflowExecutionService,
+    private readonly workflowBuilderPanel: WorkflowBuilderPanel,
+    private readonly runStatusService: RunStatusService
   ) {
     this.toolDetectionService = new ToolDetectionService(context);
     // Refresh when config changes
     this.disposables.push(
       this.configService.onDidChange(() => this.refresh()),
+      this.runStatusService.onDidChange(({ action, status }) => {
+        void this.view?.webview.postMessage({
+          command: "statusUpdate",
+          name: action.name,
+          exitCode: status.exitCode,
+          timestamp: status.timestamp,
+        });
+      }),
       // Auto-refresh when workspace folders change (e.g. user opens a folder)
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh()),
       vscode.workspace.onDidChangeConfiguration((e) => {
@@ -161,6 +178,12 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         break;
       case "executeCommand":
         void this.executeCommand(message.item);
+        break;
+      case "openWorkflowBuilder":
+        void this.openWorkflowBuilder(message.workflowId);
+        break;
+      case "runWorkflow":
+        void this.runWorkflow(message.workflowId);
         break;
       case "showAddForm":
         this.showingForm = true;
@@ -370,6 +393,28 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     void this.refresh();
   }
 
+  public async openWorkflowBuilder(workflowId?: string) {
+    await this.workflowBuilderPanel.open(workflowId);
+  }
+
+  public async runWorkflow(workflowId?: string) {
+    if (!workflowId) {
+      this.showToast("No workflow selected.", "warning");
+      return;
+    }
+
+    try {
+      const result = await this.workflowExecutionService.runWorkflowById(workflowId);
+      if (result.success) {
+        this.showToast(`Workflow "${result.workflowName}" completed.`);
+      } else if (result.invalid || result.blockedReason) {
+        this.showToast(result.blockedReason || `Workflow "${result.workflowName}" could not run.`, "warning");
+      }
+    } catch (error) {
+      this.showToast(`Failed to run workflow: ${(error as Error).message}`, "error");
+    }
+  }
+
   /* ─── refresh / render ─── */
 
   private refreshTimeout?: NodeJS.Timeout;
@@ -530,7 +575,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
             ...enrichedConfig,
             showHidden: this.showHidden,
             searchVisible: this.searchVisible,
-            runStatus: Object.fromEntries(this.runStatus),
+            runStatus: this.runStatusService.toObject(),
             ...(newActionNames && newActionNames.length > 0 ? { newActionNames } : {}),
           },
         });
@@ -559,6 +604,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
     return {
       ...config,
+      workflowSummaries: buildWorkflowSummaries(config.workflows, config.actions),
       icons: mergedIcons,
       display: {
         showCommand: wsConfig.get<boolean>("display.showCommand", true),
@@ -577,7 +623,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this.context.extensionUri, "media", "mainView.js")
     ).toString();
 
-    const initialData = { ...enrichedConfig, runStatus: Object.fromEntries(this.runStatus) };
+    const initialData = { ...enrichedConfig, runStatus: this.runStatusService.toObject() };
     if (newActionNames && newActionNames.length > 0) {
       (initialData as any).newActionNames = newActionNames;
     }
@@ -800,66 +846,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   /* ─── command execution ─── */
 
   private async executeCommand(item: Action) {
-    try {
-      // Resolve parametric inputs before executing
-      const resolvedItem = await this.resolveParams(item);
-      if (!resolvedItem) return; // user cancelled a prompt
-
-      switch (resolvedItem.type) {
-        case "launch":
-          await this.executeLaunchConfig(resolvedItem.command);
-          break;
-        case "vscode":
-        case "task":
-          await this.executeVSCodeCommand(resolvedItem.command);
-          break;
-        default:
-          await this.executeShellCommand(resolvedItem);
-          break;
-      }
-    } catch (error) {
-      vscode.window.showErrorMessage(`Failed to execute: ${(error as Error).message}`);
-    }
-  }
-
-  /** Prompt user for each declared param, interpolate values into command. Returns undefined if cancelled. */
-  private async resolveParams(item: Action): Promise<Action | undefined> {
-    if (!item.params || item.params.length === 0) return item;
-
-    let cmd = item.command;
-    for (const param of item.params) {
-      let value: string | undefined;
-      if (param.options && param.options.length > 0) {
-        value = await vscode.window.showQuickPick(param.options, { title: param.prompt });
-      } else {
-        value = await vscode.window.showInputBox({ prompt: param.prompt, value: param.default ?? "" });
-      }
-      if (value === undefined) return undefined; // user pressed Escape
-      cmd = cmd.replaceAll(`\${${param.name}}`, value);
-    }
-
-    return { ...item, command: cmd };
-  }
-
-  private async executeLaunchConfig(command: string) {
-    // Format: workbench.action.debug.start|ConfigName
-    const [, configName] = command.split("|");
-    if (!configName) {
-      throw new Error("No launch configuration name specified");
-    }
-
-    // Use VS Code debug API to start debugging with the named configuration
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    await vscode.debug.startDebugging(workspaceFolder, configName.trim());
-  }
-
-  private async executeVSCodeCommand(command: string) {
-    const [cmd, ...args] = command.split("|");
-    if (args.length > 0) {
-      await vscode.commands.executeCommand(cmd.trim(), ...args);
-    } else {
-      await vscode.commands.executeCommand(cmd.trim());
-    }
+    await this.actionExecutionService.executeStandaloneAction(item);
   }
 
   private async executeShellCommand(item: Action) {

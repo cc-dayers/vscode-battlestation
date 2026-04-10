@@ -54,7 +54,7 @@ suite('Flyout Menu Architecture Test Suite', () => {
         }
     });
 
-    test('Subgroup header uses handle-only drag without chevron', () => {
+    test('Subgroup header uses parent-style chevron indicator with handle-only drag', () => {
         const source = fs.readFileSync(webviewFile, 'utf8');
         const subgroupBlockStart = source.indexOf('<div class="lp-subgroup-header"');
         assert.ok(subgroupBlockStart !== -1, 'Should render subgroup header markup');
@@ -62,13 +62,13 @@ suite('Flyout Menu Architecture Test Suite', () => {
         const subgroupBlockEnd = source.indexOf('</div>', subgroupBlockStart);
         const subgroupBlock = source.substring(subgroupBlockStart, subgroupBlockEnd);
 
+        assert.ok(subgroupBlock.includes('codicon-chevron-down lp-group-chevron'), 'Subgroup header should render a chevron indicator');
         assert.ok(subgroupBlock.includes('<button class="lp-group-drag-handle" draggable="true"'), 'Subgroup should drag from the dedicated handle');
         assert.ok(subgroupBlock.includes('title="Drag to reorder subgroup"'), 'Subgroup drag handle should have subgroup-specific title');
-        assert.ok(!subgroupBlock.includes('lp-group-chevron'), 'Subgroup header should not render a chevron icon');
         assert.ok(!subgroupBlock.includes('draggable="true"\n                @click') && !subgroupBlock.includes('<div class="lp-subgroup-header" draggable="true"'), 'Subgroup header container should not itself be draggable');
     });
 
-    test('Subgroup styling tightens handle spacing without collapsed chevron state', () => {
+    test('Subgroup styling tightens handle spacing and rotates the chevron when collapsed', () => {
         const source = fs.readFileSync(styleFile, 'utf8');
 
         assert.ok(/\.lp-subgroup-header\s*\{[\s\S]*?gap:\s*2px;[\s\S]*?\}/.test(source), 'Subgroup header should reduce spacing around the handle and label');
@@ -76,6 +76,6 @@ suite('Flyout Menu Architecture Test Suite', () => {
 
         assert.ok(/\.lp-drag-handle,\s*\.lp-group-drag-handle\s*\{[\s\S]*?flex:\s*0 0 12px;/.test(source), 'Shared group drag handle styles should still exist');
         assert.ok(source.includes('margin-right: 2px;'), 'Drag handle should keep a small explicit right margin');
-        assert.ok(!source.includes('.lp-subgroup--collapsed .lp-group-chevron'), 'Collapsed subgroup styling should no longer depend on subgroup chevrons');
+        assert.ok(/\.lp-subgroup--collapsed\s+\.lp-group-chevron\s*\{[\s\S]*?transform:\s*rotate\(-90deg\);/.test(source), 'Collapsed subgroup styling should rotate the subgroup chevron like the parent group chevron');
     });
 });

@@ -16,4 +16,6 @@ export { renderAddActionWizard } from "./addActionWizard";
 export type { AddActionWizardContext } from "./addActionWizard";
 export { renderMainView } from "./mainView";
 export type { MainViewContext } from "./mainView";
+export { renderWorkflowBuilderView } from "./workflowBuilderView";
+export type { WorkflowBuilderViewContext } from "./workflowBuilderView";
 export { esc, renderCheckbox, renderToggleSetting } from "./helpers";

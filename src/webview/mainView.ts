@@ -1,10 +1,13 @@
 import { html, render } from "lit";
 import type { Action, Group } from "../types";
+import { getSubgroupCollapseKey } from "../utils/subgroupState";
+import type { WorkflowSummary } from "../utils/workflows";
 
 // State definition
 interface MainViewState {
     actions: Action[];
     groups: Group[];
+    workflowSummaries: WorkflowSummary[];
     searchQuery: string;
     loading: boolean;
     generating: boolean;
@@ -88,6 +91,7 @@ setTimeout(() => {
 const startState: MainViewState = {
     actions: [],
     groups: [],
+    workflowSummaries: [],
     searchQuery: "",
     loading: false,
     generating: false,
@@ -501,8 +505,8 @@ const toggleGroup = (groupName: string) => {
     state.collapsedGroups = Array.from(newCollapsed);
 };
 
-const toggleSubGroup = (groupName: string, subGroupName: string) => {
-    const key = `${groupName}::${subGroupName}`;
+const toggleSubGroup = (groupName: string, groupByField: string, subGroupName: string) => {
+    const key = getSubgroupCollapseKey(groupName, groupByField, subGroupName);
     const newCollapsed = new Set(state.collapsedSubGroups);
     if (newCollapsed.has(key)) {
         newCollapsed.delete(key);
@@ -514,6 +518,14 @@ const toggleSubGroup = (groupName: string, subGroupName: string) => {
 
 const executeAction = (item: Action) => {
     vscode.postMessage({ command: "executeCommand", item });
+};
+
+const openWorkflowBuilder = (workflowId?: string) => {
+    vscode.postMessage({ command: "openWorkflowBuilder", workflowId });
+};
+
+const runWorkflow = (workflowId: string) => {
+    vscode.postMessage({ command: "runWorkflow", workflowId });
 };
 
 const editAction = (item: Action) => {
@@ -1265,7 +1277,7 @@ const renderSecondaryGroups = (group: Group, actions: Action[], groupByField: st
     return subGroupOrder.map(label => {
         const subActs = subGroupsMap.get(label)!;
         const color = subGroupColors.get(label);
-        const subGroupKey = `${group.name}::${label}`;
+        const subGroupKey = getSubgroupCollapseKey(group.name, groupByField, label);
         const isCollapsed = !state.searchQuery && state.collapsedSubGroups.includes(subGroupKey);
 
         const isDraggingThis = dragSrcSubgroup?.group === group.name && dragSrcSubgroup?.workspace === label;
@@ -1289,9 +1301,14 @@ const renderSecondaryGroups = (group: Group, actions: Action[], groupByField: st
         let badgeStyle = color ? `color:${color};` : '';
         // Use color-mix to apply 60% opacity — works for both hex and CSS var() colors.
         // Appending "99" to a hex string is not safe when the value is a var(--token).
-        const wrapperStyle = isBordered && borderColor
-            ? `--lp-subgroup-border-color: color-mix(in srgb, ${borderColor} 60%, transparent);`
-            : '';
+        const wrapperStyles: string[] = [];
+        if (isBordered && borderColor) {
+            wrapperStyles.push(`--lp-subgroup-border-color: color-mix(in srgb, ${borderColor} 60%, transparent);`);
+        }
+        if (borderColor) {
+            wrapperStyles.push(`--lp-group-accent: ${borderColor};`);
+        }
+        const wrapperStyle = wrapperStyles.join(' ');
         if (isBordered) {
              badgeStyle += `background-color:transparent; border-color:transparent;`; 
         } else {
@@ -1304,7 +1321,17 @@ const renderSecondaryGroups = (group: Group, actions: Action[], groupByField: st
             @dragleave=${(e: DragEvent) => handleDragLeaveSubgroupHeader(e, group, label)}
             @drop=${(e: DragEvent) => handleDropOnSubgroupHeader(e, group, label)}>
             <div class="lp-subgroup-header"
-                @click=${() => toggleSubGroup(group.name, label)}>
+                role="button"
+                tabindex="0"
+                aria-expanded=${isCollapsed ? "false" : "true"}
+                @click=${() => toggleSubGroup(group.name, groupByField, label)}
+                @keydown=${(e: KeyboardEvent) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggleSubGroup(group.name, groupByField, label);
+                    }
+                }}>
+                <span class="codicon codicon-chevron-down lp-group-chevron" aria-hidden="true"></span>
                 <button class="lp-group-drag-handle" draggable="true"
                     title="Drag to reorder subgroup" aria-label=${`Drag subgroup ${label} to reorder`}
                     @click=${(e:Event) => { e.preventDefault(); e.stopPropagation(); }}
@@ -1417,6 +1444,61 @@ const renderGroup = (group: Group, actions: Action[]) => {
                 : actions.map((a) => renderButton(a))}
         </div>
     </details>
+    `;
+};
+
+const renderWorkflowSection = () => {
+    if (!state.workflowSummaries.length) {
+        return null;
+    }
+
+    return html`
+    <section class="lp-workflow-section">
+        <div class="lp-workflow-section-header">
+            <div>
+                <div class="lp-workflow-section-eyebrow">Workflows</div>
+                <h2 class="lp-workflow-section-title">Saved Chains</h2>
+            </div>
+            <button class="lp-workflow-create-btn" @click=${() => openWorkflowBuilder()}>
+                <span class="codicon codicon-symbol-array"></span>
+                Open Builder
+            </button>
+        </div>
+
+        <div class="lp-workflow-list">
+            ${state.workflowSummaries.map((workflow) => html`
+                <div class="lp-workflow-card ${workflow.valid ? '' : 'lp-workflow-card--invalid'}">
+                    <div class="lp-workflow-card-main">
+                        <div class="lp-workflow-card-title-row">
+                            <span class="lp-workflow-card-title">${workflow.name}</span>
+                            ${workflow.valid ? null : html`<span class="lp-workflow-badge">Invalid</span>`}
+                        </div>
+                        <div class="lp-workflow-card-meta">
+                            ${workflow.stepCount} step${workflow.stepCount === 1 ? '' : 's'}
+                            ${workflow.invalidReasons.length ? html` · ${workflow.invalidReasons.join(' ')}` : null}
+                        </div>
+                    </div>
+                    <div class="lp-workflow-card-actions">
+                        <button
+                            class="lp-inline-action-btn"
+                            title="Edit workflow"
+                            aria-label=${`Edit workflow ${workflow.name}`}
+                            @click=${() => openWorkflowBuilder(workflow.id)}>
+                            <span class="codicon codicon-edit"></span>
+                        </button>
+                        <button
+                            class="lp-inline-action-btn"
+                            title="Run workflow"
+                            aria-label=${`Run workflow ${workflow.name}`}
+                            ?disabled=${!workflow.valid || workflow.stepCount === 0}
+                            @click=${() => runWorkflow(workflow.id)}>
+                            <span class="codicon codicon-run-all"></span>
+                        </button>
+                    </div>
+                </div>
+            `)}
+        </div>
+    </section>
     `;
 };
 
@@ -1565,6 +1647,7 @@ function renderView() {
     ${state.loading
             ? html`<div class="lp-loading-overlay"><span class="codicon codicon-loading codicon-modifier-spin"></span></div>`
             : null}
+    ${renderWorkflowSection()}
     ${renderSearch(visibleActions)}
     ${reorderMode ? html`
     <div class="lp-reorder-banner">

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline' 'unsafe-inline'; font-src 'unsafe-inline'; script-src 'unsafe-inline' 'nonce-test-nonce-12345';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <link href="/output.css" rel="stylesheet" />
+  <title>Battlestation Workflow Builder</title>
+  <style></style>
+
+<script nonce="test-nonce-12345">
+  window.__lastCommand = null;
+  window.acquireVsCodeApi = () => ({
+    postMessage: (msg) => {
+      window.__lastCommand = msg;
+      const t = document.getElementById('vsc-toast') || document.createElement('div');
+      t.id = 'vsc-toast';
+      t.style = 'position:fixed;bottom:10px;right:10px;background:#0e639c;color:#fff;padding:8px 16px;border-radius:4px;z-index:9999;font-family:sans-serif;font-size:13px';
+      t.innerText = 'COMMAND: ' + JSON.stringify(msg);
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    },
+    getState: () => ({}),
+    setState: () => {}
+  });
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script nonce="test-nonce-12345">
+  (function() {
+    if (typeof acquireVsCodeApi === 'function') {
+      const originalAcquire = acquireVsCodeApi;
+      let cachedApi = null;
+      window.acquireVsCodeApi = function() {
+        if (!cachedApi) {
+          cachedApi = originalAcquire.apply(this, arguments);
+          
+          // Support mice with "Back" buttons (button 3 or 4 are standard)
+          window.addEventListener('mouseup', (e) => {
+            if (e.button === 3 || e.button === 4) {
+              cachedApi.postMessage({ command: 'cancelForm' });
+            }
+          });
+          
+          // Support keyboard back (Alt+Left on Windows/Linux, Cmd+Left on Mac)
+          window.addEventListener('keydown', (e) => {
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            if ((!isMac && e.altKey && e.key === 'ArrowLeft') || 
+                (isMac && e.metaKey && e.key === 'ArrowLeft')) {
+              cachedApi.postMessage({ command: 'cancelForm' });
+            }
+          });
+        }
+        return cachedApi;
+      };
+    }
+  })();
+
+      window.__WORKFLOW_BUILDER_INITIAL_DATA__ = {"actions":[{"id":"action-build","name":"Build Project","command":"npm run build","type":"npm","group":"Build"},{"id":"action-test","name":"Run Tests","command":"npm test","type":"npm","group":"Test"},{"id":"action-deploy","name":"Deploy App","command":"npm run deploy","type":"npm","group":"Release"}],"workflows":[{"id":"workflow-release","name":"Release Train","stepCount":2,"valid":true,"invalidReasons":[],"steps":[{"id":"step-build","actionId":"action-build","continueOnError":false,"valid":true,"action":{"id":"action-build","name":"Build Project","command":"npm run build","type":"npm","group":"Build"}},{"id":"step-test","actionId":"action-test","continueOnError":true,"valid":true,"action":{"id":"action-test","name":"Run Tests","command":"npm test","type":"npm","group":"Test"}}]},{"id":"workflow-invalid","name":"Broken Chain","stepCount":1,"valid":false,"invalidReasons":["Referenced action no longer exists."],"steps":[{"id":"step-missing","actionId":"missing-action","continueOnError":false,"valid":false,"reason":"Referenced action no longer exists."}]}],"activeWorkflowId":"workflow-release"};
+    
+</script>
+<script nonce="test-nonce-12345" type="module" src="/workflowBuilder.js"></script>
+</body>
+</html>

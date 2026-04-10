@@ -2,7 +2,7 @@
   "name": "battlestation",
   "displayName": "Battlestation",
   "description": "A configurable panel with action buttons driven by battle.json",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "publisher": "cc-dayers",
   "repository": {
     "type": "git",
@@ -29,6 +29,18 @@
         "title": "Battlestation: Refresh",
         "shortTitle": "$(refresh) Refresh",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "battlestation.openWorkflowBuilder",
+        "title": "Battlestation: Open Workflow Builder",
+        "shortTitle": "$(symbol-array) Workflow Builder",
+        "icon": "$(symbol-array)"
+      },
+      {
+        "command": "battlestation.runWorkflow",
+        "title": "Battlestation: Run Workflow",
+        "shortTitle": "$(run-all) Run Workflow",
+        "icon": "$(run-all)"
       },
       {
         "command": "battlestation.openSettings",
@@ -113,14 +125,19 @@
           "group": "navigation@2"
         },
         {
+          "command": "battlestation.openWorkflowBuilder",
+          "when": "view == battlestation.view && battlestation.isLoaded",
+          "group": "navigation@3"
+        },
+        {
           "command": "battlestation.addGroup",
           "when": "view == battlestation.view && battlestation.hasConfig && battlestation.isLoaded",
-          "group": "navigation@3"
+          "group": "navigation@4"
         },
         {
           "command": "battlestation.collapseAllGroups",
           "when": "view == battlestation.view && battlestation.hasConfig && !battlestation.allGroupsCollapsed && !battlestation.isSmall && battlestation.isLoaded",
-          "group": "navigation@4"
+          "group": "navigation@5"
         },
         {
           "command": "battlestation.collapseAllGroups",
@@ -130,7 +147,7 @@
         {
           "command": "battlestation.expandAllGroups",
           "when": "view == battlestation.view && battlestation.hasConfig && battlestation.allGroupsCollapsed && !battlestation.isSmall && battlestation.isLoaded",
-          "group": "navigation@4"
+          "group": "navigation@5"
         },
         {
           "command": "battlestation.expandAllGroups",
@@ -140,7 +157,7 @@
         {
           "command": "battlestation.toggleHidden",
           "when": "view == battlestation.view && !battlestation.showHidden && !battlestation.isSmall && battlestation.isLoaded",
-          "group": "navigation@5"
+          "group": "navigation@6"
         },
         {
           "command": "battlestation.toggleHidden",
@@ -150,7 +167,7 @@
         {
           "command": "battlestation.hideHidden",
           "when": "view == battlestation.view && battlestation.showHidden && !battlestation.isSmall && battlestation.isLoaded",
-          "group": "navigation@5"
+          "group": "navigation@6"
         },
         {
           "command": "battlestation.hideHidden",
@@ -160,7 +177,7 @@
         {
           "command": "battlestation.refresh",
           "when": "view == battlestation.view && !battlestation.isSmall && battlestation.isLoaded",
-          "group": "navigation@6"
+          "group": "navigation@7"
         },
         {
           "command": "battlestation.refresh",
@@ -170,7 +187,7 @@
         {
           "command": "battlestation.openSettings",
           "when": "view == battlestation.view && battlestation.isLoaded",
-          "group": "navigation@7"
+          "group": "navigation@8"
         }
       ]
     },

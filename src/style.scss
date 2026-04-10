@@ -279,6 +279,10 @@ body {
   margin-bottom: 0;
 }
 
+.lp-subgroup--collapsed .lp-group-chevron {
+  transform: rotate(-90deg);
+}
+
 .lp-subgroup-badge {
   display: inline-flex;
   align-items: center;
@@ -362,8 +366,8 @@ body {
   gap: 8px;
   padding: 6px 8px;
   margin-bottom: 4px;
-  background: color-mix(in srgb, var(--vscode-focusBorder) 12%, var(--vscode-editor-background));
-  border: 1px solid color-mix(in srgb, var(--vscode-focusBorder) 35%, transparent);
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-focusBorder);
   border-radius: 4px;
   font-size: 12px;
   position: sticky;
@@ -406,7 +410,7 @@ body {
   border: 1px solid var(--lp-action-border);
   border-right: none;
   border-radius: 4px 0 0 4px;
-  background: color-mix(in srgb, var(--vscode-focusBorder) 8%, var(--vscode-button-secondaryBackground));
+  background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-foreground);
   cursor: grab;
   display: flex;
@@ -465,7 +469,7 @@ body {
 // and dissolves the card's own borders so the ring is the sole boundary.
 // outline-offset: -1px draws inside the element to avoid clipping by overflow-x: hidden.
 .lp-btn-wrapper:has(.lp-drag-handle:hover) {
-  outline: 1px solid color-mix(in srgb, var(--vscode-focusBorder) 40%, transparent);
+  outline: 1px solid var(--vscode-focusBorder);
   outline-offset: -1px;
   border-radius: 4px;
 
@@ -477,7 +481,7 @@ body {
 
 .lp-group-header:has(.lp-group-drag-handle:hover),
 .lp-subgroup-header:has(.lp-group-drag-handle:hover) {
-  outline: 1px solid color-mix(in srgb, var(--vscode-focusBorder) 40%, transparent);
+  outline: 1px solid var(--vscode-focusBorder);
   outline-offset: -1px;
   border-bottom-color: transparent;
 }
@@ -507,31 +511,31 @@ body {
 .lp-btn-wrapper.lp-drag-over-top {
   box-shadow:
     0 -3px 0 0 var(--vscode-focusBorder),
-    0 -8px 16px -2px color-mix(in srgb, var(--vscode-focusBorder) 70%, transparent);
+    0 -8px 16px -2px var(--vscode-focusBorder);
 }
 
 .lp-btn-wrapper.lp-drag-over-bottom {
   box-shadow:
     0 3px 0 0 var(--vscode-focusBorder),
-    0 8px 16px -2px color-mix(in srgb, var(--vscode-focusBorder) 70%, transparent);
+    0 8px 16px -2px var(--vscode-focusBorder);
 }
 
 .lp-group-header.lp-drag-over-group {
   outline: 2px solid var(--vscode-focusBorder);
-  box-shadow: 0 0 14px -2px color-mix(in srgb, var(--vscode-focusBorder) 60%, transparent);
+  box-shadow: 0 0 14px -2px var(--vscode-focusBorder);
   border-radius: 3px;
 }
 
 .lp-group.lp-drag-over-top-group > summary {
   box-shadow:
     0 -3px 0 0 var(--vscode-focusBorder),
-    0 -8px 16px -2px color-mix(in srgb, var(--vscode-focusBorder) 70%, transparent);
+    0 -8px 16px -2px var(--vscode-focusBorder);
 }
 
 .lp-group.lp-drag-over-bottom-group > summary {
   box-shadow:
     0 3px 0 0 var(--vscode-focusBorder),
-    0 8px 16px -2px color-mix(in srgb, var(--vscode-focusBorder) 70%, transparent);
+    0 8px 16px -2px var(--vscode-focusBorder);
 }
 
 .lp-btn-wrapper.lp-hidden-item {
@@ -639,7 +643,7 @@ body {
 .lp-btn-wrapper:hover .lp-action-toolbar {
   background: linear-gradient(
     to right,
-    color-mix(in srgb, var(--lp-row-bg, var(--vscode-button-secondaryHoverBackground)) 0%, transparent),
+    transparent,
     var(--lp-row-bg, var(--vscode-button-secondaryHoverBackground)) 28px
   );
 }
@@ -660,7 +664,7 @@ body {
 .lp-group-header:hover .lp-group-action-toolbar {
   background: linear-gradient(
     to right,
-    color-mix(in srgb, var(--vscode-editor-background) 0%, transparent),
+    transparent,
     var(--vscode-editor-background) 28px
   );
 }
@@ -920,6 +924,7 @@ body {
   text-transform: uppercase;
   opacity: 0.42;
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
   list-style: none;
   padding: 1px 0;
@@ -970,6 +975,7 @@ body {
   font-size: 10px;
   color: var(--vscode-foreground);
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
   padding: 2px 0;
   border: 1px solid rgba(255,255,255,0.08);
@@ -1353,6 +1359,7 @@ body {
   text-align: center;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -1873,6 +1880,7 @@ form {
   display: flex;
   align-items: center;
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
   position: relative;
   padding-left: 24px;
@@ -2269,6 +2277,7 @@ form {
   background: var(--vscode-input-background);
   border: 1px solid transparent;
   cursor: default;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -2608,5 +2617,435 @@ form {
     padding: 4px;
     gap: 0;
     justify-content: center;
+  }
+}
+
+.lp-workflow-section {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--vscode-editor-background) 88%, var(--vscode-button-secondaryBackground)) 0%, var(--vscode-editor-background) 100%);
+}
+
+.lp-workflow-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.lp-workflow-section-eyebrow {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
+
+.lp-workflow-section-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.lp-workflow-create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.lp-workflow-create-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.lp-workflow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lp-workflow-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--vscode-widget-border) 65%, transparent);
+  border-radius: 6px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 78%, var(--vscode-button-secondaryBackground));
+}
+
+.lp-workflow-card--invalid {
+  border-color: color-mix(in srgb, var(--vscode-errorForeground) 65%, transparent);
+}
+
+.lp-workflow-card-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.lp-workflow-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.lp-workflow-card-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lp-workflow-card-meta {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.lp-workflow-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--vscode-editor-background);
+  background: var(--vscode-errorForeground);
+}
+
+.lp-workflow-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wf-shell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 18px;
+  min-height: 100vh;
+  padding: 18px;
+  box-sizing: border-box;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--vscode-focusBorder) 16%, transparent), transparent 32%),
+    linear-gradient(180deg, color-mix(in srgb, var(--vscode-editor-background) 86%, var(--vscode-sideBar-background)) 0%, var(--vscode-editor-background) 100%);
+}
+
+.wf-rail,
+.wf-panel {
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 92%, var(--vscode-sideBar-background));
+  box-shadow: 0 18px 40px -28px color-mix(in srgb, var(--vscode-editorShadow) 70%, transparent);
+}
+
+.wf-rail {
+  padding: 14px;
+}
+
+.wf-panel {
+  padding: 18px;
+}
+
+.wf-rail-header,
+.wf-section-head,
+.wf-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wf-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.wf-title,
+.wf-section-title {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.wf-section-meta,
+.wf-toolbar-meta,
+.wf-rail-item-meta {
+  font-size: 11px;
+  opacity: 0.72;
+}
+
+.wf-rail-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.wf-rail-item:hover {
+  background: color-mix(in srgb, var(--vscode-button-secondaryBackground) 50%, transparent);
+}
+
+.wf-rail-item--active {
+  border-color: color-mix(in srgb, var(--vscode-focusBorder) 72%, transparent);
+  background: color-mix(in srgb, var(--vscode-focusBorder) 14%, transparent);
+}
+
+.wf-rail-item-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.wf-rail-item-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.wf-primary-btn,
+.wf-secondary-btn,
+.wf-danger-btn,
+.wf-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.wf-primary-btn,
+.wf-secondary-btn,
+.wf-danger-btn {
+  padding: 8px 12px;
+  border: 1px solid var(--vscode-button-border, transparent);
+}
+
+.wf-primary-btn {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.wf-primary-btn:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.wf-secondary-btn {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.wf-secondary-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.wf-danger-btn {
+  background: color-mix(in srgb, var(--vscode-errorForeground) 18%, transparent);
+  color: var(--vscode-errorForeground);
+  border-color: color-mix(in srgb, var(--vscode-errorForeground) 35%, transparent);
+}
+
+.wf-danger-btn:hover {
+  background: color-mix(in srgb, var(--vscode-errorForeground) 25%, transparent);
+}
+
+.wf-primary-btn:disabled,
+.wf-secondary-btn:disabled,
+.wf-danger-btn:disabled,
+.wf-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wf-toolbar {
+  margin-bottom: 16px;
+}
+
+.wf-toolbar-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.wf-name-input,
+.wf-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+}
+
+.wf-name-input {
+  max-width: 420px;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.wf-toolbar-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.wf-alert,
+.wf-empty-card {
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--vscode-errorForeground) 40%, transparent);
+  background: color-mix(in srgb, var(--vscode-errorForeground) 10%, transparent);
+  padding: 12px 14px;
+}
+
+.wf-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.wf-columns {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);
+  gap: 18px;
+}
+
+.wf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.wf-card {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid color-mix(in srgb, var(--vscode-widget-border) 60%, transparent);
+  border-radius: 10px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 84%, var(--vscode-button-secondaryBackground));
+}
+
+.wf-card--catalog {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.wf-card--invalid {
+  border-color: color-mix(in srgb, var(--vscode-errorForeground) 40%, transparent);
+}
+
+.wf-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.wf-card-meta,
+.wf-empty-copy {
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.78;
+}
+
+.wf-empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.wf-card-main {
+  min-width: 0;
+}
+
+.wf-step-index {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--vscode-focusBorder) 18%, transparent);
+  color: var(--vscode-foreground);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wf-step-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.wf-icon-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.wf-icon-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.wf-icon-btn--danger {
+  color: var(--vscode-errorForeground);
+}
+
+.wf-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.wf-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.wf-pill--invalid {
+  background: color-mix(in srgb, var(--vscode-errorForeground) 18%, transparent);
+  color: var(--vscode-errorForeground);
+}
+
+.wf-panel--empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 240px;
+}
+
+@media (max-width: 900px) {
+  .wf-shell,
+  .wf-columns {
+    grid-template-columns: 1fr;
   }
 }

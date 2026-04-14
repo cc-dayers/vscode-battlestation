@@ -1,7 +1,14 @@
 import { html, render } from "lit";
 import type { Action, Group } from "../types";
 import { getSubgroupCollapseKey } from "../utils/subgroupState";
-import type { WorkflowSummary } from "../utils/workflows";
+
+interface WorkflowSummary {
+    id: string;
+    name: string;
+    stepCount: number;
+    valid: boolean;
+    invalidReasons: string[];
+}
 
 // State definition
 interface MainViewState {
@@ -518,14 +525,6 @@ const toggleSubGroup = (groupName: string, groupByField: string, subGroupName: s
 
 const executeAction = (item: Action) => {
     vscode.postMessage({ command: "executeCommand", item });
-};
-
-const openWorkflowBuilder = (workflowId?: string) => {
-    vscode.postMessage({ command: "openWorkflowBuilder", workflowId });
-};
-
-const runWorkflow = (workflowId: string) => {
-    vscode.postMessage({ command: "runWorkflow", workflowId });
 };
 
 const editAction = (item: Action) => {
@@ -1301,14 +1300,9 @@ const renderSecondaryGroups = (group: Group, actions: Action[], groupByField: st
         let badgeStyle = color ? `color:${color};` : '';
         // Use color-mix to apply 60% opacity — works for both hex and CSS var() colors.
         // Appending "99" to a hex string is not safe when the value is a var(--token).
-        const wrapperStyles: string[] = [];
-        if (isBordered && borderColor) {
-            wrapperStyles.push(`--lp-subgroup-border-color: color-mix(in srgb, ${borderColor} 60%, transparent);`);
-        }
-        if (borderColor) {
-            wrapperStyles.push(`--lp-group-accent: ${borderColor};`);
-        }
-        const wrapperStyle = wrapperStyles.join(' ');
+        const wrapperStyle = isBordered && borderColor
+            ? `--lp-subgroup-border-color: color-mix(in srgb, ${borderColor} 60%, transparent);`
+            : '';
         if (isBordered) {
              badgeStyle += `background-color:transparent; border-color:transparent;`; 
         } else {
@@ -1331,7 +1325,6 @@ const renderSecondaryGroups = (group: Group, actions: Action[], groupByField: st
                         toggleSubGroup(group.name, groupByField, label);
                     }
                 }}>
-                <span class="codicon codicon-chevron-down lp-group-chevron" aria-hidden="true"></span>
                 <button class="lp-group-drag-handle" draggable="true"
                     title="Drag to reorder subgroup" aria-label=${`Drag subgroup ${label} to reorder`}
                     @click=${(e:Event) => { e.preventDefault(); e.stopPropagation(); }}
@@ -1339,6 +1332,7 @@ const renderSecondaryGroups = (group: Group, actions: Action[], groupByField: st
                     @dragend=${handleSubgroupDragEnd}>
                     <span class="codicon codicon-gripper"></span>
                 </button>
+                <span class="codicon codicon-chevron-down lp-group-chevron"></span>
                 <div class="lp-subgroup-badge" style=${badgeStyle}>
                    ${isBordered ? '' : html`<span class="codicon codicon-briefcase lp-subgroup-icon"></span>`}
                    <span class="lp-subgroup-label-text">${label}</span>
@@ -1447,61 +1441,6 @@ const renderGroup = (group: Group, actions: Action[]) => {
     `;
 };
 
-const renderWorkflowSection = () => {
-    if (!state.workflowSummaries.length) {
-        return null;
-    }
-
-    return html`
-    <section class="lp-workflow-section">
-        <div class="lp-workflow-section-header">
-            <div>
-                <div class="lp-workflow-section-eyebrow">Workflows</div>
-                <h2 class="lp-workflow-section-title">Saved Chains</h2>
-            </div>
-            <button class="lp-workflow-create-btn" @click=${() => openWorkflowBuilder()}>
-                <span class="codicon codicon-symbol-array"></span>
-                Open Builder
-            </button>
-        </div>
-
-        <div class="lp-workflow-list">
-            ${state.workflowSummaries.map((workflow) => html`
-                <div class="lp-workflow-card ${workflow.valid ? '' : 'lp-workflow-card--invalid'}">
-                    <div class="lp-workflow-card-main">
-                        <div class="lp-workflow-card-title-row">
-                            <span class="lp-workflow-card-title">${workflow.name}</span>
-                            ${workflow.valid ? null : html`<span class="lp-workflow-badge">Invalid</span>`}
-                        </div>
-                        <div class="lp-workflow-card-meta">
-                            ${workflow.stepCount} step${workflow.stepCount === 1 ? '' : 's'}
-                            ${workflow.invalidReasons.length ? html` · ${workflow.invalidReasons.join(' ')}` : null}
-                        </div>
-                    </div>
-                    <div class="lp-workflow-card-actions">
-                        <button
-                            class="lp-inline-action-btn"
-                            title="Edit workflow"
-                            aria-label=${`Edit workflow ${workflow.name}`}
-                            @click=${() => openWorkflowBuilder(workflow.id)}>
-                            <span class="codicon codicon-edit"></span>
-                        </button>
-                        <button
-                            class="lp-inline-action-btn"
-                            title="Run workflow"
-                            aria-label=${`Run workflow ${workflow.name}`}
-                            ?disabled=${!workflow.valid || workflow.stepCount === 0}
-                            @click=${() => runWorkflow(workflow.id)}>
-                            <span class="codicon codicon-run-all"></span>
-                        </button>
-                    </div>
-                </div>
-            `)}
-        </div>
-    </section>
-    `;
-};
-
 const renderSearch = (visibleActions: Action[]) => {
     if (!state.showSearch && !state.searchQuery) return null;
 
@@ -1550,6 +1489,41 @@ const renderSearch = (visibleActions: Action[]) => {
             ` : null}
         </div>
     </div>
+    `;
+};
+
+const renderWorkflowSection = (workflows: WorkflowSummary[]) => {
+    if (workflows.length === 0) return null;
+
+    return html`
+    <section class="lp-workflow-section">
+        ${workflows.map(wf => html`
+        <div class="lp-workflow-card ${wf.valid ? '' : 'lp-workflow-card--invalid'}">
+            <div class="lp-workflow-info">
+                <span class="lp-workflow-name">${wf.name}</span>
+                <span class="lp-workflow-meta">${wf.stepCount} step${wf.stepCount === 1 ? '' : 's'}</span>
+                ${wf.valid ? null : html`<span class="lp-workflow-badge">Invalid</span>`}
+            </div>
+            <div class="lp-workflow-actions">
+                <button
+                    class="lp-workflow-btn"
+                    title="Run workflow"
+                    aria-label="Run ${wf.name}"
+                    ?disabled=${!wf.valid || wf.stepCount === 0}
+                    @click=${() => vscode.postMessage({ command: 'runWorkflow', workflowId: wf.id })}>
+                    <span class="codicon codicon-play"></span>
+                </button>
+                <button
+                    class="lp-workflow-btn"
+                    title="Edit workflow"
+                    aria-label="Edit ${wf.name}"
+                    @click=${() => vscode.postMessage({ command: 'openWorkflowBuilder', workflowId: wf.id })}>
+                    <span class="codicon codicon-edit"></span>
+                </button>
+            </div>
+        </div>
+        `)}
+    </section>
     `;
 };
 
@@ -1647,7 +1621,6 @@ function renderView() {
     ${state.loading
             ? html`<div class="lp-loading-overlay"><span class="codicon codicon-loading codicon-modifier-spin"></span></div>`
             : null}
-    ${renderWorkflowSection()}
     ${renderSearch(visibleActions)}
     ${reorderMode ? html`
     <div class="lp-reorder-banner">
@@ -1660,6 +1633,7 @@ function renderView() {
             Done
         </button>
     </div>` : null}
+    ${renderWorkflowSection(state.workflowSummaries)}
     <div class="lp-grid">
         ${content}
     </div>

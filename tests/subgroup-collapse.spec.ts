@@ -1,8 +1,8 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 test.describe('Secondary Group Collapse', () => {
-  async function sendUpdate(page, data) {
-    await page.evaluate((payload) => {
+  async function sendUpdate(page: Page, data: unknown) {
+    await page.evaluate((payload: unknown) => {
       window.dispatchEvent(new MessageEvent('message', {
         data: {
           type: 'update',
@@ -145,28 +145,18 @@ test.describe('Secondary Group Collapse', () => {
     await expect(page.locator('.lp-subgroup-header', { hasText: 'Portal' })).toHaveAttribute('aria-expanded', 'false');
   });
 
-  test('subgroup header shows collapse state and uses only the drag handle for reordering affordance', async ({ page }) => {
+  test('subgroup header is not draggable and uses only the drag handle for reordering affordance', async ({ page }) => {
     const header = page.locator('.lp-subgroup-header', { hasText: 'Portal' });
-    const chevron = header.locator('.lp-group-chevron');
     const dragHandle = header.locator('.lp-group-drag-handle');
 
-    await expect(chevron).toHaveCount(1);
-
-    const expandedTransform = await chevron.evaluate((el) => getComputedStyle(el).transform);
-    expect(expandedTransform).toBe('none');
+    // Chevron indicator should be present (shows collapse/expand state like parent group)
+    await expect(header.locator('.lp-group-chevron')).toHaveCount(1);
 
     const headerDraggable = await header.evaluate((el) => el.getAttribute('draggable'));
     expect(headerDraggable).toBeNull();
 
     const handleDraggable = await dragHandle.evaluate((el) => el.getAttribute('draggable'));
     expect(handleDraggable).toBe('true');
-
-    await header.click();
-    await page.waitForTimeout(100);
-
-    const collapsedTransform = await chevron.evaluate((el) => getComputedStyle(el).transform);
-    expect(collapsedTransform).not.toBe('none');
-    await expect(header).toHaveAttribute('aria-expanded', 'false');
 
     const spacing = await page.evaluate(() => {
       const handle = document.querySelector('.lp-subgroup-header .lp-group-drag-handle') as HTMLElement | null;

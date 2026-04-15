@@ -93,6 +93,49 @@ test.describe('Main View', () => {
     await expect(hiddenRow).toContainText('Hidden Action');
   });
 
+  test('workflow section stays hidden until the experimental flag is enabled', async ({ page }) => {
+    await sendMessage(page, {
+      type: 'update',
+      data: {
+        workflowSummaries: [
+          {
+            id: 'workflow-release',
+            name: 'Release Train',
+            stepCount: 2,
+            valid: true,
+            invalidReasons: [],
+          },
+        ],
+        experimentalFeatures: {
+          workflows: false,
+        },
+      },
+    });
+
+    await expect(page.locator('.lp-workflow-section')).toHaveCount(0);
+
+    await sendMessage(page, {
+      type: 'update',
+      data: {
+        workflowSummaries: [
+          {
+            id: 'workflow-release',
+            name: 'Release Train',
+            stepCount: 2,
+            valid: true,
+            invalidReasons: [],
+          },
+        ],
+        experimentalFeatures: {
+          workflows: true,
+        },
+      },
+    });
+
+    await expect(page.locator('.lp-workflow-section')).toHaveCount(1);
+    await expect(page.locator('.lp-workflow-card')).toContainText('Release Train');
+  });
+
   // ─────────────────────────────────────────────────────────────
   // Play button
   // ─────────────────────────────────────────────────────────────

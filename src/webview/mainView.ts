@@ -1,5 +1,6 @@
 import { html, render } from "lit";
 import type { Action, Group } from "../types";
+import { filterActionsBySearch } from "../utils/actionSearch";
 import { getSubgroupCollapseKey } from "../utils/subgroupState";
 
 interface WorkflowSummary {
@@ -15,6 +16,9 @@ interface MainViewState {
     actions: Action[];
     groups: Group[];
     workflowSummaries: WorkflowSummary[];
+    experimentalFeatures: {
+        workflows: boolean;
+    };
     searchQuery: string;
     loading: boolean;
     generating: boolean;
@@ -99,6 +103,9 @@ const startState: MainViewState = {
     actions: [],
     groups: [],
     workflowSummaries: [],
+    experimentalFeatures: {
+        workflows: false,
+    },
     searchQuery: "",
     loading: false,
     generating: false,
@@ -1493,7 +1500,7 @@ const renderSearch = (visibleActions: Action[]) => {
 };
 
 const renderWorkflowSection = (workflows: WorkflowSummary[]) => {
-    if (workflows.length === 0) return null;
+    if (!state.experimentalFeatures.workflows || workflows.length === 0) return null;
 
     return html`
     <section class="lp-workflow-section">
@@ -1544,12 +1551,7 @@ function renderView() {
 
     // Filter search
     if (state.searchQuery) {
-        const q = state.searchQuery.toLowerCase();
-        visibleActions = visibleActions.filter(a =>
-            a.name.toLowerCase().includes(q) ||
-            a.command.toLowerCase().includes(q) ||
-            (a.group && a.group.toLowerCase().includes(q))
-        );
+        visibleActions = filterActionsBySearch(visibleActions, state.searchQuery);
     }
 
     // Grouping

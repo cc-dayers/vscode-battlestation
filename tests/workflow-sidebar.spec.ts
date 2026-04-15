@@ -17,6 +17,9 @@ test.describe('Workflow Sidebar', () => {
     await sendMessage(page, {
       type: 'update',
       data: {
+        experimentalFeatures: {
+          workflows: true,
+        },
         workflowSummaries: [
           {
             id: 'workflow-release',

@@ -1,5 +1,14 @@
 import * as vscode from "vscode";
-import type { Config, Action, Group, IconMapping, Workflow, WorkflowStep } from "../types";
+import type {
+  Config,
+  Action,
+  Group,
+  IconMapping,
+  Workflow,
+  WorkflowStep,
+  DiscoveryProfile,
+  DiscoverySources,
+} from "../types";
 import { getPreferredThemeColorForName, pickDistinctThemeColor } from "../utils/themeColors";
 import { createEntityId } from "../utils/id";
 import { getWorkflowActionKey } from "../utils/workflows";
@@ -20,6 +29,20 @@ interface HistoryEntry {
 export class ConfigService {
   private configCache?: { config: Config; timestamp: number };
   private fileWatcher?: vscode.FileSystemWatcher;
+  private trackedManifestWatchers: vscode.FileSystemWatcher[] = [];
+  private trackedManifestSyncTimeout?: NodeJS.Timeout;
+
+  private static readonly DISCOVERY_PROFILE_VERSION = 1;
+  private static readonly MANIFEST_SEARCH_EXCLUDE = "**/{node_modules,.git,.vscode-test,dist,build,out,coverage,.next}/**";
+  private static readonly DISCOVERABLE_TYPES_BY_SOURCE: Record<keyof DiscoverySources, string[]> = {
+    npm: ["npm"],
+    tasks: ["task"],
+    launch: ["launch"],
+    docker: ["docker"],
+    make: ["make"],
+    rust: ["rust"],
+    go: ["go"],
+  };
 
   static readonly defaultIcons: IconMapping[] = [
     { type: "shell", icon: "terminal" },
@@ -43,6 +66,13 @@ export class ConfigService {
   constructor(private readonly context?: vscode.ExtensionContext) {
     if (this.context) {
       this.setupFileWatcher();
+      void this.refreshTrackedManifestWatchers();
+      this.context.subscriptions.push(
+        vscode.workspace.onDidChangeWorkspaceFolders(() => {
+          this.refreshFileWatcher();
+          void this.refreshTrackedManifestWatchers();
+        })
+      );
     }
   }
 
@@ -67,8 +97,9 @@ export class ConfigService {
   /** Persist the custom config directory and refresh the file watcher */
   async setCustomConfigPath(dirPath: string | undefined): Promise<void> {
     await this.context?.workspaceState?.update(ConfigService.CUSTOM_PATH_KEY, dirPath);
-    this.invalidateCache();
+    this.notifyConfigChanged();
     this.refreshFileWatcher();
+    await this.refreshTrackedManifestWatchers();
   }
 
   /** Default location: .vscode/battle.json */
@@ -146,8 +177,8 @@ export class ConfigService {
     this.fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
 
     const notify = () => {
-      this.invalidateCache();
-      this._onDidChange.fire();
+      this.notifyConfigChanged();
+      void this.refreshTrackedManifestWatchers();
     };
 
     this.fileWatcher.onDidChange(notify);
@@ -157,6 +188,358 @@ export class ConfigService {
     if (this.context) {
       this.context.subscriptions.push(this.fileWatcher);
     }
+  }
+
+  private disposeTrackedManifestWatchers(): void {
+    if (this.trackedManifestSyncTimeout) {
+      clearTimeout(this.trackedManifestSyncTimeout);
+      this.trackedManifestSyncTimeout = undefined;
+    }
+
+    for (const watcher of this.trackedManifestWatchers) {
+      watcher.dispose();
+    }
+    this.trackedManifestWatchers = [];
+  }
+
+  private getDiscoverySourcesFromActions(actions: readonly Action[]): DiscoverySources {
+    const sources: DiscoverySources = {};
+
+    for (const action of actions) {
+      for (const [source, types] of Object.entries(
+        ConfigService.DISCOVERABLE_TYPES_BY_SOURCE
+      ) as Array<[keyof DiscoverySources, string[]]>) {
+        if (types.includes(action.type)) {
+          sources[source] = true;
+        }
+      }
+    }
+
+    return sources;
+  }
+
+  private hasEnabledDiscoverySources(sources: DiscoverySources | undefined): boolean {
+    return Boolean(
+      sources && Object.values(sources).some((value) => value === true)
+    );
+  }
+
+  private getEffectiveDiscoveryProfile(
+    config: Config,
+    deepScanOverride?: boolean
+  ): DiscoveryProfile | undefined {
+    const normalizedProfile = config.discovery
+      ? this.normalizeDiscoveryProfile(config.discovery)
+      : undefined;
+
+    if (normalizedProfile && this.hasEnabledDiscoverySources(normalizedProfile.sources)) {
+      return {
+        ...normalizedProfile,
+        deepScan:
+          typeof deepScanOverride === "boolean"
+            ? deepScanOverride
+            : normalizedProfile.deepScan,
+      };
+    }
+
+    const inferredSources = this.getDiscoverySourcesFromActions(config.actions || []);
+    if (!this.hasEnabledDiscoverySources(inferredSources)) {
+      return undefined;
+    }
+
+    return {
+      version: ConfigService.DISCOVERY_PROFILE_VERSION,
+      sources: inferredSources,
+      deepScan: deepScanOverride ?? false,
+    };
+  }
+
+  private getTrackedManifestGlobs(profile: DiscoveryProfile): string[] {
+    const globs = new Set<string>();
+
+    if (profile.sources.npm) {
+      globs.add(profile.deepScan ? "**/package.json" : "package.json");
+    }
+
+    if (profile.sources.tasks) {
+      globs.add(profile.deepScan ? "**/.vscode/tasks.json" : ".vscode/tasks.json");
+    }
+
+    if (profile.sources.launch) {
+      globs.add(profile.deepScan ? "**/.vscode/launch.json" : ".vscode/launch.json");
+    }
+
+    if (profile.sources.docker) {
+      globs.add(
+        profile.deepScan
+          ? "**/{docker-compose.yml,docker-compose.yaml,compose.yml,compose.yaml}"
+          : "{docker-compose.yml,docker-compose.yaml,compose.yml,compose.yaml}"
+      );
+    }
+
+    if (profile.sources.make) {
+      globs.add(
+        profile.deepScan
+          ? "**/{Makefile,makefile,GNUmakefile}"
+          : "{Makefile,makefile,GNUmakefile}"
+      );
+    }
+
+    if (profile.sources.rust) {
+      globs.add(profile.deepScan ? "**/Cargo.toml" : "Cargo.toml");
+    }
+
+    if (profile.sources.go) {
+      globs.add(profile.deepScan ? "**/go.mod" : "go.mod");
+    }
+
+    return Array.from(globs);
+  }
+
+  private scheduleTrackedManifestSync(): void {
+    if (this.trackedManifestSyncTimeout) {
+      clearTimeout(this.trackedManifestSyncTimeout);
+    }
+
+    this.trackedManifestSyncTimeout = setTimeout(() => {
+      this.trackedManifestSyncTimeout = undefined;
+      void this.runTrackedManifestSync();
+    }, 300);
+  }
+
+  private async runTrackedManifestSync(): Promise<void> {
+    try {
+      const configUri = await this.resolveConfigUri();
+      if (!configUri || !(await this.fileExists(configUri))) {
+        return;
+      }
+
+      await this.syncConfig();
+    } catch {
+      // Ignore manifest-triggered sync failures; the user can still resync manually.
+    }
+  }
+
+  private async refreshTrackedManifestWatchers(config?: Config): Promise<void> {
+    this.disposeTrackedManifestWatchers();
+
+    const configUri = await this.resolveConfigUri();
+    if (!configUri || !(await this.fileExists(configUri))) {
+      return;
+    }
+
+    const resolvedConfig = config ?? (await this.readConfig());
+    const profile = this.getEffectiveDiscoveryProfile(resolvedConfig);
+    if (!profile) {
+      return;
+    }
+
+    const notify = () => this.scheduleTrackedManifestSync();
+
+    for (const glob of this.getTrackedManifestGlobs(profile)) {
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        glob,
+        false,
+        false,
+        false
+      );
+      watcher.onDidChange(notify);
+      watcher.onDidCreate(notify);
+      watcher.onDidDelete(notify);
+      this.trackedManifestWatchers.push(watcher);
+    }
+
+    const workspaceFile = vscode.workspace.workspaceFile;
+    if (workspaceFile && (profile.sources.tasks || profile.sources.launch)) {
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(
+          vscode.Uri.joinPath(workspaceFile, ".."),
+          this.getUriBaseName(workspaceFile)
+        )
+      );
+      watcher.onDidChange(notify);
+      watcher.onDidCreate(notify);
+      watcher.onDidDelete(notify);
+      this.trackedManifestWatchers.push(watcher);
+    }
+  }
+
+  private getUriBaseName(uri: vscode.Uri): string {
+    const normalizedPath = uri.path.replace(/\/+$/, "");
+    const lastSlash = normalizedPath.lastIndexOf("/");
+    return lastSlash >= 0 ? normalizedPath.slice(lastSlash + 1) : normalizedPath;
+  }
+
+  private getWorkspaceRelativePath(
+    workspaceFolder: vscode.WorkspaceFolder,
+    target: vscode.Uri
+  ): string {
+    const workspacePath = workspaceFolder.uri.path.replace(/\/+$/, "");
+    const targetPath = target.path.replace(/\/+$/, "");
+
+    if (targetPath === workspacePath) {
+      return "";
+    }
+
+    if (!targetPath.startsWith(`${workspacePath}/`)) {
+      return "";
+    }
+
+    return targetPath.slice(workspacePath.length + 1);
+  }
+
+  private getWorkspaceLabelForTarget(target: vscode.Uri): string | undefined {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      return undefined;
+    }
+
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(target);
+    if (!workspaceFolder) {
+      return undefined;
+    }
+
+    const relativePath = this.getWorkspaceRelativePath(workspaceFolder, target);
+    if (!relativePath) {
+      return workspaceFolders.length === 1 ? undefined : workspaceFolder.name;
+    }
+
+    return workspaceFolders.length === 1
+      ? relativePath
+      : `${workspaceFolder.name}/${relativePath}`;
+  }
+
+  private async readJsoncFile(uri: vscode.Uri): Promise<any | undefined> {
+    try {
+      const raw = await this.readText(uri);
+      return JSON.parse(this.stripJsonComments(raw));
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async getActiveWorkspaceFileJson(): Promise<any | undefined> {
+    const workspaceFile = vscode.workspace.workspaceFile;
+    if (!workspaceFile) {
+      return undefined;
+    }
+
+    return this.readJsoncFile(workspaceFile);
+  }
+
+  private getWorkspaceFileLabel(): string {
+    const workspaceFile = vscode.workspace.workspaceFile;
+    if (!workspaceFile) {
+      return "Workspace";
+    }
+
+    return this.getUriBaseName(workspaceFile).replace(/\.code-workspace$/i, "") || "Workspace";
+  }
+
+  private async getWorkspaceFileTaskActions(): Promise<Action[]> {
+    const workspaceJson = await this.getActiveWorkspaceFileJson();
+    const tasksContainer = workspaceJson?.tasks;
+    const tasks = Array.isArray(tasksContainer?.tasks)
+      ? tasksContainer.tasks
+      : Array.isArray(tasksContainer)
+        ? tasksContainer
+        : [];
+
+    const workspaceLabel = this.getWorkspaceFileLabel();
+    const actions: Action[] = [];
+
+    for (const task of tasks) {
+      if (task?.hide === true) {
+        continue;
+      }
+
+      const label =
+        (typeof task?.label === "string" && task.label.trim()) ||
+        (typeof task?.script === "string" && task.script.trim()) ||
+        (typeof task?.command === "string" && task.command.trim()) ||
+        undefined;
+
+      if (!label) {
+        continue;
+      }
+
+      let secondaryGroup: string | undefined;
+      if (typeof task?.group === "string") {
+        secondaryGroup = task.group.charAt(0).toUpperCase() + task.group.slice(1);
+      } else if (
+        task?.group &&
+        typeof task.group === "object" &&
+        typeof task.group.kind === "string"
+      ) {
+        secondaryGroup = task.group.kind.charAt(0).toUpperCase() + task.group.kind.slice(1);
+      }
+
+      if (secondaryGroup?.toLowerCase() === "none") {
+        secondaryGroup = undefined;
+      }
+
+      actions.push({
+        name: label,
+        command: `workbench.action.tasks.runTask|${label}`,
+        type: "task",
+        workspace: secondaryGroup
+          ? `${workspaceLabel} - ${secondaryGroup}`
+          : workspaceLabel,
+      });
+    }
+
+    return actions;
+  }
+
+  private async getWorkspaceFileLaunchActions(): Promise<Action[]> {
+    const workspaceJson = await this.getActiveWorkspaceFileJson();
+    const launchContainer = workspaceJson?.launch;
+    const configs = Array.isArray(launchContainer?.configurations)
+      ? launchContainer.configurations
+      : [];
+    const compounds = Array.isArray(launchContainer?.compounds)
+      ? launchContainer.compounds
+      : [];
+    const workspaceLabel = this.getWorkspaceFileLabel();
+    const actions: Action[] = [];
+
+    for (const config of configs) {
+      if (
+        typeof config?.name !== "string" ||
+        config.name.trim().length === 0 ||
+        config?.presentation?.hidden === true
+      ) {
+        continue;
+      }
+
+      const name = config.name.trim();
+      actions.push({
+        name,
+        command: `workbench.action.debug.start|${name}`,
+        type: "launch",
+        workspace: workspaceLabel,
+      });
+    }
+
+    for (const compound of compounds) {
+      if (
+        typeof compound?.name !== "string" ||
+        compound.name.trim().length === 0 ||
+        compound?.presentation?.hidden === true
+      ) {
+        continue;
+      }
+
+      const name = compound.name.trim();
+      actions.push({
+        name,
+        command: `workbench.action.debug.start|${name}`,
+        type: "launch",
+        workspace: workspaceLabel,
+      });
+    }
+
+    return actions;
   }
 
   /** Copy an external JSON file into the active config location */
@@ -174,7 +557,7 @@ export class ConfigService {
       await this.appendToHistory(existing, `Before import ${this.getTimestampLabel()}`);
     }
     await vscode.workspace.fs.copy(sourceUri, destUri, { overwrite: true });
-    this.invalidateCache();
+    this.notifyConfigChanged();
   }
 
   /* ─── Async FS helpers ─── */
@@ -342,6 +725,10 @@ export class ConfigService {
       normalized.customColors = raw.customColors;
     }
 
+    if (raw.discovery && typeof raw.discovery === "object") {
+      normalized.discovery = this.normalizeDiscoveryProfile(raw.discovery);
+    }
+
     if (Array.isArray(raw.workflows)) {
       const usedWorkflowIds = new Set<string>();
       normalized.workflows = raw.workflows
@@ -356,6 +743,35 @@ export class ConfigService {
     }
 
     return { config: normalized, didMutate };
+  }
+
+  private normalizeDiscoveryProfile(raw: any): DiscoveryProfile {
+    const sources = raw?.sources && typeof raw.sources === "object" ? raw.sources : {};
+
+    return {
+      version: ConfigService.DISCOVERY_PROFILE_VERSION,
+      sources: {
+        npm: sources.npm === true,
+        tasks: sources.tasks === true,
+        launch: sources.launch === true,
+        docker: sources.docker === true,
+        make: sources.make === true,
+        rust: sources.rust === true,
+        go: sources.go === true,
+      },
+      deepScan: raw?.deepScan === true,
+      detectionMethod:
+        raw?.detectionMethod === "file" || raw?.detectionMethod === "command" || raw?.detectionMethod === "hybrid"
+          ? raw.detectionMethod
+          : undefined,
+      enableGrouping: raw?.enableGrouping === true ? true : undefined,
+      enableColoring: raw?.enableColoring === true ? true : undefined,
+      secondaryGroupBy:
+        raw?.secondaryGroupBy === "auto" || raw?.secondaryGroupBy === "workspace" || raw?.secondaryGroupBy === "type" || raw?.secondaryGroupBy === "none"
+          ? raw.secondaryGroupBy
+          : undefined,
+      generatedAt: typeof raw?.generatedAt === "number" ? raw.generatedAt : undefined,
+    };
   }
 
   private async persistNormalizedConfig(uri: vscode.Uri, config: Config): Promise<number> {
@@ -634,7 +1050,8 @@ export class ConfigService {
 
     const json = JSON.stringify(normalized.config, null, 2);
     await this.writeText(uri, json);
-    this.invalidateCache();
+    this.notifyConfigChanged();
+    await this.refreshTrackedManifestWatchers(normalized.config);
 
     // Verify the write succeeded
     if (!(await this.fileExists(uri))) {
@@ -680,7 +1097,8 @@ export class ConfigService {
     }
 
     if (locations.length > 0) {
-      this.invalidateCache();
+      this.notifyConfigChanged();
+      this.disposeTrackedManifestWatchers();
       return { deleted: true, location: locations.join(", ") };
     }
 
@@ -719,6 +1137,11 @@ export class ConfigService {
 
   invalidateCache(): void {
     this.configCache = undefined;
+  }
+
+  private notifyConfigChanged(): void {
+    this.invalidateCache();
+    this._onDidChange.fire();
   }
 
   async listConfigVersions(): Promise<{ label: string; timestamp: number; config: Config }[]> {
@@ -764,60 +1187,11 @@ export class ConfigService {
     }
 
     await this.writeText(configUri, JSON.stringify(entry.config, null, 2));
-    this.invalidateCache();
+    this.notifyConfigChanged();
+    await this.refreshTrackedManifestWatchers(entry.config);
   }
 
   /* ─── Scanning helpers ─── */
-
-  /**
-   * Finds *.code-workspace files in the current workspace folders, parses their
-   * `folders` entries, and returns URIs for any directories not already present
-   * as VS Code workspace folders. Used by deep-scan mode to pick up sibling
-   * repos or monorepo roots that are listed in a workspace file but not open as
-   * top-level workspace folders.
-   */
-  private async resolveWorkspaceFileFolders(
-    workspaceFolders: readonly vscode.WorkspaceFolder[]
-  ): Promise<{ uri: vscode.Uri; name: string }[]> {
-    const knownPaths = new Set(workspaceFolders.map(f => f.uri.fsPath));
-    const extra: { uri: vscode.Uri; name: string }[] = [];
-    const seen = new Set<string>();
-
-    for (const folder of workspaceFolders) {
-      try {
-        const wsFiles = await vscode.workspace.findFiles(
-          new vscode.RelativePattern(folder, '*.code-workspace'),
-          null,
-          10
-        );
-        for (const wsFile of wsFiles) {
-          try {
-            const raw = await this.readText(wsFile);
-            const wsJson = JSON.parse(this.stripJsonComments(raw));
-            const entries: { path?: string }[] = wsJson.folders || [];
-            const wsDir = vscode.Uri.joinPath(wsFile, '..');
-            for (const entry of entries) {
-              if (!entry.path) continue;
-              const folderUri = /^([A-Za-z]:|\/|\/)/.test(entry.path)
-                ? vscode.Uri.file(entry.path)
-                : vscode.Uri.joinPath(wsDir, entry.path);
-              const fsPath = folderUri.fsPath;
-              if (!knownPaths.has(fsPath) && !seen.has(fsPath)) {
-                seen.add(fsPath);
-                const name = entry.path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || entry.path;
-                extra.push({ uri: folderUri, name });
-              }
-            }
-          } catch {
-            // skip invalid workspace file
-          }
-        }
-      } catch {
-        // skip
-      }
-    }
-    return extra;
-  }
 
   async scanNpmScripts(deepScan: boolean = false): Promise<Action[]> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -864,32 +1238,6 @@ export class ConfigService {
       }
     }
 
-    // Deep scan: also scan folders referenced in any *.code-workspace files
-    if (deepScan) {
-      const extraFolders = await this.resolveWorkspaceFileFolders(workspaceFolders);
-      for (const folder of extraFolders) {
-        const pkgUri = vscode.Uri.joinPath(folder.uri, "package.json");
-        if (await this.fileExists(pkgUri)) {
-          try {
-            const raw = await this.readText(pkgUri);
-            const pkg = JSON.parse(raw);
-            const scripts = pkg.scripts || {};
-            Object.keys(scripts).forEach((scriptName) => {
-              const command = `npm run ${scriptName}`;
-              const key = `${scriptName}|${command}|${folder.name}`;
-              if (!seenActions.has(key)) {
-                seenActions.add(key);
-                allActions.push({ name: scriptName, command, type: "npm", cwd: folder.uri.fsPath, workspace: folder.name });
-              }
-            });
-          } catch {
-            // skip invalid package.json
-          }
-        }
-        await this.scanNpmScriptsRecursive(folder.uri, allActions, seenActions, folder.name, false);
-      }
-    }
-
     return allActions;
   }
 
@@ -911,7 +1259,16 @@ export class ConfigService {
 
       for (const [name, type] of entries) {
         // Skip common directories
-        if (name === "node_modules" || name === ".git" || name === ".vscode-test" || name === "dist" || name === "build" || name === "out") {
+        if (
+          name === "node_modules" ||
+          name === ".git" ||
+          name === ".vscode-test" ||
+          name === "dist" ||
+          name === "build" ||
+          name === "out" ||
+          name === "coverage" ||
+          name === ".next"
+        ) {
           continue;
         }
 
@@ -980,7 +1337,10 @@ export class ConfigService {
           // Use relative pattern to search only within this workspace folder
           const globPattern = `**/{${patterns.join(',')}}`;
           const relativePattern = new vscode.RelativePattern(folder, globPattern);
-          const uris = await vscode.workspace.findFiles(relativePattern, '**/node_modules/**');
+          const uris = await vscode.workspace.findFiles(
+            relativePattern,
+            ConfigService.MANIFEST_SEARCH_EXCLUDE
+          );
           
           for (const uri of uris) {
             const relPath = vscode.workspace.asRelativePath(uri, false);
@@ -1012,37 +1372,47 @@ export class ConfigService {
         }
       }
     }
-    
-    // Deep scan: also search inside folders referenced by *.code-workspace files
-    if (deepScan) {
-      const extraFolders = await this.resolveWorkspaceFileFolders(workspaceFolders);
-      for (const folder of extraFolders) {
-        try {
-          const globPattern = `**/{${patterns.join(',')}}`;
-          const relativePattern = new vscode.RelativePattern(folder.uri, globPattern);
-          const uris = await vscode.workspace.findFiles(relativePattern, '**/node_modules/**');
-          for (const uri of uris) {
-            const fsPath = uri.fsPath;
-            const folderFsPath = folder.uri.fsPath;
-            const relPath = fsPath.startsWith(folderFsPath)
-              ? fsPath.slice(folderFsPath.length).replace(/^[\\/]/, '').replace(/\\/g, '/')
-              : '';
-            const folderPath = relPath.substring(0, relPath.lastIndexOf('/')) || '';
-            const workspaceLabel = folderPath ? `${folder.name}/${folderPath}` : folder.name;
-            results.push({ uri, isRoot: folderPath === '', relativePath: workspaceLabel });
-          }
-        } catch {
-          // ignore
-        }
-      }
-    }
-
     // Deduplicate by path
     const unique = new Map<string, any>();
     for (const res of results) {
       unique.set(res.uri.fsPath, res);
     }
     return Array.from(unique.values());
+  }
+
+  private async findVsCodeManifestUris(
+    fileName: "tasks.json" | "launch.json",
+    deepScan: boolean
+  ): Promise<vscode.Uri[]> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      return [];
+    }
+
+    const uris = new Map<string, vscode.Uri>();
+
+    for (const folder of workspaceFolders) {
+      if (deepScan) {
+        try {
+          const matches = await vscode.workspace.findFiles(
+            new vscode.RelativePattern(folder, `**/.vscode/${fileName}`),
+            ConfigService.MANIFEST_SEARCH_EXCLUDE
+          );
+          for (const match of matches) {
+            uris.set(match.toString(), match);
+          }
+        } catch {
+          // Ignore unreadable folders during deep discovery.
+        }
+      } else {
+        const uri = vscode.Uri.joinPath(folder.uri, ".vscode", fileName);
+        if (await this.fileExists(uri)) {
+          uris.set(uri.toString(), uri);
+        }
+      }
+    }
+
+    return Array.from(uris.values());
   }
 
   async scanMake(deepScan = false): Promise<Action[]> {
@@ -1126,76 +1496,69 @@ export class ConfigService {
   }
 
   async scanTasks(deepScan = false): Promise<Action[]> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) return [];
+    const allActions: Action[] = [];
+    const seenActions = new Set<string>();
+    const manifestUris = await this.findVsCodeManifestUris("tasks.json", deepScan);
 
-    type FolderEntry = { uri: vscode.Uri; name: string; alwaysLabel: boolean };
-    const foldersToScan: FolderEntry[] = workspaceFolders.map(f => ({
-      uri: f.uri, name: f.name, alwaysLabel: workspaceFolders.length > 1
-    }));
-    if (deepScan) {
-      const extra = await this.resolveWorkspaceFileFolders(workspaceFolders);
-      foldersToScan.push(...extra.map(f => ({ ...f, alwaysLabel: true })));
+    for (const uri of manifestUris) {
+      const tasksJson = await this.readJsoncFile(uri);
+      const tasks = Array.isArray(tasksJson?.tasks) ? tasksJson.tasks : [];
+      const manifestRoot = vscode.Uri.joinPath(uri, "..", "..");
+      const workspaceLabel = this.getWorkspaceLabelForTarget(manifestRoot);
+
+      for (const task of tasks) {
+        if (task?.hide === true) {
+          continue;
+        }
+
+        const label =
+          (typeof task?.label === "string" && task.label.trim()) ||
+          (typeof task?.script === "string" && task.script.trim()) ||
+          (typeof task?.command === "string" && task.command.trim()) ||
+          undefined;
+        if (!label) {
+          continue;
+        }
+
+        let secondaryGroup: string | undefined;
+        if (typeof task?.group === "string") {
+          secondaryGroup = task.group.charAt(0).toUpperCase() + task.group.slice(1);
+        } else if (
+          task?.group &&
+          typeof task.group === "object" &&
+          typeof task.group.kind === "string"
+        ) {
+          secondaryGroup = task.group.kind.charAt(0).toUpperCase() + task.group.kind.slice(1);
+        }
+
+        if (secondaryGroup?.toLowerCase() === "none") {
+          secondaryGroup = undefined;
+        }
+
+        const workspaceValue = workspaceLabel && secondaryGroup
+          ? `${workspaceLabel} - ${secondaryGroup}`
+          : secondaryGroup || workspaceLabel;
+        const key = `${label}|${workspaceValue || ""}`;
+        if (seenActions.has(key)) {
+          continue;
+        }
+
+        seenActions.add(key);
+        allActions.push({
+          name: label,
+          command: `workbench.action.tasks.runTask|${label}`,
+          type: "task",
+          cwd: manifestRoot.fsPath,
+          workspace: workspaceValue,
+        });
+      }
     }
 
-    const allActions: Action[] = [];
-
-    for (const folder of foldersToScan) {
-      const uri = vscode.Uri.joinPath(folder.uri, ".vscode", "tasks.json");
-      if (!(await this.fileExists(uri))) continue;
-
-      try {
-        const raw = await this.readText(uri);
-        const tasksJson = JSON.parse(this.stripJsonComments(raw));
-        const tasks = tasksJson.tasks || [];
-        tasks
-          .forEach((t: any) => {
-            if (t?.hide === true) return;
-
-            const label =
-              (typeof t?.label === "string" && t.label.trim()) ||
-              (typeof t?.script === "string" && t.script.trim()) ||
-              (typeof t?.command === "string" && t.command.trim()) ||
-              undefined;
-            if (!label) return;
-
-            // Extract group from task if present - this becomes SECONDARY grouping
-            let secondaryGroup: string | undefined;
-            if (t.group) {
-              // group can be a string or { kind: "build", isDefault: true }
-              if (typeof t.group === 'string') {
-                secondaryGroup = t.group.charAt(0).toUpperCase() + t.group.slice(1);
-              } else if (typeof t.group === 'object' && typeof t.group.kind === 'string') {
-                secondaryGroup = t.group.kind.charAt(0).toUpperCase() + t.group.kind.slice(1);
-              }
-            }
-
-            // Task groups defined as "none" shouldn't become an actual group named "None"
-            if (secondaryGroup?.toLowerCase() === 'none') {
-              secondaryGroup = undefined;
-            }
-
-            // Use workspace field for secondary grouping
-            // If we have both a workspace folder and a task group, combine them
-            let workspaceValue: string | undefined;
-            if (folder.alwaysLabel && secondaryGroup) {
-              workspaceValue = `${folder.name} - ${secondaryGroup}`;
-            } else if (secondaryGroup) {
-              workspaceValue = secondaryGroup;
-            } else if (folder.alwaysLabel) {
-              workspaceValue = folder.name;
-            }
-
-            const action: Action = {
-              name: label,
-              command: `workbench.action.tasks.runTask|${label}`,
-              type: "task",
-              workspace: workspaceValue,
-            };
-            allActions.push(action);
-          });
-      } catch {
-        // Skip invalid tasks.json
+    for (const action of await this.getWorkspaceFileTaskActions()) {
+      const key = `${action.name}|${action.workspace || ""}`;
+      if (!seenActions.has(key)) {
+        seenActions.add(key);
+        allActions.push(action);
       }
     }
 
@@ -1203,63 +1566,75 @@ export class ConfigService {
   }
 
   async scanLaunchConfigs(deepScan = false): Promise<Action[]> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) return [];
+    const allActions: Action[] = [];
+    const seenActions = new Set<string>();
+    const manifestUris = await this.findVsCodeManifestUris("launch.json", deepScan);
 
-    type FolderEntry = { uri: vscode.Uri; name: string; alwaysLabel: boolean };
-    const foldersToScan: FolderEntry[] = workspaceFolders.map(f => ({
-      uri: f.uri, name: f.name, alwaysLabel: workspaceFolders.length > 1
-    }));
-    if (deepScan) {
-      const extra = await this.resolveWorkspaceFileFolders(workspaceFolders);
-      foldersToScan.push(...extra.map(f => ({ ...f, alwaysLabel: true })));
+    for (const uri of manifestUris) {
+      const launchJson = await this.readJsoncFile(uri);
+      const configs = Array.isArray(launchJson?.configurations)
+        ? launchJson.configurations
+        : [];
+      const compounds = Array.isArray(launchJson?.compounds)
+        ? launchJson.compounds
+        : [];
+      const manifestRoot = vscode.Uri.joinPath(uri, "..", "..");
+      const workspaceLabel = this.getWorkspaceLabelForTarget(manifestRoot);
+
+      for (const config of configs) {
+        if (
+          typeof config?.name !== "string" ||
+          config.name.trim().length === 0 ||
+          config?.presentation?.hidden === true
+        ) {
+          continue;
+        }
+
+        const name = config.name.trim();
+        const key = `${name}|${workspaceLabel || ""}`;
+        if (seenActions.has(key)) {
+          continue;
+        }
+
+        seenActions.add(key);
+        allActions.push({
+          name,
+          command: `workbench.action.debug.start|${name}`,
+          type: "launch",
+          workspace: workspaceLabel,
+        });
+      }
+
+      for (const compound of compounds) {
+        if (
+          typeof compound?.name !== "string" ||
+          compound.name.trim().length === 0 ||
+          compound?.presentation?.hidden === true
+        ) {
+          continue;
+        }
+
+        const name = compound.name.trim();
+        const key = `${name}|${workspaceLabel || ""}`;
+        if (seenActions.has(key)) {
+          continue;
+        }
+
+        seenActions.add(key);
+        allActions.push({
+          name,
+          command: `workbench.action.debug.start|${name}`,
+          type: "launch",
+          workspace: workspaceLabel,
+        });
+      }
     }
 
-    const allActions: Action[] = [];
-
-    for (const folder of foldersToScan) {
-      const uri = vscode.Uri.joinPath(folder.uri, ".vscode", "launch.json");
-      if (!(await this.fileExists(uri))) continue;
-
-      try {
-        const raw = await this.readText(uri);
-        const launchJson = JSON.parse(this.stripJsonComments(raw));
-        const configs = Array.isArray(launchJson.configurations) ? launchJson.configurations : [];
-        const compounds = Array.isArray(launchJson.compounds) ? launchJson.compounds : [];
-
-        configs
-          .filter((c: any) =>
-            typeof c?.name === "string" &&
-            c.name.trim().length > 0 &&
-            c?.presentation?.hidden !== true
-          )
-          .forEach((c: any) => {
-            const action: Action = {
-              name: c.name.trim(),
-              command: `workbench.action.debug.start|${c.name.trim()}`,
-              type: "launch",
-              workspace: folder.alwaysLabel ? folder.name : undefined,
-            };
-            allActions.push(action);
-          });
-
-        compounds
-          .filter((c: any) =>
-            typeof c?.name === "string" &&
-            c.name.trim().length > 0 &&
-            c?.presentation?.hidden !== true
-          )
-          .forEach((c: any) => {
-            const action: Action = {
-              name: c.name.trim(),
-              command: `workbench.action.debug.start|${c.name.trim()}`,
-              type: "launch",
-              workspace: folder.alwaysLabel ? folder.name : undefined,
-            };
-            allActions.push(action);
-          });
-      } catch {
-        // Skip invalid launch.json
+    for (const action of await this.getWorkspaceFileLaunchActions()) {
+      const key = `${action.name}|${action.workspace || ""}`;
+      if (!seenActions.has(key)) {
+        seenActions.add(key);
+        allActions.push(action);
       }
     }
 
@@ -1270,23 +1645,28 @@ export class ConfigService {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) return false;
 
-    const paths: Record<string, string[]> = {
-      npm: ["package.json"],
-      tasks: [".vscode", "tasks.json"],
-      launch: [".vscode", "launch.json"],
-    };
-
-    const segments = paths[kind];
-
-    // Check all workspace folders
-    for (const folder of workspaceFolders) {
-      const uri = vscode.Uri.joinPath(folder.uri, ...segments);
-      if (await this.fileExists(uri)) {
+    if (kind === "tasks") {
+      if ((await this.findVsCodeManifestUris("tasks.json", true)).length > 0) {
         return true;
       }
+
+      return (await this.getWorkspaceFileTaskActions()).length > 0;
     }
 
-    return false;
+    if (kind === "launch") {
+      if ((await this.findVsCodeManifestUris("launch.json", true)).length > 0) {
+        return true;
+      }
+
+      return (await this.getWorkspaceFileLaunchActions()).length > 0;
+    }
+
+    const packageJsonFiles = await vscode.workspace.findFiles(
+      "**/package.json",
+      ConfigService.MANIFEST_SEARCH_EXCLUDE,
+      1
+    );
+    return packageJsonFiles.length > 0;
   }
 
   /** Check if a file exists relative to workspace root. */
@@ -1361,7 +1741,7 @@ export class ConfigService {
 
   /** Auto-generate config by scanning workspace sources. */
   async createAutoConfig(
-    sources: { npm?: boolean; tasks?: boolean; launch?: boolean; docker?: boolean; make?: boolean; rust?: boolean; go?: boolean },
+    sources: DiscoverySources,
     groupByType: boolean,
     defaultIcons: IconMapping[],
     enhancedActions?: Action[],
@@ -1639,6 +2019,23 @@ export class ConfigService {
       groups: finalGroups,
       icons: finalIcons,
       workflows: finalWorkflows,
+      discovery: {
+        version: ConfigService.DISCOVERY_PROFILE_VERSION,
+        sources: {
+          npm: sources.npm === true,
+          tasks: sources.tasks === true,
+          launch: sources.launch === true,
+          docker: sources.docker === true,
+          make: sources.make === true,
+          rust: sources.rust === true,
+          go: sources.go === true,
+        },
+        deepScan,
+        enableGrouping: groupByType,
+        enableColoring,
+        secondaryGroupBy,
+        generatedAt: Date.now(),
+      },
     };
     await this.writeConfig(config);
   }
@@ -1652,21 +2049,50 @@ export class ConfigService {
     if (!exists) return; // Nothing to sync
 
     const existingConfig = await this.readConfig();
+    const discoveryProfile = this.getEffectiveDiscoveryProfile(
+      existingConfig,
+      deepScan
+    );
+    const effectiveSources = discoveryProfile?.sources ?? {};
+    const effectiveDeepScan = discoveryProfile?.deepScan ?? deepScan;
+    const discoverableTypes = new Set(
+      (Object.entries(ConfigService.DISCOVERABLE_TYPES_BY_SOURCE) as Array<
+        [keyof DiscoverySources, string[]]
+      >)
+        .filter(([source]) => effectiveSources[source] === true)
+        .flatMap(([, types]) => types)
+    );
+
+    if (discoverableTypes.size === 0) {
+      return;
+    }
     
     // 1. Gather current reality from disk
     const newActions: Action[] = [];
-    newActions.push(...(await this.scanNpmScripts(deepScan)));
-    newActions.push(...(await this.scanMake(deepScan)));
-    newActions.push(...(await this.scanRust(deepScan)));
-    newActions.push(...(await this.scanGo(deepScan)));
-    newActions.push(...(await this.scanDocker(deepScan)));
-    newActions.push(...(await this.scanTasks(deepScan)));
-    newActions.push(...(await this.scanLaunchConfigs(deepScan)));
+    if (effectiveSources.npm) {
+      newActions.push(...(await this.scanNpmScripts(effectiveDeepScan)));
+    }
+    if (effectiveSources.make) {
+      newActions.push(...(await this.scanMake(effectiveDeepScan)));
+    }
+    if (effectiveSources.rust) {
+      newActions.push(...(await this.scanRust(effectiveDeepScan)));
+    }
+    if (effectiveSources.go) {
+      newActions.push(...(await this.scanGo(effectiveDeepScan)));
+    }
+    if (effectiveSources.docker) {
+      newActions.push(...(await this.scanDocker(effectiveDeepScan)));
+    }
+    if (effectiveSources.tasks) {
+      newActions.push(...(await this.scanTasks(effectiveDeepScan)));
+    }
+    if (effectiveSources.launch) {
+      newActions.push(...(await this.scanLaunchConfigs(effectiveDeepScan)));
+    }
 
     const newActionsMap = new Map<string, Action>();
     newActions.forEach(action => newActionsMap.set(getWorkflowActionKey(action), action));
-
-    const discoverableTypes = new Set(["npm", "task", "launch", "make", "rust", "go", "docker"]);
     const finalActions: Action[] = [];
     
     // 2. Process existing actions
@@ -1729,7 +2155,8 @@ export class ConfigService {
     const newConfig: Config = { 
        ...existingConfig, 
        actions: finalActions,
-       groups: finalGroups.length > 0 ? finalGroups : undefined
+       groups: finalGroups.length > 0 ? finalGroups : undefined,
+       discovery: discoveryProfile ?? existingConfig.discovery,
     };
 
     await this.writeConfig(newConfig);

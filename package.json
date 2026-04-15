@@ -126,7 +126,7 @@
         },
         {
           "command": "battlestation.openWorkflowBuilder",
-          "when": "view == battlestation.view && battlestation.isLoaded",
+          "when": "view == battlestation.view && battlestation.isLoaded && battlestation.experimental.workflows",
           "group": "navigation@3"
         },
         {
@@ -188,6 +188,16 @@
           "command": "battlestation.openSettings",
           "when": "view == battlestation.view && battlestation.isLoaded",
           "group": "navigation@8"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "battlestation.openWorkflowBuilder",
+          "when": "battlestation.experimental.workflows"
+        },
+        {
+          "command": "battlestation.runWorkflow",
+          "when": "battlestation.experimental.workflows"
         }
       ]
     },
@@ -258,6 +268,11 @@
           "type": "boolean",
           "default": false,
           "description": "Enable experimental multi-step wizard for adding new actions or importing JSON."
+        },
+        "battlestation.experimental.workflows": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the experimental workflow runner and workflow builder UI."
         },
         "battlestation.display.secondaryGroupStyle": {
           "type": "string",

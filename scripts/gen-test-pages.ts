@@ -16,6 +16,7 @@ import { renderEditActionForm } from '../src/views/editItemForm';
 import { renderGenerateConfigView } from '../src/views/generateConfigView';
 import { renderWorkflowBuilderView } from '../src/views/workflowBuilderView';
 import type { Action } from '../src/types';
+import { getEligibleWorkflowActionStats } from '../src/utils/workflows';
 
 const outDir = path.join(__dirname, 'test-pages');
 if (!fs.existsSync(outDir)) fs.mkdirSync(outDir);
@@ -142,14 +143,20 @@ const workflowActions: Action[] = [
   { id: 'action-build', name: 'Build Project', command: 'npm run build', type: 'npm', group: 'Build' },
   { id: 'action-test', name: 'Run Tests', command: 'npm test', type: 'npm', group: 'Test' },
   { id: 'action-deploy', name: 'Deploy App', command: 'npm run deploy', type: 'npm', group: 'Release' },
+  { id: 'action-vscode', name: 'Open Problems', command: 'workbench.actions.view.problems', type: 'vscode', group: 'Debug' },
+  { id: 'action-task', name: 'Compile Task', command: 'workbench.action.tasks.runTask|compile', type: 'task', group: 'Build' },
 ];
+
+const workflowActionStats = getEligibleWorkflowActionStats(workflowActions);
 
 const workflowBuilderHtml = renderWorkflowBuilderView({
   cspSource: CSP,
   nonce: NONCE,
   codiconStyles: CODICON,
   initialData: {
-    actions: workflowActions,
+    actions: workflowActionStats.actions,
+    eligibleActionCount: workflowActionStats.eligibleActionCount,
+    totalActionCount: workflowActionStats.totalActionCount,
     workflows: [
       {
         id: 'workflow-release',

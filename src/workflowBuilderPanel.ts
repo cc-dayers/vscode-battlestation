@@ -4,7 +4,7 @@ import { ConfigService } from "./services/configService";
 import { WorkflowExecutionService } from "./services/workflowExecutionService";
 import { renderWorkflowBuilderView } from "./views";
 import { getNonce } from "./templates/nonce";
-import { buildWorkflowSummaries, findWorkflow, getEligibleWorkflowActions } from "./utils/workflows";
+import { buildWorkflowSummaries, findWorkflow, getEligibleWorkflowActionStats } from "./utils/workflows";
 import { createEntityId } from "./utils/id";
 import codiconCssTemplate from "../media/codicon.css";
 
@@ -29,6 +29,10 @@ export class WorkflowBuilderPanel implements vscode.Disposable {
 
   public dispose(): void {
     this.disposables.forEach((disposable) => disposable.dispose());
+    this.panel?.dispose();
+  }
+
+  public close(): void {
     this.panel?.dispose();
   }
 
@@ -116,8 +120,11 @@ export class WorkflowBuilderPanel implements vscode.Disposable {
 
     const config = await this.configService.readConfig();
     const activeWorkflowId = this.resolveActiveWorkflowId(config.workflows);
+    const actionStats = getEligibleWorkflowActionStats(config.actions);
     const data = {
-      actions: getEligibleWorkflowActions(config.actions),
+      actions: actionStats.actions,
+      eligibleActionCount: actionStats.eligibleActionCount,
+      totalActionCount: actionStats.totalActionCount,
       workflows: buildWorkflowSummaries(config.workflows, config.actions),
       activeWorkflowId,
     };

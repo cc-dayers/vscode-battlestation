@@ -17,6 +17,25 @@ test.describe('Workflow Builder', () => {
     await expect(page.locator('.wf-steps .wf-card .wf-card-title', { hasText: 'Run Tests' })).toBeVisible();
   });
 
+  test('shows guidance and current workflow limitations', async ({ page }) => {
+    await expect(page.locator('.wf-guide')).toContainText('Sequential only');
+    await expect(page.locator('.wf-guide')).toContainText('No branching, conditions, loops, or freeform graph editing yet.');
+    await expect(page.locator('.wf-guide')).toContainText('VS Code commands and launch configs are excluded.');
+  });
+
+  test('catalog copy explains the eligible action subset', async ({ page }) => {
+    await expect(page.locator('.wf-catalog .wf-section-copy')).toContainText('Showing 4 of 5 actions');
+    await expect(page.locator('.wf-card--catalog')).toHaveCount(4);
+    await expect(page.locator('.wf-card--catalog', { hasText: 'Compile Task' })).toBeVisible();
+    await expect(page.locator('.wf-card--catalog', { hasText: 'Open Problems' })).toHaveCount(0);
+  });
+
+  test('renders the active workflow as connected step nodes', async ({ page }) => {
+    await expect(page.locator('.wf-step-node')).toHaveCount(2);
+    await expect(page.locator('.wf-step-line')).toHaveCount(1);
+    await expect(page.locator('.wf-step-terminal')).toContainText('End');
+  });
+
   test('new workflow button dispatches createWorkflow', async ({ page }) => {
     await page.evaluate(() => { (window as any).__lastCommand = null; });
     await page.locator('.wf-primary-btn', { hasText: 'New' }).click();
@@ -31,6 +50,102 @@ test.describe('Workflow Builder', () => {
     expect(command?.command).toBe('addWorkflowStep');
     expect(command?.workflowId).toBe('workflow-release');
     expect(command?.actionId).toBe('action-deploy');
+  });
+
+  test('task actions appear in the catalog and can be added to a workflow', async ({ page }) => {
+    await page.evaluate(() => { (window as any).__lastCommand = null; });
+    await page.locator('.wf-card--catalog', { hasText: 'Compile Task' }).locator('.wf-primary-btn').click();
+    const command = await page.evaluate(() => (window as any).__lastCommand);
+    expect(command?.command).toBe('addWorkflowStep');
+    expect(command?.workflowId).toBe('workflow-release');
+    expect(command?.actionId).toBe('action-task');
+  });
+
+  test('catalog refreshes when updated actions arrive from the extension host', async ({ page }) => {
+    await expect(page.locator('.wf-card--catalog')).toHaveCount(4);
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: {
+          type: 'update',
+          data: {
+            actions: [
+              { id: 'action-build', name: 'Build Project', command: 'npm run build', type: 'npm', group: 'Build' },
+              { id: 'action-test', name: 'Run Tests', command: 'npm test', type: 'npm', group: 'Test' },
+              { id: 'action-deploy', name: 'Deploy App', command: 'npm run deploy', type: 'npm', group: 'Release' },
+              { id: 'action-sync', name: 'Synced Action', command: 'echo synced', type: 'shell', group: 'Utility' },
+            ],
+            eligibleActionCount: 4,
+            totalActionCount: 6,
+            workflows: [
+              {
+                id: 'workflow-release',
+                name: 'Release Train',
+                stepCount: 2,
+                valid: true,
+                invalidReasons: [],
+                steps: [
+                  { id: 'step-build', actionId: 'action-build', continueOnError: false, valid: true, action: { id: 'action-build', name: 'Build Project', command: 'npm run build', type: 'npm', group: 'Build' } },
+                  { id: 'step-test', actionId: 'action-test', continueOnError: true, valid: true, action: { id: 'action-test', name: 'Run Tests', command: 'npm test', type: 'npm', group: 'Test' } },
+                ],
+              },
+              {
+                id: 'workflow-invalid',
+                name: 'Broken Chain',
+                stepCount: 1,
+                valid: false,
+                invalidReasons: ['Referenced action no longer exists.'],
+                steps: [
+                  { id: 'step-missing', actionId: 'missing-action', continueOnError: false, valid: false, reason: 'Referenced action no longer exists.' },
+                ],
+              },
+            ],
+            activeWorkflowId: 'workflow-release',
+          },
+        },
+      }));
+    });
+
+    await expect(page.locator('.wf-card--catalog')).toHaveCount(4);
+    await expect(page.locator('.wf-card--catalog', { hasText: 'Synced Action' })).toBeVisible();
+    await expect(page.locator('.wf-catalog .wf-section-copy')).toContainText('Showing 4 of 6 actions');
+  });
+
+  test('catalog search matches the side-panel algorithm by group name', async ({ page }) => {
+    await page.locator('.wf-search').fill('release');
+    await expect(page.locator('.wf-card--catalog')).toHaveCount(1);
+    await expect(page.locator('.wf-card--catalog').first()).toContainText('Deploy App');
+  });
+
+  test('delete workflow uses inline confirmation instead of window.confirm', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.message);
+    });
+
+    await page.evaluate(() => {
+      window.confirm = () => {
+        throw new Error('window.confirm should not be called by workflow deletion');
+      };
+      (window as any).__lastCommand = null;
+    });
+
+    await page.locator('.wf-danger-btn', { hasText: 'Delete' }).click();
+
+    const confirmPanel = page.locator('.wf-inline-confirm');
+    await expect(confirmPanel).toBeVisible();
+    await expect(confirmPanel).toContainText('Delete this workflow?');
+    await expect(confirmPanel).toContainText('This removes the saved chain and its step list.');
+
+    const commandBeforeConfirm = await page.evaluate(() => (window as any).__lastCommand);
+    expect(commandBeforeConfirm).toBeNull();
+
+    await confirmPanel.locator('.wf-danger-btn', { hasText: 'Delete workflow' }).click();
+
+    const command = await page.evaluate(() => (window as any).__lastCommand);
+    expect(command?.command).toBe('deleteWorkflow');
+    expect(command?.workflowId).toBe('workflow-release');
+    expect(pageErrors).toEqual([]);
   });
 
   test('renaming a workflow dispatches renameWorkflow', async ({ page }) => {

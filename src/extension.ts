@@ -6,6 +6,9 @@ import { ActionExecutionService } from "./services/actionExecutionService";
 import { WorkflowExecutionService } from "./services/workflowExecutionService";
 import { WorkflowBuilderPanel } from "./workflowBuilderPanel";
 
+const WORKFLOWS_EXPERIMENT_KEY = "experimental.workflows";
+const WORKFLOWS_EXPERIMENT_CONTEXT = "battlestation.experimental.workflows";
+
 export function activate(context: vscode.ExtensionContext) {
   const configService = new ConfigService(context);
   const runStatusService = new RunStatusService();
@@ -21,10 +24,33 @@ export function activate(context: vscode.ExtensionContext) {
     runStatusService
   );
 
+  const syncExperimentalContexts = () => {
+    const workflowsEnabled = vscode.workspace
+      .getConfiguration("battlestation")
+      .get<boolean>(WORKFLOWS_EXPERIMENT_KEY, false);
+
+    void vscode.commands.executeCommand(
+      "setContext",
+      WORKFLOWS_EXPERIMENT_CONTEXT,
+      workflowsEnabled
+    );
+
+    if (!workflowsEnabled) {
+      workflowBuilderPanel.close();
+    }
+  };
+
+  syncExperimentalContexts();
+
   context.subscriptions.push(
     provider,
     workflowBuilderPanel,
-    vscode.window.registerWebviewViewProvider("battlestation.view", provider)
+    vscode.window.registerWebviewViewProvider("battlestation.view", provider),
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration(`battlestation.${WORKFLOWS_EXPERIMENT_KEY}`)) {
+        syncExperimentalContexts();
+      }
+    })
   );
 
   context.subscriptions.push(

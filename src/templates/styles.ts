@@ -407,7 +407,6 @@ export const checkboxStyles = `
     align-items: center;
     margin: 4px 0;
     cursor: pointer;
-    user-select: none;
     font-size: 12px;
     padding: 4px;
     border-radius: 3px;
@@ -434,7 +433,6 @@ export const optionCardStyles = `
     border: 1px solid var(--vscode-widget-border);
     border-radius: 4px;
     cursor: pointer;
-    user-select: none;
     transition: all 0.2s ease;
     position: relative;
   }

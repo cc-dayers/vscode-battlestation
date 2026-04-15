@@ -18,7 +18,13 @@ export interface WorkflowSummary {
   steps: ResolvedWorkflowStep[];
 }
 
-const INELIGIBLE_WORKFLOW_TYPES = new Set(["vscode", "task", "launch"]);
+export interface WorkflowEligibleActionStats {
+  actions: Action[];
+  eligibleActionCount: number;
+  totalActionCount: number;
+}
+
+const INELIGIBLE_WORKFLOW_TYPES = new Set(["vscode", "launch"]);
 
 export function isWorkflowEligibleAction(action: Action): boolean {
   return !INELIGIBLE_WORKFLOW_TYPES.has(action.type);
@@ -29,10 +35,20 @@ export function getWorkflowActionKey(action: Action): string {
 }
 
 export function getEligibleWorkflowActions(actions: Action[]): Action[] {
-  return actions
+  return getEligibleWorkflowActionStats(actions).actions;
+}
+
+export function getEligibleWorkflowActionStats(actions: Action[]): WorkflowEligibleActionStats {
+  const eligibleActions = actions
     .filter(isWorkflowEligibleAction)
     .slice()
     .sort((left, right) => left.name.localeCompare(right.name));
+
+  return {
+    actions: eligibleActions,
+    eligibleActionCount: eligibleActions.length,
+    totalActionCount: actions.length,
+  };
 }
 
 export function resolveWorkflowStep(step: WorkflowStep, actions: Action[]): ResolvedWorkflowStep {

@@ -510,7 +510,6 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
         cursor: pointer;
         font-size: 12px;
         font-weight: 600;
-        user-select: none;
       }
       .lp-enhanced-header:hover {
         background: var(--vscode-list-hoverBackground);
@@ -553,6 +552,33 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
       }
       .lp-form-actions--welcome {
         margin-top: 20px;
+      }
+      .lp-secondary-grouping {
+        margin-top: 8px;
+      }
+      .lp-secondary-grouping-label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        opacity: 0.7;
+        text-transform: uppercase;
+      }
+      .lp-secondary-grouping-select {
+        width: 100%;
+        padding: 5px 6px;
+        font-size: 12px;
+        background: var(--vscode-dropdown-background);
+        color: var(--vscode-dropdown-foreground);
+        border: 1px solid var(--vscode-dropdown-border);
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      .lp-secondary-grouping-hint {
+        margin-top: 4px;
+        font-size: 11px;
+        color: var(--vscode-descriptionForeground);
+        font-style: italic;
       }
       .lp-show-options-check {
         cursor: pointer;
@@ -611,16 +637,16 @@ export function renderGenerateConfigView(ctx: GenerateConfigContext): string {
           ${renderCheckbox("groupCheck", "Group by type", true)}
           ${renderCheckbox("colorCheck", "Auto-colorize groups", true)}
           ${renderCheckbox("autoOpenCheck", "Auto-open config file", false)}
-          ${renderCheckbox("deepScanCheck", "Deep Scan (Recursive) - thorough but slower", false)}
-          <div style="margin-top: 8px;">
-            <label for="secondaryGroupBySelect" style="font-size: 11px; font-weight: 600; opacity: 0.7; text-transform: uppercase; display: block; margin-bottom: 4px;">Secondary Grouping:</label>
-            <select id="secondaryGroupBySelect" style="width: 100%; padding: 5px 6px; font-size: 12px; background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border); border-radius: 3px; cursor: pointer;">
+          ${renderCheckbox("deepScanCheck", "Deep Scan nested manifests in open workspace folders", false)}
+          <div class="lp-secondary-grouping">
+            <label for="secondaryGroupBySelect" class="lp-secondary-grouping-label">Secondary Grouping:</label>
+            <select id="secondaryGroupBySelect" class="lp-secondary-grouping-select">
               <option value="auto" selected>Auto-detect (recommended)</option>
               <option value="workspace">Always group by workspace / portal</option>
               <option value="type">Always group by type (build, test…)</option>
               <option value="none">None</option>
             </select>
-            <div style="font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 4px; font-style: italic;">ℹ️ Auto-detect applies workspace grouping when multiple workspaces are found in a group</div>
+            <div class="lp-secondary-grouping-hint">ℹ️ Auto-detect applies workspace grouping when multiple workspaces are found in a group</div>
           </div>
         </div>
       </div>

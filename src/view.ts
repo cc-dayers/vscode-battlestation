@@ -24,6 +24,8 @@ import { WorkflowBuilderPanel } from "./workflowBuilderPanel";
 // Import codicon CSS as a string at build time via esbuild plugin
 import codiconCssTemplate from "../media/codicon.css";
 
+const WORKFLOWS_EXPERIMENT_KEY = "experimental.workflows";
+
 type FormState =
   | false
   | true
@@ -394,10 +396,18 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   }
 
   public async openWorkflowBuilder(workflowId?: string) {
+    if (!this.isWorkflowFeatureEnabled()) {
+      return;
+    }
+
     await this.workflowBuilderPanel.open(workflowId);
   }
 
   public async runWorkflow(workflowId?: string) {
+    if (!this.isWorkflowFeatureEnabled()) {
+      return;
+    }
+
     if (!workflowId) {
       this.showToast("No workflow selected.", "warning");
       return;
@@ -590,9 +600,16 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
   /* ─── render helpers ─── */
 
+  private isWorkflowFeatureEnabled(): boolean {
+    return vscode.workspace
+      .getConfiguration("battlestation")
+      .get<boolean>(WORKFLOWS_EXPERIMENT_KEY, false);
+  }
+
   private getEnrichedConfig(config: Config): Config & Record<string, any> {
     const wsConfig = vscode.workspace.getConfiguration("battlestation");
     const customMappings = wsConfig.get<Record<string, string>>("customIconMappings", {});
+    const workflowsEnabled = this.isWorkflowFeatureEnabled();
 
     // Merge custom icon mappings into config
     const mergedIcons = [...(config.icons || [])];
@@ -604,7 +621,12 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
     return {
       ...config,
-      workflowSummaries: buildWorkflowSummaries(config.workflows, config.actions),
+      workflowSummaries: workflowsEnabled
+        ? buildWorkflowSummaries(config.workflows, config.actions)
+        : [],
+      experimentalFeatures: {
+        workflows: workflowsEnabled,
+      },
       icons: mergedIcons,
       display: {
         showCommand: wsConfig.get<boolean>("display.showCommand", true),

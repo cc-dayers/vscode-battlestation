@@ -5,6 +5,7 @@ import * as path from 'path';
 suite('Flyout Menu Architecture Test Suite', () => {
     const repoRoot = path.resolve(__dirname, '../../..');
     const webviewFile = path.join(repoRoot, 'src', 'webview', 'mainView.ts');
+    const workflowBuilderWebviewFile = path.join(repoRoot, 'src', 'webview', 'workflowBuilder.ts');
     const styleFile = path.join(repoRoot, 'src', 'style.scss');
 
     test('Webview uses shared flyout render and keyboard handlers', () => {
@@ -77,5 +78,25 @@ suite('Flyout Menu Architecture Test Suite', () => {
         assert.ok(/\.lp-drag-handle,\s*\.lp-group-drag-handle\s*\{[\s\S]*?flex:\s*0 0 12px;/.test(source), 'Shared group drag handle styles should still exist');
         assert.ok(source.includes('margin-right: 2px;'), 'Drag handle should keep a small explicit right margin');
         assert.ok(/\.lp-subgroup--collapsed\s+\.lp-group-chevron\s*\{[\s\S]*?transform:\s*rotate\(-90deg\);/.test(source), 'Collapsed subgroup styling should rotate the subgroup chevron like the parent group chevron');
+    });
+
+    test('Workflow builder explains the sequential model and renders connected steps', () => {
+        const source = fs.readFileSync(workflowBuilderWebviewFile, 'utf8');
+
+        assert.ok(source.includes('Sequential only'), 'Workflow builder should call out the current workflow model');
+        assert.ok(source.includes('No branching, conditions, loops, or freeform graph editing yet.'), 'Workflow builder should explain graph/canvas limitations');
+        assert.ok(source.includes('class="wf-step-flow"'), 'Workflow builder should render a connected step-flow container');
+        assert.ok(source.includes('"wf-step-node"') || source.includes("'wf-step-node'"), 'Workflow builder should render explicit step nodes');
+        assert.ok(source.includes('class="wf-step-line"'), 'Workflow builder should render connectors between nodes');
+    });
+
+    test('Workflow builder styles define its guided flow layout', () => {
+        const source = fs.readFileSync(styleFile, 'utf8');
+
+        assert.ok(source.includes('.wf-shell'), 'Workflow builder shell layout should be styled');
+        assert.ok(source.includes('.wf-guide'), 'Workflow builder should style its guidance panel');
+        assert.ok(source.includes('.wf-step-flow'), 'Workflow builder should style the step flow container');
+        assert.ok(source.includes('.wf-step-node'), 'Workflow builder should style step nodes');
+        assert.ok(source.includes('.wf-step-line'), 'Workflow builder should style connectors between nodes');
     });
 });

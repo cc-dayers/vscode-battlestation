@@ -78,6 +78,10 @@ const indexHtml = `
           { name: "Build", icon: "package", color: "#4a90d9" },
           { name: "Launch", icon: "rocket" }
         ],
+        workflowSummaries: [],
+        experimentalFeatures: {
+          workflows: false
+        },
         iconMap: { npm: "package", shell: "terminal" },
         display: {
           showIcon: true,

@@ -233,6 +233,26 @@ suite('Config Lifecycle Test Suite', () => {
         assert.ok((status.config?.actions?.length ?? 0) > 0, 'Generated config should include actions immediately');
     });
 
+    test('Should emit onDidChange after programmatic config writes', async function () {
+        this.timeout(5000);
+
+        let changeCount = 0;
+        const disposable = configService.onDidChange(() => {
+            changeCount += 1;
+        });
+
+        try {
+            await configService.writeConfig({
+                actions: [{ name: 'Workflow Refresh Target', command: 'echo refreshed', type: 'shell' }],
+                icons: []
+            });
+
+            assert.ok(changeCount > 0, 'writeConfig should emit onDidChange so dependent views can refresh');
+        } finally {
+            disposable.dispose();
+        }
+    });
+
     test('Should preserve task groups from tasks.json during auto-config generation', async function () {
         this.timeout(10000);
 

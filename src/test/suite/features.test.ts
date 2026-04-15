@@ -5,6 +5,8 @@
  */
 
 import * as assert from 'assert';
+import * as fs from 'fs';
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { renderErrorView } from '../../views/errorView';
 import { renderMainView } from '../../views/mainView';
@@ -264,6 +266,73 @@ suite('Feature 3: Last-Run Status Indicator', () => {
     assert.ok(compiled.includes('lp-status-dot'), 'Should include status-dot class');
     assert.ok(compiled.includes('lp-status-ok'), 'Should include status-ok class');
     assert.ok(compiled.includes('lp-status-fail'), 'Should include status-fail class');
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// Feature 4: Experimental Workflow Gating
+// ────────────────────────────────────────────────────────────
+suite('Feature 4: Experimental Workflow Gating', () => {
+  test('workflow experiment defaults to disabled', () => {
+    const config = vscode.workspace.getConfiguration('battlestation');
+    assert.strictEqual(config.get<boolean>('experimental.workflows', false), false);
+  });
+
+  test('package contributions hide workflow commands unless the experiment is enabled', () => {
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '../../..', 'package.json'), 'utf8')
+    );
+
+    const commandPaletteEntries = packageJson.contributes?.menus?.commandPalette || [];
+    const openWorkflowBuilderEntry = commandPaletteEntries.find(
+      (entry: any) => entry.command === 'battlestation.openWorkflowBuilder'
+    );
+    const runWorkflowEntry = commandPaletteEntries.find(
+      (entry: any) => entry.command === 'battlestation.runWorkflow'
+    );
+    const viewTitleEntries = packageJson.contributes?.menus?.['view/title'] || [];
+    const toolbarWorkflowEntry = viewTitleEntries.find(
+      (entry: any) => entry.command === 'battlestation.openWorkflowBuilder'
+    );
+
+    assert.ok(openWorkflowBuilderEntry, 'Workflow builder command should have a commandPalette visibility rule');
+    assert.ok(runWorkflowEntry, 'Run workflow command should have a commandPalette visibility rule');
+    assert.ok(toolbarWorkflowEntry, 'Workflow builder toolbar command should exist');
+    assert.ok(
+      openWorkflowBuilderEntry.when.includes('battlestation.experimental.workflows'),
+      'Workflow builder command should stay out of the command palette until enabled'
+    );
+    assert.ok(
+      runWorkflowEntry.when.includes('battlestation.experimental.workflows'),
+      'Run workflow command should stay out of the command palette until enabled'
+    );
+    assert.ok(
+      toolbarWorkflowEntry.when.includes('battlestation.experimental.workflows'),
+      'Workflow builder toolbar affordance should stay hidden until enabled'
+    );
+  });
+
+  test('renderMainView can carry the workflow experiment state to the webview', () => {
+    const html = renderMainView({
+      cspSource: 'none',
+      nonce: 'test-nonce',
+      codiconStyles: '',
+      config: { actions: [], groups: [], icons: [] },
+      showHidden: false,
+      searchVisible: false,
+      initialData: {
+        actions: [],
+        groups: [],
+        workflowSummaries: [],
+        experimentalFeatures: { workflows: false },
+        runStatus: {},
+      },
+    });
+
+    assert.ok(
+      html.includes('"experimentalFeatures":{"workflows":false}'),
+      'Main view should serialize the workflow experiment state into initial data'
+    );
   });
 });
 

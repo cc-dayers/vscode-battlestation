@@ -1,3 +1,4 @@
+import * as path from "path";
 import * as vscode from "vscode";
 import type { Action } from "../types";
 import { RunStatusService, type RunStatusEntry } from "./runStatusService";
@@ -40,7 +41,12 @@ export class ActionExecutionService {
       throw new Error(`Action type "${resolvedItem.type}" is not supported in workflows.`);
     }
 
-    return this.executeShellCommandBlocking(resolvedItem);
+    switch (resolvedItem.type) {
+      case "task":
+        return this.executeTaskBlocking(resolvedItem);
+      default:
+        return this.executeShellCommandBlocking(resolvedItem);
+    }
   }
 
   private async resolveParams(item: Action): Promise<Action | undefined> {
@@ -78,6 +84,80 @@ export class ActionExecutionService {
     } else {
       await vscode.commands.executeCommand(cmd.trim());
     }
+  }
+
+  private parseTaskLabel(command: string): string | undefined {
+    const [cmd, ...labelParts] = command.split("|");
+    if (cmd.trim() !== "workbench.action.tasks.runTask") {
+      return undefined;
+    }
+
+    const label = labelParts.join("|").trim();
+    return label.length > 0 ? label : undefined;
+  }
+
+  private normalizeFsPath(fsPath: string): string {
+    const normalized = path.normalize(fsPath);
+    return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+  }
+
+  private isWorkspaceFolderTaskScope(
+    scope: vscode.TaskScope | vscode.WorkspaceFolder | undefined
+  ): scope is vscode.WorkspaceFolder {
+    return typeof scope === "object" && scope !== null && "uri" in scope;
+  }
+
+  private async resolveTaskForAction(item: Action): Promise<vscode.Task> {
+    const label = this.parseTaskLabel(item.command);
+    if (!label) {
+      throw new Error(`Task action "${item.name}" is missing a task label.`);
+    }
+
+    const tasks = await vscode.tasks.fetchTasks();
+    let matches = tasks.filter((task) => task.name === label);
+
+    if (matches.length === 0) {
+      throw new Error(
+        `Task "${label}" is not available in the current workspace. Regenerate your config if the task source changed.`
+      );
+    }
+
+    if (item.cwd) {
+      const normalizedCwd = this.normalizeFsPath(item.cwd);
+      const scopedMatches = matches.filter(
+        (task) =>
+          this.isWorkspaceFolderTaskScope(task.scope) &&
+          this.normalizeFsPath(task.scope.uri.fsPath) === normalizedCwd
+      );
+
+      if (scopedMatches.length === 1) {
+        return scopedMatches[0];
+      }
+
+      if (scopedMatches.length > 1) {
+        matches = scopedMatches;
+      }
+    } else {
+      const workspaceMatches = matches.filter(
+        (task) => task.scope === vscode.TaskScope.Workspace
+      );
+
+      if (workspaceMatches.length === 1) {
+        return workspaceMatches[0];
+      }
+
+      if (workspaceMatches.length > 1) {
+        matches = workspaceMatches;
+      }
+    }
+
+    if (matches.length === 1) {
+      return matches[0];
+    }
+
+    throw new Error(
+      `Task "${label}" is ambiguous in the current workspace. Regenerate your config so the task keeps its folder context.`
+    );
   }
 
   private createTerminal(item: Action): vscode.Terminal {
@@ -219,6 +299,66 @@ export class ActionExecutionService {
         );
         finish(1);
       }, 2000);
+    });
+  }
+
+  private async executeTaskBlocking(item: Action): Promise<RunStatusEntry> {
+    const task = await this.resolveTaskForAction(item);
+
+    return new Promise<RunStatusEntry>((resolve, reject) => {
+      let finished = false;
+      let sawProcessExit = false;
+      let startedExecution: vscode.TaskExecution | undefined;
+      let startTaskListener: vscode.Disposable | undefined;
+      let endTaskListener: vscode.Disposable | undefined;
+      let endTaskProcessListener: vscode.Disposable | undefined;
+
+      const disposeListeners = () => {
+        startTaskListener?.dispose();
+        endTaskListener?.dispose();
+        endTaskProcessListener?.dispose();
+      };
+
+      const finish = (exitCode: number) => {
+        if (finished) return;
+        finished = true;
+        disposeListeners();
+        resolve(this.buildRunStatus(item, exitCode));
+      };
+
+      const fail = (error: unknown) => {
+        if (finished) return;
+        finished = true;
+        disposeListeners();
+        reject(error instanceof Error ? error : new Error(String(error)));
+      };
+
+      startTaskListener = vscode.tasks.onDidStartTask((event) => {
+        if (event.execution.task !== task) return;
+        startedExecution = event.execution;
+      });
+
+      endTaskProcessListener = vscode.tasks.onDidEndTaskProcess((event) => {
+        if (!startedExecution || event.execution !== startedExecution) return;
+        sawProcessExit = true;
+        finish(event.exitCode ?? 0);
+      });
+
+      endTaskListener = vscode.tasks.onDidEndTask((event) => {
+        if (!startedExecution || event.execution !== startedExecution) return;
+        if (!sawProcessExit) {
+          finish(0);
+        }
+      });
+
+      void vscode.tasks.executeTask(task).then(
+        (execution) => {
+          startedExecution = execution;
+        },
+        (error) => {
+          fail(error);
+        }
+      );
     });
   }
 }

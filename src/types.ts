@@ -54,11 +54,33 @@ export interface BattleConfig {
   actions: Action[];
 }
 
+export interface DiscoverySources {
+  npm?: boolean;
+  tasks?: boolean;
+  launch?: boolean;
+  docker?: boolean;
+  make?: boolean;
+  rust?: boolean;
+  go?: boolean;
+}
+
+export interface DiscoveryProfile {
+  version: 1;
+  sources: DiscoverySources;
+  deepScan: boolean;
+  detectionMethod?: "file" | "command" | "hybrid";
+  enableGrouping?: boolean;
+  enableColoring?: boolean;
+  secondaryGroupBy?: "auto" | "workspace" | "type" | "none";
+  generatedAt?: number;
+}
+
 export interface Config {
   actions: Action[];
   groups?: Group[];
   icons?: IconMapping[];
   workflows?: Workflow[];
   customColors?: string[]; // User-defined color palette
+  discovery?: DiscoveryProfile;
   [key: string]: any; // Allow arbitrary keys from config
 }

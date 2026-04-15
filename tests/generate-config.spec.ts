@@ -20,6 +20,14 @@ test.describe('Generate Config View', () => {
     expect(pageErrors).toEqual([]);
   });
 
+  test('deep scan copy explains nested manifest discovery scope', async ({ page }) => {
+    await page.locator('#showOptionsCheck').check();
+
+    await expect(page.locator('#optionsContainer')).toContainText(
+      'Deep Scan nested manifests in open workspace folders'
+    );
+  });
+
   test('checkbox changes whether custom generation options are used', async ({ page }) => {
     await page.evaluate(() => {
       (window as any).__lastCommand = null;

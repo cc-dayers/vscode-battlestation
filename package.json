@@ -14,7 +14,9 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -89,6 +91,60 @@
         "title": "Battlestation: Expand All Groups",
         "shortTitle": "$(expand-all) Expand All Groups",
         "icon": "$(expand-all)"
+      },
+      {
+        "command": "battlestation.openJobs",
+        "title": "Battlestation: Open Jobs",
+        "shortTitle": "$(watch) Open Jobs",
+        "icon": "$(watch)"
+      },
+      {
+        "command": "battlestation.runJobNow",
+        "title": "Battlestation: Run Job Now",
+        "shortTitle": "$(run) Run Job Now",
+        "icon": "$(run)"
+      },
+      {
+        "command": "battlestation.pauseJob",
+        "title": "Battlestation: Pause Job",
+        "shortTitle": "$(debug-pause) Pause Job",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "battlestation.resumeJob",
+        "title": "Battlestation: Resume Job",
+        "shortTitle": "$(debug-continue) Resume Job",
+        "icon": "$(debug-continue)"
+      },
+      {
+        "command": "battlestation.openJobLog",
+        "title": "Battlestation: Open Job Log",
+        "shortTitle": "$(output) Open Job Log",
+        "icon": "$(output)"
+      },
+      {
+        "command": "battlestation.openJobAdmin",
+        "title": "Battlestation: Open Job Admin",
+        "shortTitle": "$(info) Job Admin",
+        "icon": "$(info)"
+      },
+      {
+        "command": "battlestation.openBattles",
+        "title": "Battlestation: Open Battles",
+        "shortTitle": "$(shield) Open Battles",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "battlestation.refreshBattles",
+        "title": "Battlestation: Refresh Battles",
+        "shortTitle": "$(refresh) Refresh Battles",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "battlestation.addBattleProvider",
+        "title": "Battlestation: Add Battle Provider",
+        "shortTitle": "$(add) Add Provider",
+        "icon": "$(add)"
       }
     ],
     "viewsContainers": {
@@ -109,6 +165,21 @@
           "name": "Battlestation",
           "icon": "media/icon.svg",
           "contextualTitle": "Battlestation"
+        },
+        {
+          "type": "webview",
+          "id": "battlestation.jobs",
+          "name": "Jobs",
+          "icon": "media/icon.svg",
+          "contextualTitle": "Jobs"
+        },
+        {
+          "type": "webview",
+          "id": "battlestation.battles",
+          "name": "Battles",
+          "icon": "media/icon.svg",
+          "contextualTitle": "Battles",
+          "when": "battlestation.experimental.battles"
         }
       ]
     },
@@ -188,6 +259,36 @@
           "command": "battlestation.openSettings",
           "when": "view == battlestation.view && battlestation.isLoaded",
           "group": "navigation@8"
+        },
+        {
+          "command": "battlestation.openJobs",
+          "when": "view == battlestation.view",
+          "group": "navigation@9"
+        },
+        {
+          "command": "battlestation.runJobNow",
+          "when": "view == battlestation.jobs && battlestation.hasJobs",
+          "group": "navigation@1"
+        },
+        {
+          "command": "battlestation.openJobLog",
+          "when": "view == battlestation.jobs && battlestation.hasJobs",
+          "group": "navigation@2"
+        },
+        {
+          "command": "battlestation.openJobAdmin",
+          "when": "view == battlestation.jobs && battlestation.hasJobs",
+          "group": "navigation@3"
+        },
+        {
+          "command": "battlestation.refreshBattles",
+          "when": "view == battlestation.battles",
+          "group": "navigation@1"
+        },
+        {
+          "command": "battlestation.addBattleProvider",
+          "when": "view == battlestation.battles",
+          "group": "navigation@2"
         }
       ],
       "commandPalette": [
@@ -198,6 +299,36 @@
         {
           "command": "battlestation.runWorkflow",
           "when": "battlestation.experimental.workflows"
+        },
+        {
+          "command": "battlestation.openJobs"
+        },
+        {
+          "command": "battlestation.runJobNow"
+        },
+        {
+          "command": "battlestation.pauseJob"
+        },
+        {
+          "command": "battlestation.resumeJob"
+        },
+        {
+          "command": "battlestation.openJobLog"
+        },
+        {
+          "command": "battlestation.openJobAdmin"
+        },
+        {
+          "command": "battlestation.openBattles",
+          "when": "battlestation.experimental.battles"
+        },
+        {
+          "command": "battlestation.refreshBattles",
+          "when": "battlestation.experimental.battles"
+        },
+        {
+          "command": "battlestation.addBattleProvider",
+          "when": "battlestation.experimental.battles"
         }
       ]
     },
@@ -274,6 +405,11 @@
           "default": false,
           "description": "Enable the experimental workflow runner and workflow builder UI."
         },
+        "battlestation.experimental.battles": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the experimental Battles panel for tracking external work items from CLI providers."
+        },
         "battlestation.display.secondaryGroupStyle": {
           "type": "string",
           "enum": [
@@ -332,5 +468,8 @@
     "playwright": "^1.58.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "node-cron": "^4.2.1"
   }
 }

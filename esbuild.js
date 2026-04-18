@@ -73,7 +73,10 @@ async function main() {
     entryPoints: [
       "src/webview/settingsView.ts",
       "src/webview/mainView.ts",
+      "src/webview/jobsView.ts",
+      "src/webview/battlesView.ts",
       "src/webview/workflowBuilder.ts",
+      "src/webview/jobAdmin.ts",
     ],
     bundle: true,
     format: "esm",

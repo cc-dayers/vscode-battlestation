@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const url = require('url');
 
 const port = 3000;
 
@@ -107,7 +108,236 @@ const indexHtml = `
 </html>
 `;
 
-const url = require('url');
+const jobsHtml = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Jobs View Test</title>
+    <link href="/output.css" rel="stylesheet" />
+    <link href="/codicon.css" rel="stylesheet" />
+    <style>
+      body { padding: 20px; background: #1e1e1e; color: #cccccc; font-family: sans-serif; }
+      .codicon { font-family: codicon; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      ${mockVscodeApi}
+      window.__JOBS_INITIAL_DATA__ = {
+        jobs: [
+          {
+            jobId: "job-nightly-tests",
+            name: "Nightly Tests",
+            schedule: "0 9 * * 1-5",
+            timezone: "America/New_York",
+            enabled: true,
+            paused: false,
+            valid: true,
+            status: "scheduled",
+            targetKind: "workflow",
+            targetLabel: "workflow-release",
+            nextRunAt: Date.now() + 3600_000,
+            lastFinishedAt: Date.now() - 90_000,
+            lastOutcome: "success",
+            lastLogPath: ".vscode/battle.jobs/logs/job-nightly-tests/run-1.log",
+            lastLogLine: 3
+          },
+          {
+            jobId: "job-paused",
+            name: "Paused Sync",
+            schedule: "*/15 * * * *",
+            enabled: true,
+            paused: true,
+            valid: true,
+            status: "paused",
+            targetKind: "action",
+            targetLabel: "action-sync",
+            lastFinishedAt: Date.now() - 5_000,
+            lastOutcome: "failure"
+          },
+          {
+            jobId: "job-missed",
+            name: "Missed Deploy",
+            schedule: "0 2 * * *",
+            enabled: true,
+            paused: false,
+            valid: true,
+            status: "scheduled",
+            targetKind: "action",
+            targetLabel: "action-deploy",
+            nextRunAt: Date.now() + 7200_000,
+            lastFinishedAt: Date.now() - 7200_000,
+            lastOutcome: "missed",
+            lastLogPath: ".vscode/battle.jobs/logs/job-missed/run-missed-1.log",
+            lastLogLine: 8
+          }
+        ]
+      };
+    </script>
+    <script type="module" src="/jobsView.js"></script>
+  </body>
+</html>
+`;
+
+const battlesHtml = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Battles View Test</title>
+    <link href="/output.css" rel="stylesheet" />
+    <link href="/codicon.css" rel="stylesheet" />
+    <style>
+      body { padding: 20px; background: #1e1e1e; color: #cccccc; font-family: sans-serif; }
+      .codicon { font-family: codicon; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      ${mockVscodeApi}
+      window.__BATTLES_INITIAL_DATA__ = {
+        providers: [
+          {
+            providerId: "bb-prs",
+            providerName: "Bitbucket PRs",
+            providerIcon: "git-pull-request",
+            providerColor: "#0052CC",
+            battles: [
+              {
+                id: "pr-123",
+                title: "Fix auth flow",
+                description: "PR #123 needs your review",
+                status: "active",
+                priority: "high",
+                url: "https://bitbucket.org/team/repo/pull-requests/123",
+                tags: ["review", "auth"],
+                metadata: { author: "johndoe", branch: "feature/auth" },
+                actions: [
+                  { label: "Checkout", type: "shell", value: "git checkout feature/auth" }
+                ]
+              },
+              {
+                id: "pr-456",
+                title: "Update CI pipeline",
+                description: "PR #456 — CI config changes",
+                status: "active",
+                priority: "medium",
+                url: "https://bitbucket.org/team/repo/pull-requests/456",
+                tags: ["ci"],
+                actions: []
+              },
+              {
+                id: "pr-789",
+                title: "Bump dependencies",
+                status: "active",
+                priority: "low",
+                tags: ["deps", "bot"],
+                actions: []
+              }
+            ],
+            lastRefreshedAt: Date.now() - 120_000,
+            isLoading: false
+          },
+          {
+            providerId: "gh-issues",
+            providerName: "GitHub Issues",
+            providerIcon: "issues",
+            providerColor: "#238636",
+            battles: [],
+            lastRefreshedAt: Date.now() - 300_000,
+            isLoading: false
+          },
+          {
+            providerId: "error-provider",
+            providerName: "Broken Provider",
+            providerIcon: "warning",
+            battles: [],
+            lastError: "Command not found: fake-cli",
+            isLoading: false
+          }
+        ]
+      };
+    </script>
+    <script type="module" src="/battlesView.js"></script>
+  </body>
+</html>
+`;
+
+const jobAdminHtml = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Job Admin Test</title>
+    <link href="/output.css" rel="stylesheet" />
+    <link href="/codicon.css" rel="stylesheet" />
+    <style>
+      body { padding: 20px; background: #1e1e1e; color: #cccccc; font-family: sans-serif; }
+      .codicon { font-family: codicon; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      ${mockVscodeApi}
+      window.__JOB_ADMIN_DATA__ = {
+        snapshot: {
+          jobId: "job-nightly-tests",
+          name: "Nightly Tests",
+          schedule: "0 9 * * 1-5",
+          timezone: "America/New_York",
+          enabled: true,
+          paused: false,
+          valid: true,
+          status: "scheduled",
+          targetKind: "workflow",
+          targetLabel: "workflow-release",
+          nextRunAt: Date.now() + 3600_000,
+          lastRunAt: Date.now() - 90_000,
+          lastFinishedAt: Date.now() - 85_000,
+          lastExitCode: 0,
+          lastOutcome: "success",
+          lastRunId: "run-abc123",
+          lastLogPath: ".vscode/battle.jobs/logs/job-nightly-tests/run-abc123.log",
+          lastLogLine: 3
+        },
+        recentRuns: [
+          {
+            runId: "run-abc123",
+            jobId: "job-nightly-tests",
+            jobName: "Nightly Tests",
+            targetKind: "workflow",
+            targetLabel: "workflow-release",
+            startedAt: Date.now() - 90_000,
+            finishedAt: Date.now() - 85_000,
+            exitCode: 0,
+            outcome: "success",
+            logPath: ".vscode/battle.jobs/logs/job-nightly-tests/run-abc123.log",
+            logLine: 3,
+            inputs: { ENV: "staging" }
+          },
+          {
+            runId: "run-xyz456",
+            jobId: "job-nightly-tests",
+            jobName: "Nightly Tests",
+            targetKind: "workflow",
+            targetLabel: "workflow-release",
+            startedAt: Date.now() - 3_600_000,
+            finishedAt: Date.now() - 3_595_000,
+            exitCode: 1,
+            outcome: "failure",
+            logPath: ".vscode/battle.jobs/logs/job-nightly-tests/run-xyz456.log",
+            logLine: 3,
+            inputs: { ENV: "staging" }
+          }
+        ]
+      };
+    </script>
+    <script type="module" src="/jobAdmin.js"></script>
+  </body>
+</html>
+`;
+
 
 const getSettingsHtml = (reqUrl) => {
   const parsedUrl = url.parse(reqUrl, true);
@@ -181,6 +411,24 @@ const server = http.createServer((req, res) => {
   if (parsedReq.pathname === '/settings' || parsedReq.pathname === '/settings.html') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(getSettingsHtml(req.url), 'utf-8');
+    return;
+  }
+
+  if (parsedReq.pathname === '/jobs' || parsedReq.pathname === '/jobs.html') {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(jobsHtml, 'utf-8');
+    return;
+  }
+
+  if (parsedReq.pathname === '/battles' || parsedReq.pathname === '/battles.html') {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(battlesHtml, 'utf-8');
+    return;
+  }
+
+  if (parsedReq.pathname === '/job-admin' || parsedReq.pathname === '/job-admin.html') {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(jobAdminHtml, 'utf-8');
     return;
   }
 

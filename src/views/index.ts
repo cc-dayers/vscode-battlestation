@@ -24,4 +24,8 @@ export { renderJobAdminView } from "./jobAdminView";
 export type { JobAdminViewContext, JobAdminData } from "./jobAdminView";
 export { renderBattlesView } from "./battlesView";
 export type { BattlesViewContext } from "./battlesView";
+export { renderBattlesSettingsView } from "./battlesSettingsView";
+export type { BattlesSettingsViewContext, BattlesSettingsData } from "./battlesSettingsView";
+export { renderBattleTestView } from "./battleTestView";
+export type { BattleTestViewContext, BattleTestData } from "./battleTestView";
 export { esc, renderCheckbox, renderToggleSetting } from "./helpers";

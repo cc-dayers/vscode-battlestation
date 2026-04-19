@@ -145,6 +145,18 @@
         "title": "Battlestation: Add Battle Provider",
         "shortTitle": "$(add) Add Provider",
         "icon": "$(add)"
+      },
+      {
+        "command": "battlestation.openBattlesSettings",
+        "title": "Battlestation: Open Battles Settings",
+        "shortTitle": "$(gear) Settings",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "battlestation.testBattleProvider",
+        "title": "Battlestation: Test Battle Provider",
+        "shortTitle": "$(beaker) Test Provider",
+        "icon": "$(beaker)"
       }
     ],
     "viewsContainers": {
@@ -289,6 +301,11 @@
           "command": "battlestation.addBattleProvider",
           "when": "view == battlestation.battles",
           "group": "navigation@2"
+        },
+        {
+          "command": "battlestation.openBattlesSettings",
+          "when": "view == battlestation.battles",
+          "group": "navigation@3"
         }
       ],
       "commandPalette": [
@@ -328,6 +345,14 @@
         },
         {
           "command": "battlestation.addBattleProvider",
+          "when": "battlestation.experimental.battles"
+        },
+        {
+          "command": "battlestation.openBattlesSettings",
+          "when": "battlestation.experimental.battles"
+        },
+        {
+          "command": "battlestation.testBattleProvider",
           "when": "battlestation.experimental.battles"
         }
       ]

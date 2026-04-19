@@ -10,7 +10,8 @@ import { JobLogService } from "./services/jobLogService";
 import { JobSchedulerService } from "./services/jobSchedulerService";
 import { BattleProviderService } from "./services/battleProviderService";
 import { WorkflowBuilderPanel } from "./workflowBuilderPanel";
-import { JobAdminPanel } from "./jobAdminPanel";
+import { BattleTestPanel } from "./battleTestPanel";
+import { JobAdminPanel } from "./jobAdminPanel";
 
 const WORKFLOWS_EXPERIMENT_KEY = "experimental.workflows";
 const WORKFLOWS_EXPERIMENT_CONTEXT = "battlestation.experimental.workflows";
@@ -34,7 +35,8 @@ export function activate(context: vscode.ExtensionContext) {
   const jobAdminPanel = new JobAdminPanel(context, jobSchedulerService, jobLogService);
   const jobsProvider = new JobsViewProvider(context, jobSchedulerService);
   const battleProviderService = new BattleProviderService(context, configService);
-  const battlesProvider = new BattlesViewProvider(context, battleProviderService);
+  const battlesProvider = new BattlesViewProvider(context, battleProviderService, configService);
+  const battleTestPanel = new BattleTestPanel(context, configService, battleProviderService);
   const provider = new BattlestationViewProvider(
     context,
     configService,
@@ -84,6 +86,7 @@ export function activate(context: vscode.ExtensionContext) {
     jobAdminPanel,
     battleProviderService,
     battlesProvider,
+    battleTestPanel,
     provider,
     workflowBuilderPanel,
     vscode.window.registerWebviewViewProvider("battlestation.view", provider),
@@ -302,6 +305,33 @@ export function activate(context: vscode.ExtensionContext) {
       });
 
       void vscode.window.showInformationMessage(`Battle provider "${name}" added.`);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("battlestation.openBattlesSettings", () => {
+      battlesProvider.showSettings();
+      void vscode.commands.executeCommand("battlestation.battles.focus");
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("battlestation.testBattleProvider", async (providerId?: string) => {
+      if (!providerId) {
+        const config = await configService.readConfig();
+        const providers = config?.battleProviders?.filter((p) => p.enabled !== false) ?? [];
+        if (providers.length === 0) {
+          void vscode.window.showInformationMessage("No battle providers configured.");
+          return;
+        }
+        const pick = await vscode.window.showQuickPick(
+          providers.map((p) => ({ label: p.name, description: p.command, id: p.id })),
+          { title: "Select a Battle Provider to test" }
+        );
+        if (!pick) return;
+        providerId = pick.id;
+      }
+      await battleTestPanel.open(providerId);
     })
   );
 }

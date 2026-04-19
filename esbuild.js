@@ -75,6 +75,8 @@ async function main() {
       "src/webview/mainView.ts",
       "src/webview/jobsView.ts",
       "src/webview/battlesView.ts",
+      "src/webview/battlesSettings.ts",
+      "src/webview/battleTest.ts",
       "src/webview/workflowBuilder.ts",
       "src/webview/jobAdmin.ts",
     ],

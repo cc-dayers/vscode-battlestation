@@ -264,6 +264,131 @@ const battlesHtml = `
 </html>
 `;
 
+const battlesSettingsHtml = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Battles Settings Test</title>
+    <link href="/output.css" rel="stylesheet" />
+    <link href="/codicon.css" rel="stylesheet" />
+    <style>
+      body { padding: 20px; background: #1e1e1e; color: #cccccc; font-family: sans-serif; }
+      .codicon { font-family: codicon; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      ${mockVscodeApi}
+      window.__BATTLES_SETTINGS__ = {
+        providers: [
+          {
+            id: "bb-prs",
+            name: "Bitbucket PRs",
+            command: "bb-cli battles list --json",
+            refreshInterval: 300,
+            icon: "git-pull-request",
+            color: "#0052CC",
+            enabled: true
+          },
+          {
+            id: "gh-issues",
+            name: "GitHub Issues",
+            command: "gh issue list --json number,title,url,state",
+            refreshInterval: 600,
+            icon: "issues",
+            color: "#238636",
+            enabled: true
+          },
+          {
+            id: "disabled-one",
+            name: "Disabled Provider",
+            command: "some-tool list",
+            refreshInterval: 0,
+            icon: "warning",
+            enabled: false
+          }
+        ],
+        providerStates: [
+          {
+            providerId: "bb-prs",
+            providerName: "Bitbucket PRs",
+            providerIcon: "git-pull-request",
+            providerColor: "#0052CC",
+            battles: [
+              { id: "pr-1", title: "Fix auth", status: "active", priority: "high" },
+              { id: "pr-2", title: "Update CI", status: "active", priority: "medium" },
+              { id: "pr-3", title: "Bump deps", status: "active", priority: "low" }
+            ],
+            lastRefreshedAt: Date.now() - 120_000,
+            isLoading: false
+          },
+          {
+            providerId: "gh-issues",
+            providerName: "GitHub Issues",
+            providerIcon: "issues",
+            providerColor: "#238636",
+            battles: [],
+            lastRefreshedAt: Date.now() - 300_000,
+            isLoading: false
+          },
+          {
+            providerId: "disabled-one",
+            providerName: "Disabled Provider",
+            providerIcon: "warning",
+            battles: [],
+            lastError: "Provider is disabled",
+            isLoading: false
+          }
+        ]
+      };
+    </script>
+    <script type="module" src="/battlesSettings.js"></script>
+  </body>
+</html>
+`;
+
+const battleTestHtml = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Battle Test Panel</title>
+    <link href="/output.css" rel="stylesheet" />
+    <link href="/codicon.css" rel="stylesheet" />
+    <style>
+      body { padding: 20px; background: #1e1e1e; color: #cccccc; font-family: sans-serif; }
+      .codicon { font-family: codicon; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      ${mockVscodeApi}
+      window.__BATTLE_TEST_DATA__ = {
+        provider: {
+          id: "bb-prs",
+          name: "Bitbucket PRs",
+          command: "bb-cli battles list --json",
+          refreshInterval: 300
+        },
+        stdout: JSON.stringify({
+          battles: [
+            { id: "pr-123", title: "Fix auth flow", status: "active", priority: "high" },
+            { id: "pr-456", title: "Update CI", status: "active", priority: "medium" }
+          ]
+        }, null, 2),
+        stderr: "",
+        exitCode: 0,
+        duration: 342,
+        parsedCount: 2,
+        parseError: null
+      };
+    </script>
+    <script type="module" src="/battleTest.js"></script>
+  </body>
+</html>
+`;
+
 const jobAdminHtml = `
 <!DOCTYPE html>
 <html>
@@ -423,6 +548,18 @@ const server = http.createServer((req, res) => {
   if (parsedReq.pathname === '/battles' || parsedReq.pathname === '/battles.html') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(battlesHtml, 'utf-8');
+    return;
+  }
+
+  if (parsedReq.pathname === '/battles-settings' || parsedReq.pathname === '/battles-settings.html') {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(battlesSettingsHtml, 'utf-8');
+    return;
+  }
+
+  if (parsedReq.pathname === '/battle-test' || parsedReq.pathname === '/battle-test.html') {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(battleTestHtml, 'utf-8');
     return;
   }
 

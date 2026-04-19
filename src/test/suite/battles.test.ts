@@ -1,5 +1,7 @@
 import * as assert from 'assert';
 import { renderBattlesView } from '../../views/battlesView';
+import { renderBattlesSettingsView } from '../../views/battlesSettingsView';
+import { renderBattleTestView } from '../../views/battleTestView';
 import type { BattleProvider, Battle, Config } from '../../types';
 
 suite('Battles Feature Test Suite', () => {
@@ -54,6 +56,91 @@ suite('Battles Feature Test Suite', () => {
 
         assert.ok(html.includes('window.__BATTLES_INITIAL_DATA__'), 'Should contain data injection');
         assert.ok(html.includes('{}'), 'Should serialize empty object');
+    });
+
+    // --- renderBattlesSettingsView tests ---
+
+    test('renderBattlesSettingsView injects settings data and script URI', () => {
+        const html = renderBattlesSettingsView({
+            cspSource: 'default-src "none"',
+            nonce: 'test-nonce',
+            codiconStyles: '',
+            cssUri: 'style.css',
+            scriptUri: 'battlesSettings.js',
+            initialData: {
+                providers: [
+                    { id: 'bb-prs', name: 'Bitbucket PRs', command: 'bb-cli list --json', enabled: true },
+                ],
+                providerStates: [
+                    {
+                        providerId: 'bb-prs',
+                        providerName: 'Bitbucket PRs',
+                        battles: [],
+                        isLoading: false,
+                    },
+                ],
+            },
+        });
+
+        assert.ok(html.includes('window.__BATTLES_SETTINGS__'), 'Should contain settings data injection');
+        assert.ok(html.includes('Bitbucket PRs'), 'Should serialize provider name');
+        assert.ok(html.includes('battlesSettings.js'), 'Should contain the settings view script URI');
+    });
+
+    test('renderBattlesSettingsView handles empty providers', () => {
+        const html = renderBattlesSettingsView({
+            cspSource: 'default-src "none"',
+            nonce: 'test-nonce',
+            codiconStyles: '',
+            initialData: { providers: [], providerStates: [] },
+        });
+
+        assert.ok(html.includes('window.__BATTLES_SETTINGS__'), 'Should contain settings data injection');
+        assert.ok(html.includes('"providers":[]'), 'Should serialize empty providers');
+    });
+
+    // --- renderBattleTestView tests ---
+
+    test('renderBattleTestView injects test data and script URI', () => {
+        const html = renderBattleTestView({
+            cspSource: 'default-src "none"',
+            nonce: 'test-nonce',
+            codiconStyles: '',
+            scriptUri: 'battleTest.js',
+            initialData: {
+                provider: { id: 'bb', name: 'Bitbucket', command: 'bb-cli list' },
+                stdout: '{"battles":[]}',
+                stderr: '',
+                exitCode: 0,
+                duration: 100,
+                parsedCount: 0,
+                parseError: null,
+            },
+        });
+
+        assert.ok(html.includes('window.__BATTLE_TEST_DATA__'), 'Should contain test data injection');
+        assert.ok(html.includes('Bitbucket'), 'Should serialize provider name');
+        assert.ok(html.includes('battleTest.js'), 'Should contain the test view script URI');
+    });
+
+    test('renderBattleTestView serializes error states', () => {
+        const html = renderBattleTestView({
+            cspSource: 'default-src "none"',
+            nonce: 'test-nonce',
+            codiconStyles: '',
+            initialData: {
+                provider: { id: 'broken', name: 'Broken', command: 'fake-cli' },
+                stdout: '',
+                stderr: 'command not found',
+                exitCode: 127,
+                duration: 15,
+                parsedCount: null,
+                parseError: null,
+            },
+        });
+
+        assert.ok(html.includes('command not found'), 'Should serialize stderr');
+        assert.ok(html.includes('"exitCode":127'), 'Should serialize exit code');
     });
 
     // --- Type system tests ---

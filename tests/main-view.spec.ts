@@ -53,7 +53,7 @@ test.describe('Main View', () => {
     page.on('console', () => {});
     page.on('pageerror', () => {});
 
-    await page.goto('/');
+    await page.goto('/main');
     await page.waitForSelector('.lp-btn-wrapper');
     await page.waitForTimeout(100); // let Lit finish any async renders
   });
@@ -536,7 +536,7 @@ test.describe('Secondary group border color', () => {
     page.on('console', () => {});
     page.on('pageerror', () => {});
 
-    await page.goto('/');
+    await page.goto('/main');
     await page.waitForSelector('.lp-btn-wrapper');
 
     // Send an update that creates a group with secondaryGroupBy + a known group color,
@@ -590,7 +590,7 @@ test.describe('Secondary group border color', () => {
     page.on('console', () => {});
     page.on('pageerror', () => {});
 
-    await page.goto('/');
+    await page.goto('/main');
     await page.waitForSelector('.lp-btn-wrapper');
 
     await page.evaluate(() => {
@@ -636,7 +636,7 @@ test.describe('Secondary group border color', () => {
     page.on('console', () => {});
     page.on('pageerror', () => {});
 
-    await page.goto('/');
+    await page.goto('/main');
     await page.waitForSelector('.lp-btn-wrapper');
 
     await page.evaluate(() => {

@@ -11,7 +11,7 @@ test.describe('Workflow Sidebar', () => {
     page.on('console', () => {});
     page.on('pageerror', () => {});
 
-    await page.goto('/');
+    await page.goto('/main');
     await page.waitForSelector('.lp-btn-wrapper');
 
     await sendMessage(page, {

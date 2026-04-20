@@ -10,7 +10,7 @@ test.describe('Zero State Flow', () => {
         console.error('BROWSER PAGE ERROR:', err.message);
     });
 
-    await page.goto('/');
+    await page.goto('/main');
     
     // Injected mock data with empty actions to trigger welcome screen
     await page.evaluate(() => {

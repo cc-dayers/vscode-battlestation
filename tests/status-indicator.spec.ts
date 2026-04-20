@@ -21,7 +21,7 @@ test.describe('Status Indicator', () => {
     page = await browser.newPage();
     page.on('console', () => {}); // suppress test-page noise
     page.on('pageerror', () => {});
-    await page.goto('/');
+    await page.goto('/main');
     await page.waitForSelector('.lp-btn-wrapper');
   });
 

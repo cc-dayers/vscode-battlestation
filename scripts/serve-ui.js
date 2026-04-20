@@ -522,12 +522,144 @@ const mimeTypes = {
   '.wasm': 'application/wasm'
 };
 
+const navHtml = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Battlestation — Test Views</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { background: #1e1e1e; color: #cccccc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 32px; }
+      h1 { font-size: 22px; margin-bottom: 8px; color: #e0e0e0; }
+      .subtitle { color: #888; font-size: 13px; margin-bottom: 28px; }
+      .subtitle code { background: #2d2d2d; padding: 2px 6px; border-radius: 3px; color: #dcdcaa; }
+      .section { margin-bottom: 28px; }
+      .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: #888; margin-bottom: 10px; padding-bottom: 4px; border-bottom: 1px solid #333; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+      a.card { display: block; background: #252526; border: 1px solid #333; border-radius: 6px; padding: 14px 16px; text-decoration: none; color: #cccccc; transition: border-color 0.15s, background 0.15s; }
+      a.card:hover { border-color: #0e639c; background: #2a2d2e; }
+      .card-name { font-size: 14px; font-weight: 600; color: #e0e0e0; margin-bottom: 4px; }
+      .card-route { font-size: 12px; color: #569cd6; font-family: 'Cascadia Code', 'Fira Code', monospace; }
+      .card-desc { font-size: 12px; color: #888; margin-top: 6px; }
+      .badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; margin-left: 8px; vertical-align: middle; }
+      .badge--providers { background: #264f78; color: #9cdcfe; }
+      .badge--forms { background: #4d3800; color: #dcdcaa; }
+      .badge--gen { background: #2e4d2e; color: #b5cea8; }
+    </style>
+  </head>
+  <body>
+    <h1>⚔ Battlestation — Test Views</h1>
+    <p class="subtitle">UI test harness · <code>npm run test:ui-server</code> · Each card opens a standalone view with mock data</p>
+
+    <div class="section">
+      <div class="section-title">Main Panels</div>
+      <div class="grid">
+        <a class="card" href="/main">
+          <div class="card-name">Command Launcher</div>
+          <div class="card-route">/main</div>
+          <div class="card-desc">Actions, groups, search, status dots, workflows</div>
+        </a>
+        <a class="card" href="/settings">
+          <div class="card-name">Settings</div>
+          <div class="card-route">/settings</div>
+          <div class="card-desc">Display toggles, config management, backup history</div>
+        </a>
+        <a class="card" href="/jobs">
+          <div class="card-name">Jobs</div>
+          <div class="card-route">/jobs</div>
+          <div class="card-desc">Scheduled jobs, pause/resume, run outcomes</div>
+        </a>
+        <a class="card" href="/job-admin">
+          <div class="card-name">Job Admin</div>
+          <div class="card-route">/job-admin</div>
+          <div class="card-desc">Single job detail — schedule, runs, log links</div>
+        </a>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Battles (Providers) <span class="badge badge--providers">providers</span></div>
+      <div class="grid">
+        <a class="card" href="/battles">
+          <div class="card-name">Battles View</div>
+          <div class="card-route">/battles</div>
+          <div class="card-desc">Provider sections, battle cards, search, collapse</div>
+        </a>
+        <a class="card" href="/battles-settings">
+          <div class="card-name">Battles Settings</div>
+          <div class="card-route">/battles-settings</div>
+          <div class="card-desc">Provider config, enable/disable, test & refresh</div>
+        </a>
+        <a class="card" href="/battle-test">
+          <div class="card-name">Battle Test Panel</div>
+          <div class="card-route">/battle-test</div>
+          <div class="card-desc">Single provider test run — stdout, parse results</div>
+        </a>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Forms <span class="badge badge--forms">forms</span></div>
+      <div class="grid">
+        <a class="card" href="/add-action">
+          <div class="card-name">Add Action</div>
+          <div class="card-route">/add-action</div>
+          <div class="card-desc">Classic add action form</div>
+        </a>
+        <a class="card" href="/add-wizard">
+          <div class="card-name">Add Action Wizard</div>
+          <div class="card-route">/add-wizard</div>
+          <div class="card-desc">Step-by-step wizard with JSON bulk mode</div>
+        </a>
+        <a class="card" href="/edit-action">
+          <div class="card-name">Edit Action</div>
+          <div class="card-route">/edit-action</div>
+          <div class="card-desc">Edit form with params pre-populated</div>
+        </a>
+        <a class="card" href="/edit-action-workspace">
+          <div class="card-name">Edit Action (Workspace)</div>
+          <div class="card-route">/edit-action-workspace</div>
+          <div class="card-desc">Edit form with secondary label / workspace</div>
+        </a>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Generated Pages <span class="badge badge--gen">gen-test-pages</span></div>
+      <div class="grid">
+        <a class="card" href="/generate-config">
+          <div class="card-name">Generate Config</div>
+          <div class="card-route">/generate-config</div>
+          <div class="card-desc">Auto-detect tools wizard (npm, tasks, launch)</div>
+        </a>
+        <a class="card" href="/workflow-builder">
+          <div class="card-name">Workflow Builder</div>
+          <div class="card-route">/workflow-builder</div>
+          <div class="card-desc">Create/edit workflow step chains</div>
+        </a>
+        <a class="card" href="/error">
+          <div class="card-name">Error View</div>
+          <div class="card-route">/error</div>
+          <div class="card-desc">Config validation error state</div>
+        </a>
+      </div>
+    </div>
+  </body>
+</html>
+`;
+
 const server = http.createServer((req, res) => {
   console.log('GET', req.url);
 
   const parsedReq = url.parse(req.url);
 
   if (parsedReq.pathname === '/' || parsedReq.pathname === '/index.html') {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(navHtml, 'utf-8');
+    return;
+  }
+
+  if (parsedReq.pathname === '/main' || parsedReq.pathname === '/main.html') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(indexHtml, 'utf-8');
     return;

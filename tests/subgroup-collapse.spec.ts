@@ -17,7 +17,7 @@ test.describe('Secondary Group Collapse', () => {
     page.on('console', () => {});
     page.on('pageerror', () => {});
 
-    await page.goto('/');
+    await page.goto('/main');
     await page.waitForSelector('.lp-btn-wrapper');
 
     // Setup a custom state with secondary groups

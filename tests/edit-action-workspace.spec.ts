@@ -126,7 +126,7 @@ test.describe('Main View – Secondary Label Badge', () => {
   test.beforeEach(async ({ page }) => {
     page.on('console', () => {});
     page.on('pageerror', () => {});
-    await page.goto('/');
+    await page.goto('/main');
     await page.waitForSelector('.lp-btn-wrapper');
     await page.waitForTimeout(100);
   });

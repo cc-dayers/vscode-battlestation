@@ -2,7 +2,7 @@
   "name": "battlestation",
   "displayName": "Battlestation",
   "description": "A configurable panel with action buttons driven by battle.json",
-  "version": "0.6.7",
+  "version": "1.0.0",
   "publisher": "cc-dayers",
   "repository": {
     "type": "git",
@@ -25,6 +25,12 @@
         "title": "Battlestation: Open Panel",
         "shortTitle": "$(rocket) Open Panel",
         "icon": "$(rocket)"
+      },
+      {
+        "command": "battlestation.openBattles",
+        "title": "Battlestation: Open Battles",
+        "shortTitle": "$(checklist) Open Battles",
+        "icon": "$(checklist)"
       },
       {
         "command": "battlestation.refresh",
@@ -61,6 +67,18 @@
         "title": "Battlestation: Add Group",
         "shortTitle": "$(new-folder) Add Group",
         "icon": "$(new-folder)"
+      },
+      {
+        "command": "battlestation.addBattleProvider",
+        "title": "Battlestation: Add Battle Provider",
+        "shortTitle": "$(add) Add Battle Provider",
+        "icon": "$(add)"
+      },
+      {
+        "command": "battlestation.testBattleProvider",
+        "title": "Battlestation: Test Battle Provider",
+        "shortTitle": "$(beaker) Test Battle Provider",
+        "icon": "$(beaker)"
       },
       {
         "command": "battlestation.toggleSearch",
@@ -127,36 +145,6 @@
         "title": "Battlestation: Open Job Admin",
         "shortTitle": "$(info) Job Admin",
         "icon": "$(info)"
-      },
-      {
-        "command": "battlestation.openBattles",
-        "title": "Battlestation: Open Battles",
-        "shortTitle": "$(shield) Open Battles",
-        "icon": "$(shield)"
-      },
-      {
-        "command": "battlestation.refreshBattles",
-        "title": "Battlestation: Refresh Battles",
-        "shortTitle": "$(refresh) Refresh Battles",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "battlestation.addBattleProvider",
-        "title": "Battlestation: Add Battle Provider",
-        "shortTitle": "$(add) Add Provider",
-        "icon": "$(add)"
-      },
-      {
-        "command": "battlestation.openBattlesSettings",
-        "title": "Battlestation: Open Battles Settings",
-        "shortTitle": "$(gear) Settings",
-        "icon": "$(gear)"
-      },
-      {
-        "command": "battlestation.testBattleProvider",
-        "title": "Battlestation: Test Battle Provider",
-        "shortTitle": "$(beaker) Test Provider",
-        "icon": "$(beaker)"
       }
     ],
     "viewsContainers": {
@@ -164,7 +152,7 @@
         {
           "id": "battlestation",
           "title": "Battlestation",
-          "icon": "$(rocket)"
+          "icon": "media/icon.svg"
         }
       ]
     },
@@ -180,18 +168,17 @@
         },
         {
           "type": "webview",
+          "id": "battlestation.battles",
+          "name": "Battles",
+          "icon": "media/icon.svg",
+          "contextualTitle": "Battles"
+        },
+        {
+          "type": "webview",
           "id": "battlestation.jobs",
           "name": "Jobs",
           "icon": "media/icon.svg",
           "contextualTitle": "Jobs"
-        },
-        {
-          "type": "webview",
-          "id": "battlestation.battles",
-          "name": "Battles",
-          "icon": "media/icon.svg",
-          "contextualTitle": "Battles",
-          "when": "battlestation.experimental.battles"
         }
       ]
     },
@@ -273,9 +260,24 @@
           "group": "navigation@8"
         },
         {
-          "command": "battlestation.openJobs",
+          "command": "battlestation.openBattles",
           "when": "view == battlestation.view",
           "group": "navigation@9"
+        },
+        {
+          "command": "battlestation.openJobs",
+          "when": "view == battlestation.view",
+          "group": "navigation@10"
+        },
+        {
+          "command": "battlestation.addBattleProvider",
+          "when": "view == battlestation.battles",
+          "group": "navigation@1"
+        },
+        {
+          "command": "battlestation.openJobs",
+          "when": "view == battlestation.battles",
+          "group": "navigation@2"
         },
         {
           "command": "battlestation.runJobNow",
@@ -293,19 +295,9 @@
           "group": "navigation@3"
         },
         {
-          "command": "battlestation.refreshBattles",
-          "when": "view == battlestation.battles",
-          "group": "navigation@1"
-        },
-        {
-          "command": "battlestation.addBattleProvider",
-          "when": "view == battlestation.battles",
-          "group": "navigation@2"
-        },
-        {
-          "command": "battlestation.openBattlesSettings",
-          "when": "view == battlestation.battles",
-          "group": "navigation@3"
+          "command": "battlestation.openBattles",
+          "when": "view == battlestation.jobs",
+          "group": "navigation@4"
         }
       ],
       "commandPalette": [
@@ -316,6 +308,15 @@
         {
           "command": "battlestation.runWorkflow",
           "when": "battlestation.experimental.workflows"
+        },
+        {
+          "command": "battlestation.openBattles"
+        },
+        {
+          "command": "battlestation.addBattleProvider"
+        },
+        {
+          "command": "battlestation.testBattleProvider"
         },
         {
           "command": "battlestation.openJobs"
@@ -334,26 +335,6 @@
         },
         {
           "command": "battlestation.openJobAdmin"
-        },
-        {
-          "command": "battlestation.openBattles",
-          "when": "battlestation.experimental.battles"
-        },
-        {
-          "command": "battlestation.refreshBattles",
-          "when": "battlestation.experimental.battles"
-        },
-        {
-          "command": "battlestation.addBattleProvider",
-          "when": "battlestation.experimental.battles"
-        },
-        {
-          "command": "battlestation.openBattlesSettings",
-          "when": "battlestation.experimental.battles"
-        },
-        {
-          "command": "battlestation.testBattleProvider",
-          "when": "battlestation.experimental.battles"
         }
       ]
     },
@@ -429,11 +410,6 @@
           "type": "boolean",
           "default": false,
           "description": "Enable the experimental workflow runner and workflow builder UI."
-        },
-        "battlestation.experimental.battles": {
-          "type": "boolean",
-          "default": false,
-          "description": "Enable the experimental Battles panel for tracking external work items from CLI providers."
         },
         "battlestation.display.secondaryGroupStyle": {
           "type": "string",

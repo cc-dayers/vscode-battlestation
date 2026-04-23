@@ -35,10 +35,14 @@ export interface Workflow {
 }
 
 export interface JobTarget {
-  kind: "action" | "workflow";
+  kind: "action" | "workflow" | "providerSync";
   actionId?: string;
   workflowId?: string;
 }
+
+export type JobRunTargetKind = JobTarget["kind"];
+export type ScheduledWorkKind = "job" | "providerSync";
+export type ScheduledWorkScheduleKind = "cron" | "interval";
 
 export interface JobInputMap {
   [key: string]: string;
@@ -62,15 +66,19 @@ export type JobLastOutcome = "success" | "failure" | "blocked" | "missed";
 
 export interface JobRuntimeSnapshot {
   jobId: string;
+  sourceKind?: ScheduledWorkKind;
   name: string;
   schedule: string;
+  scheduleKind?: ScheduledWorkScheduleKind;
+  intervalSeconds?: number;
   timezone?: string;
   enabled: boolean;
   paused: boolean;
   valid: boolean;
   status: JobRuntimeStatus;
-  targetKind: JobTarget["kind"];
+  targetKind: JobRunTargetKind;
   targetLabel?: string;
+  providerId?: string;
   nextRunAt?: number;
   lastRunAt?: number;
   lastFinishedAt?: number;
@@ -85,9 +93,11 @@ export interface JobRuntimeSnapshot {
 export interface JobRunRecord {
   runId: string;
   jobId: string;
+  sourceKind?: ScheduledWorkKind;
   jobName: string;
-  targetKind: JobTarget["kind"];
+  targetKind: JobRunTargetKind;
   targetLabel?: string;
+  providerId?: string;
   startedAt: number;
   finishedAt: number;
   exitCode?: number;

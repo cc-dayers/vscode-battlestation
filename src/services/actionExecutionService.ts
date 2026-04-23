@@ -1,15 +1,17 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import type { Action } from "../types";
+import type { Action, JobInputMap } from "../types";
 import { RunStatusService, type RunStatusEntry } from "./runStatusService";
 import { isWorkflowEligibleAction } from "../utils/workflows";
 
 export class ActionExecutionService {
   constructor(private readonly runStatusService: RunStatusService) {}
 
-  public async executeStandaloneAction(item: Action): Promise<void> {
+  public async executeStandaloneAction(item: Action, inputs?: JobInputMap): Promise<void> {
     try {
-      const resolvedItem = await this.resolveParams(item);
+      const resolvedItem = inputs
+        ? this.resolveScheduledParams(item, inputs)
+        : await this.resolveParams(item);
       if (!resolvedItem) {
         return;
       }
@@ -49,6 +51,46 @@ export class ActionExecutionService {
     }
   }
 
+  public getScheduledExecutionBlockReason(item: Action, inputs?: JobInputMap): string | undefined {
+    if (!item.params || item.params.length === 0) {
+      return undefined;
+    }
+
+    for (const param of item.params) {
+      const value = inputs?.[param.name];
+      if (typeof value !== "string" || value.length === 0) {
+        return `Action "${item.name}" requires saved input "${param.name}".`;
+      }
+    }
+
+    return undefined;
+  }
+
+  public async executeScheduledAction(
+    item: Action,
+    inputs?: JobInputMap
+  ): Promise<{ cancelled: false; status?: RunStatusEntry; blockedReason?: string }> {
+    const blockedReason = this.getScheduledExecutionBlockReason(item, inputs);
+    if (blockedReason) {
+      return { cancelled: false, blockedReason };
+    }
+
+    const resolvedItem = this.resolveScheduledParams(item, inputs);
+
+    switch (resolvedItem.type) {
+      case "launch":
+        await this.executeLaunchConfig(resolvedItem.command);
+        return { cancelled: false, status: this.buildRunStatus(item, 0) };
+      case "vscode":
+        await this.executeVSCodeCommand(resolvedItem.command);
+        return { cancelled: false, status: this.buildRunStatus(item, 0) };
+      case "task":
+        return { cancelled: false, status: await this.executeTaskBlocking(resolvedItem) };
+      default:
+        return { cancelled: false, status: await this.executeShellCommandBlocking(resolvedItem) };
+    }
+  }
+
   private async resolveParams(item: Action): Promise<Action | undefined> {
     if (!item.params || item.params.length === 0) return item;
 
@@ -61,6 +103,20 @@ export class ActionExecutionService {
         value = await vscode.window.showInputBox({ prompt: param.prompt, value: param.default ?? "" });
       }
       if (value === undefined) return undefined;
+      cmd = cmd.replaceAll(`\${${param.name}}`, value);
+    }
+
+    return { ...item, command: cmd };
+  }
+
+  private resolveScheduledParams(item: Action, inputs?: JobInputMap): Action {
+    if (!item.params || item.params.length === 0) {
+      return item;
+    }
+
+    let cmd = item.command;
+    for (const param of item.params) {
+      const value = inputs?.[param.name] ?? "";
       cmd = cmd.replaceAll(`\${${param.name}}`, value);
     }
 

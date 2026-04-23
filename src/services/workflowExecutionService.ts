@@ -1,4 +1,4 @@
-import type { Action, Workflow } from "../types";
+import type { Action, JobInputMap, Workflow } from "../types";
 import { ConfigService } from "./configService";
 import { ActionExecutionService } from "./actionExecutionService";
 import { buildWorkflowSummary, findWorkflow } from "../utils/workflows";
@@ -22,13 +22,21 @@ export interface WorkflowRunResult {
   steps: WorkflowRunStepResult[];
 }
 
+interface WorkflowRunOptions {
+  interactive?: boolean;
+  inputs?: JobInputMap;
+}
+
 export class WorkflowExecutionService {
   constructor(
     private readonly configService: ConfigService,
     private readonly actionExecutionService: ActionExecutionService
   ) {}
 
-  public async runWorkflowById(workflowId: string): Promise<WorkflowRunResult> {
+  public async runWorkflowById(
+    workflowId: string,
+    options: WorkflowRunOptions = {}
+  ): Promise<WorkflowRunResult> {
     const config = await this.configService.readConfig();
     const workflow = findWorkflow(config.workflows, workflowId);
 
@@ -36,10 +44,43 @@ export class WorkflowExecutionService {
       throw new Error(`Workflow "${workflowId}" was not found.`);
     }
 
-    return this.runWorkflow(workflow, config.actions);
+    return this.runWorkflow(workflow, config.actions, options);
   }
 
-  private async runWorkflow(workflow: Workflow, actions: Action[]): Promise<WorkflowRunResult> {
+  public async getScheduledRunBlockReason(
+    workflowId: string,
+    inputs?: JobInputMap
+  ): Promise<string | undefined> {
+    const config = await this.configService.readConfig();
+    const workflow = findWorkflow(config.workflows, workflowId);
+
+    if (!workflow) {
+      return `Workflow "${workflowId}" was not found.`;
+    }
+
+    const summary = buildWorkflowSummary(workflow, config.actions);
+    if (!summary.valid) {
+      return summary.invalidReasons.join(" ");
+    }
+
+    for (const step of summary.steps) {
+      if (!step.action) {
+        return step.reason;
+      }
+      const blockedReason = this.actionExecutionService.getScheduledExecutionBlockReason(step.action, inputs);
+      if (blockedReason) {
+        return blockedReason;
+      }
+    }
+
+    return undefined;
+  }
+
+  private async runWorkflow(
+    workflow: Workflow,
+    actions: Action[],
+    options: WorkflowRunOptions
+  ): Promise<WorkflowRunResult> {
     const summary = buildWorkflowSummary(workflow, actions);
     if (!summary.valid) {
       return {
@@ -74,6 +115,33 @@ export class WorkflowExecutionService {
     const steps: WorkflowRunStepResult[] = [];
     for (const step of summary.steps) {
       const action = step.action as Action;
+      if (options.interactive === false) {
+        const result = await this.actionExecutionService.executeScheduledAction(action, options.inputs);
+
+        steps.push({
+          stepId: step.id,
+          actionId: step.actionId,
+          actionName: action.name,
+          continueOnError: step.continueOnError,
+          exitCode: result.status?.exitCode,
+        });
+
+        if ((result.blockedReason || result.status?.exitCode !== 0) && !step.continueOnError) {
+          return {
+            workflowId: workflow.id,
+            workflowName: workflow.name,
+            success: false,
+            cancelled: false,
+            invalid: false,
+            blockedReason:
+              result.blockedReason || `Workflow "${workflow.name}" stopped after "${action.name}" failed.`,
+            steps,
+          };
+        }
+
+        continue;
+      }
+
       const result = await this.actionExecutionService.executeWorkflowAction(action);
 
       if (!result) {

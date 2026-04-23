@@ -35,6 +35,37 @@
         "panel": "dedicated"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Release: Version, tag, and publish VSIX",
+      "type": "shell",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npm run release:run -- ${input:releaseType}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "releaseType",
+      "type": "pickString",
+      "description": "Select the version bump for the release workflow",
+      "options": [
+        "patch",
+        "minor",
+        "major"
+      ],
+      "default": "patch"
     }
   ]
 }

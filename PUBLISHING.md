@@ -58,6 +58,24 @@ npm run publish
 
 This runs `npm run build` first (via the `vscode:prepublish` hook), then uploads to the marketplace. The first publish creates the listing; subsequent runs push updates.
 
+## VS Code Task Release Flow
+
+If you want one local entry point for the full GitHub-release flow, run the VS Code task:
+
+- `Tasks: Run Task` -> `Release: Version, tag, and publish VSIX`
+
+That task prompts for `patch`, `minor`, or `major`, then runs:
+
+```bash
+npm run test:ui
+npm run test:unit
+npm run build
+npm run release:<patch|minor|major>
+npm run release:tag
+```
+
+The final tag push triggers `.github/workflows/release.yml`, which reruns the release gates in GitHub Actions, packages the extension, and attaches the generated `.vsix` file to the GitHub release.
+
 ---
 
 ## Releasing Updates

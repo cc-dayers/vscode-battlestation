@@ -444,6 +444,7 @@
     "release:patch": "npm run release-version patch",
     "release:minor": "npm run release-version minor",
     "release:major": "npm run release-version major",
+    "release:run": "node scripts/release-run.js",
     "release-version": "npm run build && npm version --no-git-tag-version",
     "release:tag": "node scripts/release-tag.js"
   },

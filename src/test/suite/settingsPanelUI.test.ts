@@ -20,6 +20,7 @@ suite('Settings Panel Integration Test Suite', () => {
 
     // Track original values for cleanup
     let originalShowCommand: boolean | undefined;
+    let originalRememberActionSearch: boolean | undefined;
 
     setup(async () => {
         configService = new ConfigService(mockContext);
@@ -33,12 +34,14 @@ suite('Settings Panel Integration Test Suite', () => {
         }
 
         originalShowCommand = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.showCommand');
+        originalRememberActionSearch = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.rememberActionSearch');
     });
 
     teardown(async () => {
         // Restore original setting value
-        await vscode.workspace.getConfiguration('battlestation')
-            .update('display.showCommand', originalShowCommand, vscode.ConfigurationTarget.Global);
+        const config = vscode.workspace.getConfiguration('battlestation');
+        await config.update('display.showCommand', originalShowCommand, vscode.ConfigurationTarget.Global);
+        await config.update('display.rememberActionSearch', originalRememberActionSearch, vscode.ConfigurationTarget.Global);
     });
 
     test('battlestation.open and battlestation.openSettings execute without error', async function () {
@@ -76,6 +79,25 @@ suite('Settings Panel Integration Test Suite', () => {
 
         const restored = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.showCommand');
         assert.strictEqual(restored, initial, 'Setting value should be restored');
+    });
+
+    test('display.rememberActionSearch setting round-trips through Configuration API', async function () {
+        this.timeout(10000);
+
+        const config = vscode.workspace.getConfiguration('battlestation');
+        const initial = config.get<boolean>('display.rememberActionSearch', true);
+
+        await config.update('display.rememberActionSearch', !initial, vscode.ConfigurationTarget.Global);
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        const toggled = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.rememberActionSearch');
+        assert.strictEqual(toggled, !initial, 'Remember search setting value should be toggled');
+
+        await config.update('display.rememberActionSearch', initial, vscode.ConfigurationTarget.Global);
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        const restored = vscode.workspace.getConfiguration('battlestation').get<boolean>('display.rememberActionSearch');
+        assert.strictEqual(restored, initial, 'Remember search setting value should be restored');
     });
 
     test('changing settings does not mutate battle.json config', async function () {

@@ -68,4 +68,25 @@ test.describe('Settings View', () => {
     const msg = await page.evaluate(() => (window as any).__lastCommand);
     expect(msg).toEqual({ command: 'deleteConfig', deleteHistory: true });
   });
+
+  test('saves Remember Action Search setting', async () => {
+    await page.goto('/settings?configExists=true&backupCount=3&rememberActionSearch=true');
+    await page.waitForSelector('.lp-settings-view');
+
+    const rememberSearchRow = page.locator('.lp-setting-row').filter({ hasText: 'Remember Action Search' });
+    const checkbox = rememberSearchRow.locator('input[type="checkbox"]');
+    await expect(checkbox).toBeChecked();
+
+    await checkbox.evaluate((input) => {
+      const checkboxInput = input as HTMLInputElement;
+      checkboxInput.checked = false;
+      checkboxInput.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    await page.getByRole('button', { name: 'Save Settings' }).click();
+
+    const msg = await page.evaluate(() => (window as any).__lastCommand);
+    expect(msg.command).toBe('saveSettings');
+    expect(msg.settings.rememberActionSearch).toBe(false);
+  });
 });

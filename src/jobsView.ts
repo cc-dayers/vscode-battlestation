@@ -28,7 +28,10 @@ export class JobsViewProvider implements vscode.WebviewViewProvider, vscode.Disp
 
         void this.view.webview.postMessage({
           type: "update",
-          data: { jobs: snapshots },
+          data: {
+            jobs: snapshots,
+            backgroundActivityPaused: this.jobSchedulerService.isBackgroundActivityPaused(),
+          },
         });
       })
     );
@@ -69,7 +72,10 @@ export class JobsViewProvider implements vscode.WebviewViewProvider, vscode.Disp
     }
 
     const jobs = this.jobSchedulerService.getSnapshots();
-    const data = { jobs };
+    const data = {
+      jobs,
+      backgroundActivityPaused: this.jobSchedulerService.isBackgroundActivityPaused(),
+    };
 
     if (!this.isInitialized) {
       this.isInitialized = true;
@@ -107,6 +113,12 @@ export class JobsViewProvider implements vscode.WebviewViewProvider, vscode.Disp
         break;
       case "openJobAdmin":
         await vscode.commands.executeCommand("battlestation.openJobAdmin", message.jobId);
+        break;
+      case "pauseBackgroundActivity":
+        await vscode.commands.executeCommand("battlestation.pauseBackgroundActivity");
+        break;
+      case "resumeBackgroundActivity":
+        await vscode.commands.executeCommand("battlestation.resumeBackgroundActivity");
         break;
       default:
         break;

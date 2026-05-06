@@ -1,3 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#C5C5C5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <polygon points="5 3 19 12 5 21 5 3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <g transform="translate(-2.25 -1)">
+    <g fill="currentColor" transform="scale(1.75)">
+      <path d="M12 9H4c-.827 0-1.5.673-1.5 1.5v.5c0 .123.062 3 5.5 3s5.5-2.877 5.5-3v-.5c0-.827-.673-1.5-1.5-1.5Zm.5 1.991C12.497 11.073 12.372 13 8 13s-4.497-1.927-4.5-2v-.5A.5.5 0 0 1 4 10h8a.5.5 0 0 1 .5.5v.491ZM5.5 8h5c.827 0 1.5-.673 1.5-1.5v-3c0-.827-.673-1.5-1.5-1.5h-2v-.5a.5.5 0 0 0-1 0V2h-2C4.673 2 4 2.673 4 3.5v3C4 7.327 4.673 8 5.5 8ZM5 3.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5h-5a.5.5 0 0 1-.5-.5v-3ZM5.75 5a.75.75 0 1 1 1.5 0 .75.75 0 0 1-1.5 0ZM10.25 5a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/>
+    </g>
+  </g>
 </svg>

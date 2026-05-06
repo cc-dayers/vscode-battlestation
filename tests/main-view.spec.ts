@@ -251,6 +251,38 @@ test.describe('Main View', () => {
     await expect(page.locator('.lp-btn-wrapper')).toHaveCount(6);
   });
 
+  test('rememberActionSearch persists the search query by default', async ({ page }) => {
+    await openSearch(page);
+    await page.fill('.lp-search-box', 'script');
+    await page.waitForTimeout(50);
+
+    const persisted = await page.evaluate(() => (window as any).__mockVscodeState);
+    expect(persisted.searchQuery).toBe('script');
+    expect(persisted.showSearch).toBe(true);
+  });
+
+  test('disabled rememberActionSearch ignores a saved search query on reload', async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as any).__initialVscodeState = {
+        collapsedGroups: [],
+        collapsedSubGroups: [],
+        searchQuery: 'script',
+        showSearch: true,
+      };
+      (window as any).__mainDisplayOverrides = { rememberActionSearch: false };
+    });
+
+    await page.goto('/main');
+    await page.waitForSelector('.lp-btn-wrapper');
+
+    await expect(page.locator('.lp-search-box')).toBeVisible();
+    await expect(page.locator('.lp-search-box')).toHaveValue('');
+    await expect(page.locator('.lp-btn-wrapper')).toHaveCount(6);
+
+    const persisted = await page.evaluate(() => (window as any).__mockVscodeState);
+    expect(persisted.searchQuery).toBe('');
+  });
+
   test('searching automatically expands collapsed groups', async ({ page }) => {
     // Manually collapse the "Build" group first
     await page.locator('summary.lp-group-header', { hasText: 'Build' }).click();

@@ -20,6 +20,7 @@ import {
 } from "./views";
 import { THEME_COLOR_OPTIONS } from "./utils/themeColors";
 import { buildWorkflowSummaries } from "./utils/workflows";
+import { getSubgroupHiddenKey, toggleSubgroupHiddenKey } from "./utils/subgroupState";
 import { WorkflowBuilderPanel } from "./workflowBuilderPanel";
 // Import codicon CSS as a string at build time via esbuild plugin
 import codiconCssTemplate from "../media/codicon.css";
@@ -255,6 +256,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         break;
       case "hideGroup":
         void this.toggleGroupHidden(message.group);
+        break;
+      case "hideSubGroup":
+        void this.toggleSubGroupHidden(message.group, message.groupByField, message.subGroupName);
         break;
       case "bulkHideActions":
         void this.bulkHideActions(message.items);
@@ -631,6 +635,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       display: {
         showCommand: wsConfig.get<boolean>("display.showCommand", true),
         showGroup: wsConfig.get<boolean>("display.showGroup", true),
+        rememberActionSearch: wsConfig.get<boolean>("display.rememberActionSearch", true),
         hideIcon: wsConfig.get<string>("display.hideIcon", "eye-closed"),
         playButtonBg: wsConfig.get<string>("display.playButtonBackgroundColor", "transparent"),
         actionToolbar: wsConfig.get<string[]>("display.actionToolbar", ["hide", "setColor", "edit", "delete"]),
@@ -681,6 +686,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       codiconStyles: this.getCodiconStyles(),
       showCommand: wsConfig.get<boolean>("display.showCommand", true),
       showGroup: wsConfig.get<boolean>("display.showGroup", true),
+      rememberActionSearch: wsConfig.get<boolean>("display.rememberActionSearch", true),
       hideIcon: wsConfig.get<string>("display.hideIcon", "eye-closed"),
       actionToolbar: wsConfig.get<string[]>("display.actionToolbar", ["edit", "setColor", "hide"]),
       secondaryGroupStyle: wsConfig.get<string>("display.secondaryGroupStyle", "border"),
@@ -1189,9 +1195,33 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     this.showToast(target.hidden ? `Group "${group.name}" hidden` : `Group "${group.name}" shown`);
   }
 
+  private async toggleSubGroupHidden(group: Group, groupByField: string, subGroupName: string) {
+    if (groupByField !== "workspace" && groupByField !== "type") {
+      this.showToast(`Cannot hide subgroup "${subGroupName}" for grouping "${groupByField}".`, "warning");
+      return;
+    }
+
+    const config = await this.configService.readConfig();
+    const target = (config.groups || []).find((candidate) => candidate.name === group.name);
+    if (!target) {
+      this.showToast(`Group "${group.name}" not found.`, "error");
+      return;
+    }
+
+    const hiddenKey = getSubgroupHiddenKey(groupByField, subGroupName);
+    const nextHiddenSubGroups = toggleSubgroupHiddenKey(target.hiddenSubGroups, groupByField, subGroupName);
+    const isHidden = nextHiddenSubGroups.includes(hiddenKey);
+    target.hiddenSubGroups = nextHiddenSubGroups.length > 0 ? nextHiddenSubGroups : undefined;
+
+    await this.configService.writeConfig(config);
+    void this.refresh();
+    this.showToast(isHidden ? `Subgroup "${subGroupName}" hidden` : `Subgroup "${subGroupName}" shown`);
+  }
+
   private async saveSettings(settings: {
     showCommand: boolean;
     showGroup: boolean;
+    rememberActionSearch?: boolean;
     hideIcon?: string;
     actionToolbar?: string[];
     secondaryGroupStyle?: string;
@@ -1205,6 +1235,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
     const cfg = vscode.workspace.getConfiguration("battlestation");
     await cfg.update("display.showCommand", settings.showCommand, vscode.ConfigurationTarget.Global);
     await cfg.update("display.showGroup", settings.showGroup, vscode.ConfigurationTarget.Global);
+    if (typeof settings.rememberActionSearch === "boolean") {
+      await cfg.update("display.rememberActionSearch", settings.rememberActionSearch, vscode.ConfigurationTarget.Global);
+    }
     if (settings.hideIcon) {
       await cfg.update("display.hideIcon", settings.hideIcon, vscode.ConfigurationTarget.Global);
     }

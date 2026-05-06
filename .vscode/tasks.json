@@ -1,71 +1,514 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "type": "npm",
-      "script": "watch",
-      "isBackground": true,
-      "presentation": {
-        "reveal": "never"
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "problemMatcher": {
-        "owner": "esbuild",
-        "pattern": {
-          "regexp": "^✘ \\[ERROR\\] (.+)$",
-          "message": 1
-        },
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": "^\\[watch\\] build started",
-          "endsPattern": "^\\[watch\\] build finished"
-        }
-      }
-    },
-    {
-      "type": "npm",
-      "script": "test:ui-server",
-      "label": "Serve UI (localhost:3000)",
-      "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Release: Version, tag, and publish VSIX",
-      "type": "shell",
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npm run release:run -- ${input:releaseType}"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      },
-      "problemMatcher": []
-    }
-  ],
-  "inputs": [
-    {
-      "id": "releaseType",
-      "type": "pickString",
-      "description": "Select the version bump for the release workflow",
-      "options": [
-        "patch",
-        "minor",
-        "major"
-      ],
-      "default": "patch"
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "npm",
+			"script": "watch",
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never"
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": {
+				"owner": "esbuild",
+				"pattern": {
+					"regexp": "^✘ \\[ERROR\\] (.+)$",
+					"message": 1
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "^\\[watch\\] build started",
+					"endsPattern": "^\\[watch\\] build finished"
+				}
+			}
+		},
+		{
+			"type": "npm",
+			"script": "test:ui-server",
+			"label": "Serve UI (localhost:3000)",
+			"isBackground": true,
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Release: Version, tag, and publish VSIX",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"npm run release:run -- ${input:releaseType}"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Clean Extension",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"scripts/clean-extension-cmds.js"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Type Check",
+			"type": "shell",
+			"command": "npx tsc",
+			"args": [
+				"--noEmit"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "NPM Check Types",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"check-types"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Clean Extension part 4",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"scripts/clean-extension-cmds-4.js"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "NPM Check Types 2",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"check-types"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Rebuild Extension",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"scripts/rebuild-extension.js"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Check types 3",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"check-types"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Lint",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"lint"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Delete files",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"del /f /q src\\battlesView.ts src\\battleTestPanel.ts src\\types.ts src\\services\\battleProviderService.ts src\\services\\agentService.ts src\\services\\managedWorktreeLanguageModelToolService.ts src\\services\\orchestrationRoutingService.ts src\\services\\orchestrationStateService.ts src\\services\\orchestrationStateTypes.ts src\\services\\toolLoopService.ts src\\services\\worktreeService.ts src\\utils\\orchestrationRadar.ts src\\utils\\workflows.ts src\\utils\\battleProviderConfig.ts src\\utils\\battleProviderPayload.ts"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Restore types",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"git checkout src/types.ts"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Clean types",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"scripts/clean-types.js"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Check Types 4",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"check-types"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Check types 5",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"check-types"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Check Types 6",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"check-types"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Check types 7",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"check-types"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Check types 8",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"check-types"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Unit tests",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:unit"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Fix Unit tests",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"scripts/fix-unit-tests.js"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Check Types 9",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"check-types"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Select String",
+			"type": "shell",
+			"command": "pwsh",
+			"args": [
+				"-Command",
+				"Select-String -Pattern 'const config: Config = {' 'src/test/suite/configLifecycle.test.ts' -Context 0,10"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Unit tests 2",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:unit"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Playwright tests",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:ui"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Playwright tests 2",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:ui"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Fix jobs view tests",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"scripts/fix-jobs-test.js"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Playwright tests 3",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:ui"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Playwright single",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:ui",
+				"--",
+				"tests/edit-action-workspace.spec.ts"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "npm build",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Fix esbuild and build",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"scripts/fix-esbuild.js",
+				"&&",
+				"npm",
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Esbuild 2",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"scripts/fix-esbuild-2.js",
+				"&&",
+				"npm",
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Playwright tests 4",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:ui"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Test main view",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:ui",
+				"--",
+				"tests/main-view.spec.ts"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Fix main view",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"scripts/fix-main-view.js"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Playwright tests 5",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:ui"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "fix main view 2",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"scripts/fix-main-view-2.js"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Playwright 6",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:ui"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Playwright tests 7",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:ui"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Playwright single jobs",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:ui",
+				"--",
+				"tests/jobs-view.spec.ts"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "npm build 2",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Full E2E",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:ui"
+			],
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Full Unit tests",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test:unit"
+			],
+			"isBackground": false,
+			"group": "test"
+		}
+	],
+	"inputs": [
+		{
+			"id": "releaseType",
+			"type": "pickString",
+			"description": "Select the version bump for the release workflow",
+			"options": [
+				"patch",
+				"minor",
+				"major"
+			],
+			"default": "patch"
+		}
+	]
 }

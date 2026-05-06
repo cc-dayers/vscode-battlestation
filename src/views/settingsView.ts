@@ -7,6 +7,7 @@ export interface SettingsViewContext {
   codiconStyles: string;
   showCommand: boolean;
   showGroup: boolean;
+  rememberActionSearch: boolean;
   hideIcon: string;
   backupCount: number;
   configExists: boolean;
@@ -22,6 +23,7 @@ export function renderSettingsView(ctx: SettingsViewContext): string {
   const initialState = {
     showCommand: ctx.showCommand,
     showGroup: ctx.showGroup,
+    rememberActionSearch: ctx.rememberActionSearch,
     hideIcon: ctx.hideIcon,
     backupCount: ctx.backupCount,
     configExists: ctx.configExists,

@@ -20,6 +20,7 @@ import { ConfigService } from "./configService";
 
 const LAST_HYDRATED_AT_KEY = "battlestation.jobs.lastHydratedAt";
 const PAUSED_PROVIDER_SYNC_IDS_KEY = "battlestation.providerSync.pausedIds";
+const BACKGROUND_ACTIVITY_PAUSED_KEY = "battlestation.backgroundActivity.paused";
 const PROVIDER_SYNC_JOB_ID_PREFIX = "provider-sync:";
 
 interface ScheduledWorkHandle {
@@ -143,6 +144,18 @@ export class JobSchedulerService implements vscode.Disposable {
 
   public getSnapshot(jobId: string): JobRuntimeSnapshot | undefined {
     return this.runtimeSnapshots.get(jobId);
+  }
+
+  public isBackgroundActivityPaused(): boolean {
+    return this.context.workspaceState.get<boolean>(BACKGROUND_ACTIVITY_PAUSED_KEY, false) === true;
+  }
+
+  public async setBackgroundActivityPaused(paused: boolean): Promise<void> {
+    await this.context.workspaceState.update(
+      BACKGROUND_ACTIVITY_PAUSED_KEY,
+      paused ? true : undefined
+    );
+    await this.hydrate();
   }
 
   public async runJobNow(jobId: string): Promise<JobRuntimeSnapshot | undefined> {
@@ -282,6 +295,7 @@ export class JobSchedulerService implements vscode.Disposable {
   }
 
   private getScheduledWork(config: Config): ScheduledWork[] {
+    const backgroundActivityPaused = this.isBackgroundActivityPaused();
     const pausedProviderSyncIds = this.getPausedProviderSyncJobIds();
     const work: ScheduledWork[] = [];
 
@@ -296,7 +310,7 @@ export class JobSchedulerService implements vscode.Disposable {
         scheduleKind: "cron",
         timezone: job.timezone,
         enabled: job.enabled !== false,
-        paused: job.paused === true,
+        paused: backgroundActivityPaused || job.paused === true,
         targetKind: job.target.kind,
         targetLabel:
           job.target.kind === "workflow" ? job.target.workflowId : job.target.actionId,
@@ -320,7 +334,7 @@ export class JobSchedulerService implements vscode.Disposable {
         scheduleKind: "interval",
         intervalSeconds,
         enabled: provider.enabled !== false,
-        paused: pausedProviderSyncIds.has(jobId),
+        paused: backgroundActivityPaused || pausedProviderSyncIds.has(jobId),
         targetKind: "providerSync",
         targetLabel: provider.id,
         providerId: provider.id,

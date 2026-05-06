@@ -60,6 +60,96 @@ test.describe('Secondary Group Collapse', () => {
     await expect(page.locator('.lp-subgroup-header', { hasText: 'Portal' })).toHaveAttribute('aria-expanded', 'false');
   });
 
+  test('hide subgroup button dispatches hideSubGroup without collapsing header', async ({ page }) => {
+    await page.evaluate(() => { (window as any).__lastCommand = null; });
+
+    await page.evaluate(() => {
+      const button = document.querySelector('[aria-label="Hide subgroup Portal"]') as HTMLElement | null;
+      if (!button) throw new Error('Hide subgroup Portal button not found');
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+
+    const message = await page.evaluate(() => (window as any).__lastCommand);
+    expect(message).toMatchObject({
+      command: 'hideSubGroup',
+      groupByField: 'workspace',
+      subGroupName: 'Portal',
+      group: { name: 'Apps' },
+    });
+    await expect(page.locator('.lp-subgroup-header', { hasText: 'Portal' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('hidden subgroup is omitted unless showHidden is enabled', async ({ page }) => {
+    await sendUpdate(page, {
+      actions: [
+        { name: 'App A', command: 'npm run a', type: 'npm', group: 'Apps', workspace: 'Portal' },
+        { name: 'App B', command: 'npm run b', type: 'npm', group: 'Apps', workspace: 'Admin' },
+      ],
+      groups: [
+        { name: 'Apps', color: '#e06c75', secondaryGroupBy: 'workspace', hiddenSubGroups: ['workspace::Portal'] },
+      ],
+      showHidden: false,
+      display: {
+        showCommand: true,
+        showGroup: true,
+        hideIcon: 'eye-closed',
+        playButtonBg: 'transparent',
+        actionToolbar: ['hide', 'setColor', 'edit', 'delete'],
+        secondaryGroupStyle: 'border',
+      },
+      runStatus: {},
+    });
+    await page.waitForTimeout(100);
+
+    await expect(page.locator('.lp-subgroup-header', { hasText: 'Portal' })).toHaveCount(0);
+    await expect(page.locator('.lp-btn-wrapper', { hasText: 'App A' })).toHaveCount(0);
+    await expect(page.locator('.lp-subgroup-header', { hasText: 'Admin' })).toBeVisible();
+    await expect(page.locator('.lp-btn-wrapper', { hasText: 'App B' })).toBeVisible();
+  });
+
+  test('showHidden reveals hidden subgroup with a show action', async ({ page }) => {
+    await sendUpdate(page, {
+      actions: [
+        { name: 'App A', command: 'npm run a', type: 'npm', group: 'Apps', workspace: 'Portal' },
+        { name: 'App B', command: 'npm run b', type: 'npm', group: 'Apps', workspace: 'Admin' },
+      ],
+      groups: [
+        { name: 'Apps', color: '#e06c75', secondaryGroupBy: 'workspace', hiddenSubGroups: ['workspace::Portal'] },
+      ],
+      showHidden: true,
+      display: {
+        showCommand: true,
+        showGroup: true,
+        hideIcon: 'eye-closed',
+        playButtonBg: 'transparent',
+        actionToolbar: ['hide', 'setColor', 'edit', 'delete'],
+        secondaryGroupStyle: 'border',
+      },
+      runStatus: {},
+    });
+    await page.waitForTimeout(100);
+
+    const portalSubgroup = page.locator('.lp-subgroup', { hasText: 'Portal' });
+    await expect(portalSubgroup).toHaveClass(/lp-hidden-subgroup/);
+    await expect(portalSubgroup.locator('.lp-hidden-badge')).toContainText('hidden');
+    await expect(page.locator('.lp-btn-wrapper', { hasText: 'App A' })).toBeVisible();
+
+    await page.evaluate(() => { (window as any).__lastCommand = null; });
+    await page.evaluate(() => {
+      const button = document.querySelector('[aria-label="Show subgroup Portal"]') as HTMLElement | null;
+      if (!button) throw new Error('Show subgroup Portal button not found');
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+
+    const message = await page.evaluate(() => (window as any).__lastCommand);
+    expect(message).toMatchObject({
+      command: 'hideSubGroup',
+      groupByField: 'workspace',
+      subGroupName: 'Portal',
+      group: { name: 'Apps' },
+    });
+  });
+
   test('searching expands collapsed subgroups', async ({ page }) => {
     // Collapse Portal
     await page.locator('.lp-subgroup-header', { hasText: 'Portal' }).click();

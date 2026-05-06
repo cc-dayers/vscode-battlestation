@@ -337,6 +337,33 @@ suite('Feature 4: Experimental Workflow Gating', () => {
 });
 
 // ────────────────────────────────────────────────────────────
+// Feature 5: Jobs Toolbar Runtime Commands
+// ────────────────────────────────────────────────────────────
+suite('Feature 5: Jobs Toolbar Runtime Commands', () => {
+  const repoRoot = path.resolve(__dirname, '../../..');
+  const jobsProviderFile = path.join(repoRoot, 'src', 'jobsView.ts');
+  const jobsWebviewFile = path.join(repoRoot, 'src', 'webview', 'jobsView.ts');
+
+  test('jobs runtime controls do not reference an unregistered Agent Activity command', () => {
+    const providerSource = fs.readFileSync(jobsProviderFile, 'utf8');
+    const webviewSource = fs.readFileSync(jobsWebviewFile, 'utf8');
+
+    assert.ok(
+      webviewSource.includes('jobs-toggle-background-activity-button'),
+      'Jobs toolbar should keep the background activity control'
+    );
+    assert.ok(
+      !webviewSource.includes('openAgentActivity'),
+      'Jobs webview should not post an unregistered openAgentActivity command'
+    );
+    assert.ok(
+      !providerSource.includes('battlestation.openAgentActivity'),
+      'Jobs provider should not execute an unregistered openAgentActivity command'
+    );
+  });
+});
+
+// ────────────────────────────────────────────────────────────
 // Feature: Secondary Label (workspace) editing
 // ────────────────────────────────────────────────────────────
 suite('Feature: Secondary Label (workspace) round-trip', () => {

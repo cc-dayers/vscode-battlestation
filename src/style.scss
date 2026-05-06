@@ -259,7 +259,7 @@ body {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 4px 6px;
+  padding: 4px 30px 4px 6px;
   margin-bottom: 4px;
   position: relative;
   cursor: pointer;
@@ -273,6 +273,18 @@ body {
   &:active {
     cursor: grabbing;
   }
+}
+
+.lp-hidden-subgroup {
+  opacity: 0.58;
+}
+
+.lp-hidden-subgroup .lp-subgroup-header {
+  border: 1px dashed var(--vscode-widget-border);
+}
+
+.lp-hidden-subgroup:hover {
+  opacity: 0.78;
 }
 
 .lp-subgroup--collapsed .lp-subgroup-header {
@@ -628,6 +640,40 @@ body {
   margin-top: 3px;
 }
 
+.lp-btn-detections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.lp-detection-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--vscode-foreground) 16%, transparent);
+  background: color-mix(in srgb, var(--vscode-badge-background, var(--vscode-button-secondaryBackground)) 28%, transparent);
+  color: var(--vscode-descriptionForeground);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lp-detection-badge--caution {
+  background: color-mix(in srgb, var(--vscode-editorWarning-foreground, #cca700) 18%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-editorWarning-foreground, #cca700) 34%, transparent);
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.lp-detection-badge--danger {
+  background: color-mix(in srgb, var(--vscode-errorForeground, #f14c4c) 16%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-errorForeground, #f14c4c) 36%, transparent);
+  color: var(--vscode-errorForeground, #f14c4c);
+}
+
 /* Inline action toolbar — floats over .lp-btn-name on the right */
 .lp-action-toolbar {
   position: absolute;
@@ -669,6 +715,11 @@ body {
   );
 }
 
+.lp-subgroup-action-toolbar {
+  right: 4px;
+  padding: 0 2px 0 18px;
+}
+
 .lp-inline-action-btn {
   width: 20px;
   height: 20px;
@@ -701,6 +752,11 @@ body {
 }
 
 .lp-group-header:hover .lp-inline-action-btn {
+  opacity: 1;
+  border-color: rgba(128, 128, 128, 0.5);
+}
+
+.lp-subgroup-header:hover .lp-inline-action-btn {
   opacity: 1;
   border-color: rgba(128, 128, 128, 0.5);
 }

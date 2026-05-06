@@ -120,6 +120,7 @@ export interface Group {
   backgroundColor?: string;
   borderColor?: string;
   hidden?: boolean;
+  hiddenSubGroups?: string[];
   secondaryGroupBy?: "workspace" | "type" | "none";
 }
 

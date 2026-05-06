@@ -3,18 +3,21 @@
     {
       "name": "Test Action 1",
       "command": "echo \"test1\"",
-      "type": "shell"
+      "type": "shell",
+      "id": "action-de8905d7-0d6e-4f02-8a74-fa4ea3f1418b"
     },
     {
       "name": "Test Action 2",
       "command": "echo \"test2\"",
-      "type": "shell"
+      "type": "shell",
+      "id": "action-70de1f3e-cb7a-415e-a8c4-0d8e53fac123"
     },
     {
       "name": "Hidden Action",
       "command": "echo \"hidden\"",
       "type": "shell",
-      "hidden": true
+      "hidden": true,
+      "id": "action-cbfd77a3-e324-4918-acfd-abde89c1e82f"
     }
   ],
   "groups": [

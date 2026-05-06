@@ -4,6 +4,7 @@ import { classMap } from "lit/directives/class-map.js";
 type SettingsState = {
   showCommand: boolean;
   showGroup: boolean;
+  rememberActionSearch: boolean;
   hideIcon: string;
   backupCount: number;
   configExists: boolean;
@@ -47,9 +48,10 @@ declare global {
 const vscode = window.acquireVsCodeApi();
 const root = document.getElementById("root");
 
-const state: SettingsState = window.__SETTINGS__ || {
+const defaultSettingsState: SettingsState = {
   showCommand: true,
   showGroup: true,
+  rememberActionSearch: true,
   hideIcon: "eye-closed",
   backupCount: 0,
   configExists: false,
@@ -58,6 +60,8 @@ const state: SettingsState = window.__SETTINGS__ || {
   actionToolbar: ["hide", "setColor", "edit", "delete"],
   secondaryGroupStyle: "border",
 };
+
+const state: SettingsState = { ...defaultSettingsState, ...(window.__SETTINGS__ || {}) };
 
 let showDeleteConfirm = false;
 let showDeleteHistoryConfirm = false;
@@ -97,6 +101,7 @@ const onSave = () => {
       settings: {
         showCommand: state.showCommand,
         showGroup: state.showGroup,
+        rememberActionSearch: state.rememberActionSearch,
         hideIcon: state.hideIcon,
         actionToolbar: state.actionToolbar,
         secondaryGroupStyle: state.secondaryGroupStyle,
@@ -358,6 +363,21 @@ const renderView = () => {
               .checked=${state.showGroup}
               @change=${(e: Event) =>
         setState({ showGroup: (e.target as HTMLInputElement).checked })}
+            />
+            <span class="lp-toggle-slider"></span>
+          </label>
+        </div>
+          <div class="lp-setting-row">
+          <div class="lp-setting-label">
+            <div class="lp-setting-name">Remember Action Search</div>
+            <div class="lp-setting-desc">Keep the action search term when the view reloads</div>
+          </div>
+          <label class="lp-setting-toggle">
+            <input
+              type="checkbox"
+              .checked=${state.rememberActionSearch}
+              @change=${(event: Event) =>
+        setState({ rememberActionSearch: (event.target as HTMLInputElement).checked })}
             />
             <span class="lp-toggle-slider"></span>
           </label>

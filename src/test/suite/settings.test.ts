@@ -9,6 +9,7 @@ suite('Settings View Test Suite', () => {
             codiconStyles: "",
             showCommand: true,
             showGroup: true,
+            rememberActionSearch: true,
             hideIcon: "trash",
             backupCount: 5,
             configExists: true,
@@ -24,6 +25,7 @@ suite('Settings View Test Suite', () => {
         // Check for state injection
         assert.ok(html.includes('window.__SETTINGS__'), 'Should inject initial settings');
         assert.ok(html.includes('"showCommand":true'), 'Should inject correct showCommand value');
+        assert.ok(html.includes('"rememberActionSearch":true'), 'Should inject correct rememberActionSearch value');
         assert.ok(html.includes('"hideIcon":"trash"'), 'Should inject correct hideIcon value');
 
         // Check for script loading
@@ -40,6 +42,7 @@ suite('Settings View Test Suite', () => {
             codiconStyles: "",
             showCommand: false,
             showGroup: false,
+            rememberActionSearch: false,
             hideIcon: "eye-closed",
             backupCount: 0,
             configExists: false,

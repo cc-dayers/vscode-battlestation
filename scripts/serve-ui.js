@@ -8,6 +8,7 @@ const port = 3000;
 // Mock VS Code API
 const mockVscodeApi = `
   window.__lastCommand = null;
+  window.__mockVscodeState = window.__mockVscodeState || window.__initialVscodeState || {};
   window.acquireVsCodeApi = () => {
     const api = {
       postMessage: (msg) => {
@@ -28,8 +29,8 @@ const mockVscodeApi = `
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 2000);
       },
-      getState: () => ({}),
-      setState: (state) => {}
+      getState: () => window.__mockVscodeState || {},
+      setState: (state) => { window.__mockVscodeState = state; }
     };
 
     window.addEventListener('mouseup', (e) => {
@@ -89,8 +90,11 @@ const indexHtml = `
           showType: true,
           showCommand: true,
           showGroup: true,
+          rememberActionSearch: true,
           hideIcon: 'eye-closed',
           playButtonBg: 'transparent',
+          actionToolbar: ['hide', 'setColor', 'edit', 'delete'],
+          secondaryGroupStyle: 'border',
           density: 'comfortable',
           useEmojiLoader: false,
           loaderEmoji: '🌯'
@@ -102,6 +106,12 @@ const indexHtml = `
           "Deploy Script": { exitCode: 1, timestamp: Date.now() - 5000 }
         }
       };
+      if (window.__mainDisplayOverrides) {
+        window.__INITIAL_DATA__.display = {
+          ...window.__INITIAL_DATA__.display,
+          ...window.__mainDisplayOverrides
+        };
+      }
     </script>
     <script type="module" src="/mainView.js"></script>
   </body>
@@ -125,6 +135,7 @@ const jobsHtml = `
     <script>
       ${mockVscodeApi}
       window.__JOBS_INITIAL_DATA__ = {
+        backgroundActivityPaused: false,
         jobs: [
           {
             jobId: "job-nightly-tests",
@@ -196,10 +207,149 @@ const battlesHtml = `
     <div id="root"></div>
     <script>
       ${mockVscodeApi}
-      window.__BATTLES_INITIAL_DATA__ = {
-        providers: [
-          {
-            providerId: "bb-prs",
+       window.__BATTLES_INITIAL_DATA__ = {
+         backgroundActivityPaused: false,
+         radar: {
+           updatedAt: Date.now() - 5_000,
+           counts: {
+             openBattles: 2,
+             awaitingReview: 1,
+             blockedSorties: 1,
+             activeAgents: 3
+           },
+           battles: [
+             {
+               id: "routed-auth-flow",
+               title: "Fix auth flow",
+               status: "active",
+               summary: "Awaiting review for \\"Patch auth workflow\\".",
+               commanderName: "Commander · Fix auth flow",
+               updatedAt: Date.now() - 5_000,
+               sortieCount: 2,
+               awaitingReviewCount: 1,
+               activeSortieCount: 2,
+               sorties: [
+                 {
+                   id: "sortie-auth-review",
+                   battleId: "routed-auth-flow",
+                   title: "Patch auth workflow",
+                   status: "awaiting_review",
+                   progressLabel: "Ready for commander review",
+                   summary: "Implemented the requested slice and verified it.",
+                   assignedAgentName: "Specialist · Fix auth flow",
+                   handoffTargetName: "Commander · Fix auth flow",
+                   updatedAt: Date.now() - 12_000,
+                   toolSummary: {
+                     total: 2,
+                     succeeded: 2,
+                     failed: 0,
+                     lastToolName: "read_file",
+                     lastStatus: "succeeded",
+                     lastRecordedAt: Date.now() - 12_000
+                   },
+                   action: {
+                     label: "Review",
+                     command: "reviewSortie",
+                     battleId: "routed-auth-flow",
+                     sortieId: "sortie-auth-review"
+                   }
+                 },
+                 {
+                   id: "sortie-auth-tests",
+                   battleId: "routed-auth-flow",
+                   title: "Verify targeted coverage",
+                   status: "planned",
+                   progressLabel: "Queued for specialist handoff",
+                   summary: "Derived from battle objective: Repair the auth flow before review.",
+                   updatedAt: Date.now() - 20_000,
+                   toolSummary: {
+                     total: 0,
+                     succeeded: 0,
+                     failed: 0
+                   },
+                   action: {
+                     label: "Continue",
+                     command: "runNextSortie",
+                     battleId: "routed-auth-flow",
+                     sortieId: "sortie-auth-tests"
+                   }
+                 }
+               ]
+             },
+             {
+               id: "routed-radar-ui",
+               title: "Stabilize radar vertical slice",
+               status: "blocked",
+               summary: "Review blocked for \\"Tighten regression coverage\\".",
+               blockedReason: "Needs stronger regression coverage.",
+               commanderName: "Commander · Stabilize radar vertical slice",
+               updatedAt: Date.now() - 45_000,
+               sortieCount: 1,
+               awaitingReviewCount: 0,
+               activeSortieCount: 1,
+               sorties: [
+                 {
+                   id: "sortie-radar-tests",
+                   battleId: "routed-radar-ui",
+                   title: "Tighten regression coverage",
+                   status: "blocked",
+                   progressLabel: "Blocked and waiting for explicit follow-up",
+                   summary: "Review blocked: Needs stronger regression coverage.",
+                   blockedReason: "Needs stronger regression coverage.",
+                   assignedAgentName: "Specialist · Stabilize radar vertical slice",
+                   handoffTargetName: "Specialist · Stabilize radar vertical slice",
+                   updatedAt: Date.now() - 45_000,
+                   toolSummary: {
+                     total: 1,
+                     succeeded: 0,
+                     failed: 1,
+                     lastToolName: "execute_command",
+                     lastStatus: "failed",
+                     lastRecordedAt: Date.now() - 60_000
+                   }
+                 }
+               ]
+             }
+           ],
+           agents: [
+             {
+               id: "commander-auth-flow",
+               displayName: "Commander · Fix auth flow",
+               role: "commander",
+               status: "ready",
+               battleTitle: "Fix auth flow",
+               note: "Awaiting review: Patch auth workflow",
+               updatedAt: Date.now() - 5_000,
+               lastHeartbeatAt: Date.now() - 5_000
+             },
+             {
+               id: "specialist-auth-flow",
+               displayName: "Specialist · Fix auth flow",
+               role: "specialist",
+               status: "ready",
+               battleTitle: "Fix auth flow",
+               activeSortieTitle: "Patch auth workflow",
+               note: "Awaiting review: Patch auth workflow",
+               updatedAt: Date.now() - 12_000,
+               lastHeartbeatAt: Date.now() - 12_000
+             },
+             {
+               id: "specialist-radar-ui",
+               displayName: "Specialist · Stabilize radar vertical slice",
+               role: "specialist",
+               status: "blocked",
+               battleTitle: "Stabilize radar vertical slice",
+               activeSortieTitle: "Tighten regression coverage",
+               note: "Review blocked: Tighten regression coverage",
+               blockedReason: "Needs stronger regression coverage.",
+               updatedAt: Date.now() - 45_000,
+               lastHeartbeatAt: Date.now() - 45_000
+             }
+           ]
+         },
+         providers: [
+           {
+             providerId: "bb-prs",
             providerName: "Bitbucket PRs",
             providerIcon: "git-pull-request",
             providerColor: "#0052CC",
@@ -368,14 +518,47 @@ const battleTestHtml = `
         provider: {
           id: "bb-prs",
           name: "Bitbucket PRs",
-          command: "bb-cli battles list --json",
+          command: "bb pr get --json --rpc",
           refreshInterval: 300
         },
         stdout: JSON.stringify({
-          battles: [
-            { id: "pr-123", title: "Fix auth flow", status: "active", priority: "high" },
-            { id: "pr-456", title: "Update CI", status: "active", priority: "medium" }
-          ]
+          ok: true,
+          command: "bb pr get",
+          result: {
+            spec: "bb.pull-request-work-item-feed/v1",
+            pullRequests: [
+              {
+                currentUserReviewStatus: "needs-review",
+                mentionCount: 1,
+                reviewStatus: {
+                  overallState: "changes-requested-open"
+                },
+                scopeReasons: ["review-requested"],
+                pullRequest: {
+                  id: 123,
+                  title: "Fix auth flow",
+                  url: "https://bitbucket.org/team/repo/pull-requests/123",
+                  state: "OPEN"
+                },
+                workItems: []
+              },
+              {
+                currentUserReviewStatus: "watching",
+                mentionCount: 0,
+                reviewStatus: {
+                  overallState: "approved-open"
+                },
+                scopeReasons: ["inbox"],
+                pullRequest: {
+                  id: 456,
+                  title: "Update CI",
+                  url: "https://bitbucket.org/team/repo/pull-requests/456",
+                  state: "OPEN"
+                },
+                workItems: []
+              }
+            ]
+          }
         }, null, 2),
         stderr: "",
         exitCode: 0,
@@ -490,12 +673,14 @@ const getSettingsHtml = (reqUrl) => {
         showType: true,
         showCommand: true,
         showGroup: true,
+        rememberActionSearch: ${parsedUrl.query.rememberActionSearch === 'false' ? 'false' : 'true'},
         hideIcon: 'eye-closed',
         backupCount: ${backupCount},
         configExists: ${configExists},
         usedIcons: ['package', 'terminal', 'play', 'gear', 'history', 'trash'],
         customConfigPath: null,
-        actionToolbar: ['hide', 'setColor', 'edit', 'delete']
+        actionToolbar: ['hide', 'setColor', 'edit', 'delete'],
+        secondaryGroupStyle: 'border'
       };
     </script>
     <script type="module" src="/settingsView.js"></script>

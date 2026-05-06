@@ -73,6 +73,23 @@ suite('Action Integration Test Suite', () => {
         assert.strictEqual(hiddenAction!.hidden, true, 'Should be hidden after update');
     });
 
+    test('group hiddenSubGroups is preserved through write/read round-trip', async function () {
+        this.timeout(10000);
+
+        const config = await configService.readConfig();
+        assert.ok(config.groups?.[0], 'Precondition: first group exists');
+
+        config.groups![0].hiddenSubGroups = ['workspace::Portal'];
+        await configService.writeConfig(config);
+
+        const updated = await configService.readConfig();
+        assert.deepStrictEqual(
+            updated.groups?.[0].hiddenSubGroups,
+            ['workspace::Portal'],
+            'Hidden subgroup metadata should be preserved on groups'
+        );
+    });
+
     test('deleting an action persists correctly', async function () {
         this.timeout(10000);
 

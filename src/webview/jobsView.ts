@@ -3,6 +3,7 @@ import type { JobRuntimeSnapshot } from "../types";
 
 interface JobsViewState {
   jobs: JobRuntimeSnapshot[];
+  backgroundActivityPaused: boolean;
   searchQuery: string;
 }
 
@@ -22,6 +23,8 @@ const root = document.getElementById("root");
 
 const state: JobsViewState = {
   jobs: window.__JOBS_INITIAL_DATA__?.jobs || [],
+  backgroundActivityPaused:
+    window.__JOBS_INITIAL_DATA__?.backgroundActivityPaused ?? false,
   searchQuery: "",
 };
 
@@ -164,6 +167,40 @@ function actionButtons(job: JobRuntimeSnapshot) {
   `;
 }
 
+function toggleBackgroundActivity(): void {
+  vscode.postMessage({
+    command: state.backgroundActivityPaused
+      ? "resumeBackgroundActivity"
+      : "pauseBackgroundActivity",
+  });
+}
+
+function renderToolbar() {
+  const paused = state.backgroundActivityPaused;
+  return html`
+    <div class="jobs-toolbar">
+      <div
+        class="jobs-toolbar__status ${paused
+          ? "jobs-toolbar__status--paused"
+          : "jobs-toolbar__status--running"}"
+        data-testid="jobs-background-activity-status"
+      >
+        <span class="codicon codicon-${paused ? "debug-pause" : "play"}"></span>
+        ${paused ? "Background activity paused" : "Background activity running"}
+      </div>
+      <div class="jobs-toolbar__actions">
+        <button
+          class="jobs-btn"
+          data-testid="jobs-toggle-background-activity-button"
+          @click=${toggleBackgroundActivity}
+        >
+          ${paused ? "Resume Background" : "Pause Background"}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 function renderView() {
   if (!root) {
     return;
@@ -176,6 +213,11 @@ function renderView() {
       <style>
         :host { color: var(--vscode-foreground); }
         .jobs-shell { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+        .jobs-toolbar { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+        .jobs-toolbar__status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--vscode-panel-border, rgba(127,127,127,0.2)); background: color-mix(in srgb, var(--vscode-editorWidget-background, var(--vscode-sideBar-background)) 92%, transparent); }
+        .jobs-toolbar__status--paused { color: var(--vscode-errorForeground, #f48771); }
+        .jobs-toolbar__status--running { color: var(--vscode-testing-iconPassed, #73c991); }
+        .jobs-toolbar__actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .jobs-search { width: 100%; box-sizing: border-box; border: 1px solid var(--vscode-input-border, transparent); background: var(--vscode-input-background); color: var(--vscode-input-foreground); padding: 8px 10px; border-radius: 6px; }
         .jobs-list { display: flex; flex-direction: column; gap: 10px; content-visibility: auto; }
         .jobs-card { border: 1px solid var(--vscode-panel-border, rgba(127,127,127,0.2)); background: var(--vscode-sideBar-background); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -193,6 +235,7 @@ function renderView() {
         .jobs-empty { border: 1px dashed var(--vscode-panel-border, rgba(127,127,127,0.2)); border-radius: 8px; padding: 16px; color: var(--vscode-descriptionForeground); text-align: center; }
       </style>
       <div class="jobs-shell">
+        ${renderToolbar()}
         <input class="jobs-search" type="search" placeholder="Search jobs" .value=${state.searchQuery} @input=${(event: InputEvent) => { state.searchQuery = (event.target as HTMLInputElement).value; renderView(); }} />
         <div class="jobs-list">
           ${jobs.length === 0
@@ -236,6 +279,9 @@ window.addEventListener("message", (event) => {
   const msg = event.data;
   if (msg.type === "update") {
     state.jobs = msg.data.jobs || [];
+    if (typeof msg.data?.backgroundActivityPaused === "boolean") {
+      state.backgroundActivityPaused = msg.data.backgroundActivityPaused;
+    }
     renderView();
   }
 });

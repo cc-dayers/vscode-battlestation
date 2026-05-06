@@ -9,7 +9,7 @@
     "url": "https://github.com/cc-dayers/vscode-battlestation"
   },
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.104.0"
   },
   "categories": [
     "Other"
@@ -25,12 +25,6 @@
         "title": "Battlestation: Open Panel",
         "shortTitle": "$(rocket) Open Panel",
         "icon": "$(rocket)"
-      },
-      {
-        "command": "battlestation.openBattles",
-        "title": "Battlestation: Open Battles",
-        "shortTitle": "$(checklist) Open Battles",
-        "icon": "$(checklist)"
       },
       {
         "command": "battlestation.refresh",
@@ -67,18 +61,6 @@
         "title": "Battlestation: Add Group",
         "shortTitle": "$(new-folder) Add Group",
         "icon": "$(new-folder)"
-      },
-      {
-        "command": "battlestation.addBattleProvider",
-        "title": "Battlestation: Add Battle Provider",
-        "shortTitle": "$(add) Add Battle Provider",
-        "icon": "$(add)"
-      },
-      {
-        "command": "battlestation.testBattleProvider",
-        "title": "Battlestation: Test Battle Provider",
-        "shortTitle": "$(beaker) Test Battle Provider",
-        "icon": "$(beaker)"
       },
       {
         "command": "battlestation.toggleSearch",
@@ -145,6 +127,18 @@
         "title": "Battlestation: Open Job Admin",
         "shortTitle": "$(info) Job Admin",
         "icon": "$(info)"
+      },
+      {
+        "command": "battlestation.pauseBackgroundActivity",
+        "title": "Battlestation: Pause Background Activity",
+        "shortTitle": "$(debug-pause) Pause Background",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "battlestation.resumeBackgroundActivity",
+        "title": "Battlestation: Resume Background Activity",
+        "shortTitle": "$(debug-continue) Resume Background",
+        "icon": "$(debug-continue)"
       }
     ],
     "viewsContainers": {
@@ -168,17 +162,11 @@
         },
         {
           "type": "webview",
-          "id": "battlestation.battles",
-          "name": "Battles",
-          "icon": "media/icon.svg",
-          "contextualTitle": "Battles"
-        },
-        {
-          "type": "webview",
           "id": "battlestation.jobs",
           "name": "Jobs",
           "icon": "media/icon.svg",
-          "contextualTitle": "Jobs"
+          "contextualTitle": "Jobs",
+          "when": "battlestation.experimental.jobs"
         }
       ]
     },
@@ -257,27 +245,12 @@
         {
           "command": "battlestation.openSettings",
           "when": "view == battlestation.view && battlestation.isLoaded",
-          "group": "navigation@8"
-        },
-        {
-          "command": "battlestation.openBattles",
-          "when": "view == battlestation.view",
-          "group": "navigation@9"
+          "group": "navigation@12"
         },
         {
           "command": "battlestation.openJobs",
-          "when": "view == battlestation.view",
-          "group": "navigation@10"
-        },
-        {
-          "command": "battlestation.addBattleProvider",
-          "when": "view == battlestation.battles",
-          "group": "navigation@1"
-        },
-        {
-          "command": "battlestation.openJobs",
-          "when": "view == battlestation.battles",
-          "group": "navigation@2"
+          "when": "view == battlestation.view && battlestation.experimental.jobs",
+          "group": "navigation@11"
         },
         {
           "command": "battlestation.runJobNow",
@@ -295,9 +268,14 @@
           "group": "navigation@3"
         },
         {
-          "command": "battlestation.openBattles",
-          "when": "view == battlestation.jobs",
-          "group": "navigation@4"
+          "command": "battlestation.pauseBackgroundActivity",
+          "when": "view == battlestation.jobs && !battlestation.backgroundActivityPaused",
+          "group": "navigation@5"
+        },
+        {
+          "command": "battlestation.resumeBackgroundActivity",
+          "when": "view == battlestation.jobs && battlestation.backgroundActivityPaused",
+          "group": "navigation@5"
         }
       ],
       "commandPalette": [
@@ -310,16 +288,8 @@
           "when": "battlestation.experimental.workflows"
         },
         {
-          "command": "battlestation.openBattles"
-        },
-        {
-          "command": "battlestation.addBattleProvider"
-        },
-        {
-          "command": "battlestation.testBattleProvider"
-        },
-        {
-          "command": "battlestation.openJobs"
+          "command": "battlestation.openJobs",
+          "when": "battlestation.experimental.jobs"
         },
         {
           "command": "battlestation.runJobNow"
@@ -335,6 +305,12 @@
         },
         {
           "command": "battlestation.openJobAdmin"
+        },
+        {
+          "command": "battlestation.pauseBackgroundActivity"
+        },
+        {
+          "command": "battlestation.resumeBackgroundActivity"
         }
       ]
     },
@@ -350,6 +326,11 @@
           "type": "boolean",
           "default": true,
           "description": "Show group headers in the panel"
+        },
+        "battlestation.display.rememberActionSearch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Remember the action search term while the Battlestation view is open. Disable to clear action search when the view reloads."
         },
         "battlestation.display.hideIcon": {
           "type": "string",
@@ -419,6 +400,11 @@
           ],
           "default": "border",
           "description": "How to style secondary widget groupings (e.g. by workspace)."
+        },
+        "battlestation.experimental.jobs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable the experimental scheduled jobs runner and Jobs view."
         }
       }
     }
@@ -453,7 +439,7 @@
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.11.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.104.0",
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
     "@vscode/codicons": "^0.0.44",

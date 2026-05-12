@@ -129,11 +129,9 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       ],
     };
 
-    // Show loading view immediately while initializing
+    // Show minimal empty body while resolving config to avoid flicker
     const cspSource = webviewView.webview.cspSource;
     const nonce = getNonce();
-
-    webviewView.webview.html = renderLoadingView(cspSource, nonce, {});
 
     // Set up context after first render
     void this.configService.getConfigStatus().then((status) => {
@@ -460,7 +458,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
       clearTimeout(this.refreshTimeout);
     }
 
-    this.refreshTimeout = setTimeout(async () => {
+    const doRefresh = async () => {
       if (!this.view) {
         return;
       }
@@ -597,7 +595,14 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
         this._currentViewMode = "main";
         this.view.webview.html = this.renderMain(config, cspSource, nonce, newActionNames);
       }
-    }, 100);
+    };
+
+    if (!this.view?.webview.html) {
+      // First load, don't debounce, make it instant
+      void doRefresh();
+    } else {
+      this.refreshTimeout = setTimeout(doRefresh, 100);
+    }
   }
 
   private _currentViewMode: string | boolean = false;

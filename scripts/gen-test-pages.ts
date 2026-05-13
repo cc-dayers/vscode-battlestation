@@ -138,6 +138,21 @@ const generateConfigHtml = renderGenerateConfigView({
 fs.writeFileSync(path.join(outDir, 'generate-config.html'), generateConfigHtml);
 console.log('✓ generate-config.html');
 
+// ── Generate Config Welcome View ─────────────────────────────────
+const generateConfigWelcomeHtml = renderGenerateConfigView({
+  cspSource: CSP,
+  nonce: NONCE,
+  codiconStyles: CODICON,
+  hasNpm: true,
+  hasTasks: true,
+  hasLaunch: true,
+  hasWorkspace: true,
+  showWelcome: true,
+  isFirstTimer: true,
+}).replace('</head>', mockVscodeApi + '</head>');
+fs.writeFileSync(path.join(outDir, 'generate-config-welcome.html'), generateConfigWelcomeHtml);
+console.log('✓ generate-config-welcome.html');
+
 // ── Workflow Builder View ───────────────────────────────────────
 const workflowActions: Action[] = [
   { id: 'action-build', name: 'Build Project', command: 'npm run build', type: 'npm', group: 'Build' },

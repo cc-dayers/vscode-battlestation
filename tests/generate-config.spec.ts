@@ -89,3 +89,44 @@ test.describe('Generate Config View', () => {
     });
   });
 });
+
+test.describe('Generate Config Welcome Animation', () => {
+  test('first-timer battle animation is one-shot and keeps its DOM node', async ({ page }) => {
+    await page.goto('/generate-config-welcome');
+    await page.waitForSelector('.lp-battle-word');
+
+    const initial = await page.evaluate(() => {
+      const battleWord = document.querySelector('.lp-battle-word');
+      if (!(battleWord instanceof HTMLElement)) {
+        throw new Error('Battle word was not rendered');
+      }
+
+      (window as any).__battleWordNode = battleWord;
+      const style = getComputedStyle(battleWord);
+      return {
+        animationName: style.animationName,
+        animationIterationCount: style.animationIterationCount
+      };
+    });
+
+    expect(initial.animationName).toContain('textShake');
+    expect(initial.animationIterationCount).toBe('1');
+
+    await page.waitForTimeout(1700);
+
+    const afterOpening = await page.evaluate(() => {
+      const battleWord = document.querySelector('.lp-battle-word');
+      if (!(battleWord instanceof HTMLElement)) {
+        throw new Error('Battle word was not rendered after opening animation');
+      }
+
+      return {
+        sameNode: battleWord === (window as any).__battleWordNode,
+        opacity: getComputedStyle(battleWord).opacity
+      };
+    });
+
+    expect(afterOpening.sameNode).toBe(true);
+    expect(Number(afterOpening.opacity)).toBeGreaterThan(0.9);
+  });
+});

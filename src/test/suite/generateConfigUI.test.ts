@@ -1,4 +1,6 @@
 import * as assert from 'assert';
+import * as fs from 'fs';
+import * as path from 'path';
 import { renderGenerateConfigView, GenerateConfigContext, EnhancedModeContext } from '../../views/generateConfigView';
 
 suite('Generate Config UI Test Suite', () => {
@@ -113,6 +115,17 @@ suite('Generate Config UI Test Suite', () => {
         assert.ok(html.includes("message?.type === 'configGenerationStarted'"), 'Should handle generation started message');
         assert.ok(html.includes("message?.type === 'configGenerationComplete'"), 'Should handle generation complete message');
         assert.ok(html.includes('setGenerationLoading(true);'), 'Should enable generation loading when creating config');
+    });
+
+    test('Should guard identical no-config refreshes from restarting welcome animation', () => {
+        const source = fs.readFileSync(path.join(__dirname, '../../..', 'src', 'view.ts'), 'utf8');
+
+        assert.ok(source.includes('private lastNoConfigRenderKey?: string;'), 'Provider should track no-config render state');
+        assert.ok(source.includes('const noConfigRenderKey = JSON.stringify({'), 'No-config render should use a stable key');
+        assert.ok(
+            source.includes('this._currentViewMode === "noConfig" && this.lastNoConfigRenderKey === noConfigRenderKey'),
+            'Identical no-config refreshes should skip replacing webview.html'
+        );
     });
 
     test('Should emit browser-valid script for generate interactions', () => {

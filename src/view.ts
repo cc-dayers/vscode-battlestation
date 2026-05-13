@@ -430,6 +430,7 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
   /* ─── refresh / render ─── */
 
   private refreshTimeout?: NodeJS.Timeout;
+  private lastNoConfigRenderKey?: string;
 
   public async syncAndRefresh() {
     await vscode.window.withProgress(
@@ -504,7 +505,6 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
       if (!exists) {
         this.showingForm = false;
-        this._currentViewMode = "noConfig";
         const codiconStyles = this.getCodiconStyles();
         const hasWorkspace = (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
 
@@ -519,6 +519,20 @@ export class BattlestationViewProvider implements vscode.WebviewViewProvider {
 
         // Allow forcing the first-timer welcome screen via environment variable for debugging
         const isFirstTimer = !hasHistory || process.env.BATTLESTATION_FORCE_FIRST_TIMER === 'true';
+        const noConfigRenderKey = JSON.stringify({
+          hasWorkspace,
+          hasNpm,
+          hasTasks,
+          hasLaunch,
+          isFirstTimer,
+        });
+
+        if (this._currentViewMode === "noConfig" && this.lastNoConfigRenderKey === noConfigRenderKey) {
+          return;
+        }
+
+        this._currentViewMode = "noConfig";
+        this.lastNoConfigRenderKey = noConfigRenderKey;
 
         this.view.webview.html = renderGenerateConfigView({
           cspSource,
